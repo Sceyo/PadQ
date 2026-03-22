@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../CSS/Homepage.css';
 
 function HomePage() {
   const navigate = useNavigate();
+  const [apiStatus, setApiStatus] = useState('');
+
+  useEffect(() => {
+    fetch(`${process.env.REACT_APP_API_URL}/`)
+      .then(res => res.json())
+      .then(data => setApiStatus(data.message))
+      .catch(err => setApiStatus('Failed to connect to backend'));
+  }, []);
 
   const handleModeSelect = (mode) => {
- 
     navigate(`/queue/${mode}`);
   };
 
@@ -23,6 +30,9 @@ function HomePage() {
         <button className="mode-btn doubles" onClick={() => handleModeSelect('doubles')}>
           Doubles Mode
         </button>
+      </div>
+      <div className="api-status">
+        <small>Backend: {apiStatus || 'Loading...'}</small>
       </div>
     </div>
   );
