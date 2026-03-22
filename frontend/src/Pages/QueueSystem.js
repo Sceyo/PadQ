@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import '../CSS/QueueSystem.css';
 
-const API_URL = 'http://localhost:5000/api';
+const API_URL = '';
 
 function QueueSystem() {
   const { mode: gameMode } = useParams(); // 'singles' or 'doubles'
