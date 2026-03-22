@@ -1,14 +1,39 @@
 {
   "builds": [
     {
+      "src": "frontend/package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "build" }
+    },
+    {
       "src": "backend/app.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
-      "src": "/(.*)",
+      "src": "/mode",
       "dest": "backend/app.py"
+    },
+    {
+      "src": "/players",
+      "dest": "backend/app.py"
+    },
+    {
+      "src": "/queue",
+      "dest": "backend/app.py"
+    },
+    {
+      "src": "/match/(.*)",
+      "dest": "backend/app.py"
+    },
+    {
+      "src": "/randomize",
+      "dest": "backend/app.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "frontend/build/$1"
     }
   ]
 }

@@ -10,6 +10,10 @@ game_mode = None          # 'singles' or 'doubles'
 players = []              # list of player names
 queue = []                # current queue order
 
+@app.route('/')
+def home():
+    return jsonify({"message": "Queue System API is running"})
+
 # Helper functions (your queue logic from earlier)
 def init_queue():
     global queue
@@ -56,7 +60,7 @@ def play_doubles(team_a, team_b, winning_team):  # winning_team = 'A' or 'B'
 
 # API endpoints
 
-@app.route('/api/mode', methods=['POST'])
+@app.route('/mode', methods=['POST'])
 def set_mode():
     global game_mode
     data = request.get_json()
@@ -66,7 +70,7 @@ def set_mode():
     game_mode = mode
     return jsonify({'mode': game_mode})
 
-@app.route('/api/players', methods=['POST'])
+@app.route('/players', methods=['POST'])
 def set_players():
     global players, queue
     data = request.get_json()
@@ -77,11 +81,11 @@ def set_players():
     init_queue()  # Randomize initial queue
     return jsonify({'players': players, 'queue': queue})
 
-@app.route('/api/queue', methods=['GET'])
+@app.route('/queue', methods=['GET'])
 def get_queue():
     return jsonify({'queue': queue, 'mode': game_mode})
 
-@app.route('/api/match/singles', methods=['POST'])
+@app.route('/match/singles', methods=['POST'])
 def match_singles():
     if game_mode != 'singles':
         return jsonify({'error': 'Not in singles mode'}), 400
@@ -94,7 +98,7 @@ def match_singles():
         return jsonify({'error': result}), 400
     return jsonify({'queue': result})
 
-@app.route('/api/match/doubles', methods=['POST'])
+@app.route('/match/doubles', methods=['POST'])
 def match_doubles():
     if game_mode != 'doubles':
         return jsonify({'error': 'Not in doubles mode'}), 400
@@ -113,7 +117,7 @@ def match_doubles():
         return jsonify({'error': result}), 400
     return jsonify({'queue': result})
 
-@app.route('/api/randomize', methods=['POST'])
+@app.route('/randomize', methods=['POST'])
 def randomize_queue():
     global queue
     if not players:
