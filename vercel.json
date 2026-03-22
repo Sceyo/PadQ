@@ -16,6 +16,7 @@
     { "src": "/queue", "dest": "backend/app.py" },
     { "src": "/match/(.*)", "dest": "backend/app.py" },
     { "src": "/randomize", "dest": "backend/app.py" },
+    { "src": "/", "dest": "/index.html" },
     { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
