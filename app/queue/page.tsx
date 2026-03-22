@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import useQueue from '@/hooks/useQueue';
 import './QueueSystem.css';
@@ -245,16 +245,12 @@ const WinnerModal: React.FC<{
   );
 };
 
-// Main component
-export default function QueueSystem() {
+// Inner component that uses useSearchParams
+function QueueSystemContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  if (!searchParams) {
-    return <div>Loading...</div>;
-  }
-
-  const mode = searchParams.get('mode');
+  const mode = searchParams?.get('mode');  
   const gameModeFromUrl = (mode === 'singles' || mode === 'doubles') ? mode : null;
 
   const {
@@ -780,5 +776,14 @@ export default function QueueSystem() {
         setAutoClose={setAutoClose}
       />
     </div>
+  );
+}
+
+// Main export with Suspense boundary
+export default function QueueSystem() {
+  return (
+    <Suspense fallback={<div>Loading queue system...</div>}>
+      <QueueSystemContent />
+    </Suspense>
   );
 }
