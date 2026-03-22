@@ -11,12 +11,13 @@
     }
   ],
   "routes": [
-    { "src": "/mode", "dest": "backend/app.py" },
-    { "src": "/players", "dest": "backend/app.py" },
-    { "src": "/queue", "dest": "backend/app.py" },
-    { "src": "/match/(.*)", "dest": "backend/app.py" },
-    { "src": "/randomize", "dest": "backend/app.py" },
-    { "src": "/", "dest": "/index.html" },
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "src": "^/mode$", "dest": "backend/app.py" },
+    { "src": "^/players$", "dest": "backend/app.py" },
+    { "src": "^/queue$", "dest": "backend/app.py" },
+    { "src": "^/match/(.*)", "dest": "backend/app.py" },
+    { "src": "^/randomize$", "dest": "backend/app.py" },
+
+    { "src": "^/$", "dest": "/index.html" },
+    { "src": "^(?!/mode|/players|/queue|/match|/randomize).*", "dest": "/index.html" }
   ]
 }
