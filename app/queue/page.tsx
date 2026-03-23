@@ -2,7 +2,11 @@
 
 import React, { useState, useEffect, useMemo, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import useQueue from '@/hooks/useQueue';
+import useQueue, {
+  suggestNextDoublesMatch,
+  suggestNextSinglesMatch,
+  PlayAllSuggestion,
+} from '@/hooks/useQueue';
 import './QueueSystem.css';
 
 // Types for match history entries
@@ -23,7 +27,9 @@ interface TournamentMatch {
   winner: string | null;
 }
 
-// Helper components (unchanged)
+// ---------------------------------------------------------------------------
+// Helper table components
+// ---------------------------------------------------------------------------
 const SinglesTable: React.FC<{ queue: string[] }> = ({ queue }) => {
   const pairs: { match: number; p1: string; p2: string }[] = [];
   for (let i = 0; i < queue.length; i += 2) {
@@ -106,24 +112,36 @@ const DoublesTable: React.FC<{ queue: string[] }> = ({ queue }) => {
   );
 };
 
+// ---------------------------------------------------------------------------
+// DoublesMatch — supports optional Play-All suggested teams
+// ---------------------------------------------------------------------------
 const DoublesMatch: React.FC<{
   firstFour: string[];
+  suggestedTeamA?: [string, string] | null;
+  suggestedTeamB?: [string, string] | null;
+  playAllScore?: number | null;
   onMatch: (teamA: string[], teamB: string[], winningTeam: 'A' | 'B') => void;
-}> = ({ firstFour, onMatch }) => {
+}> = ({ firstFour, suggestedTeamA, suggestedTeamB, playAllScore, onMatch }) => {
   const [teamA, setTeamA] = useState<string[]>([]);
   const [teamB, setTeamB] = useState<string[]>([]);
   const [winningTeam, setWinningTeam] = useState<'A' | 'B' | null>(null);
 
+  // Apply suggested teams whenever the suggestion or first-four changes
   useEffect(() => {
     if (firstFour.length === 4) {
-      setTeamA([firstFour[0], firstFour[1]]);
-      setTeamB([firstFour[2], firstFour[3]]);
+      if (suggestedTeamA && suggestedTeamB) {
+        setTeamA([...suggestedTeamA]);
+        setTeamB([...suggestedTeamB]);
+      } else {
+        setTeamA([firstFour[0], firstFour[1]]);
+        setTeamB([firstFour[2], firstFour[3]]);
+      }
     } else {
       setTeamA([]);
       setTeamB([]);
     }
     setWinningTeam(null);
-  }, [firstFour]);
+  }, [firstFour, suggestedTeamA, suggestedTeamB]);
 
   const togglePlayer = (player: string) => {
     if (teamA.includes(player)) {
@@ -153,9 +171,26 @@ const DoublesMatch: React.FC<{
     onMatch(teamA, teamB, winningTeam);
   };
 
+  const isPlayAllSuggested = suggestedTeamA != null && suggestedTeamB != null;
+
   return (
     <div className="match-section">
       <h3>Next Match: Form Teams</h3>
+
+      {/* Play-All badge */}
+      {isPlayAllSuggested && (
+        <div className="playall-badge">
+          <span className="playall-icon">✨</span>
+          <span>
+            Teams suggested for maximum novelty
+            {playAllScore === 0 && ' — all new pairings!'}
+            {playAllScore !== null && playAllScore !== undefined && playAllScore > 0 && (
+              <span className="playall-score"> (repeat score: {playAllScore})</span>
+            )}
+          </span>
+        </div>
+      )}
+
       <p>Players: {firstFour.join(', ')}</p>
       <div className="team-display">
         <strong>Team A:</strong> {teamA.join(', ') || 'None'} <br />
@@ -203,6 +238,9 @@ const DoublesMatch: React.FC<{
   );
 };
 
+// ---------------------------------------------------------------------------
+// Winner modal
+// ---------------------------------------------------------------------------
 const WinnerModal: React.FC<{
   isOpen: boolean;
   winner: string;
@@ -245,31 +283,36 @@ const WinnerModal: React.FC<{
   );
 };
 
-// Inner component that uses useSearchParams
+// ---------------------------------------------------------------------------
+// Inner component
+// ---------------------------------------------------------------------------
 function QueueSystemContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const mode = searchParams?.get('mode');  
+  const mode = searchParams?.get('mode');
   const gameModeFromUrl = (mode === 'singles' || mode === 'doubles') ? mode : null;
 
   const {
     gameMode,
     players,
     queue,
+    playAllRel,
     setGameMode,
     setPlayers,
     playSingles,
     playDoubles,
     randomizeQueue,
     setQueue,
+    recordPlayAllDoubles,
+    recordPlayAllSingles,
+    resetPlayAllRelationships,
   } = useQueue();
 
   // Local UI state
   const [tempPlayers, setTempPlayers] = useState<string[]>([]);
   const [currentName, setCurrentName] = useState('');
   const [matchHistory, setMatchHistory] = useState<MatchHistoryEntry[]>([]);
-  const [recentPairs, setRecentPairs] = useState<string[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalWinner, setModalWinner] = useState('');
   const [autoClose, setAutoClose] = useState(false);
@@ -282,10 +325,53 @@ function QueueSystemContent() {
   const [tournamentActive, setTournamentActive] = useState(false);
   const [tournamentWinner, setTournamentWinner] = useState<string | null>(null);
 
-  // Memoize first four players to prevent infinite loop
+  // ---------------------------------------------------------------------------
+  // Play-All suggestion — recomputed whenever queue or relationships change.
+  //
+  // For doubles: we compute the best group-of-4 + team split and, if the
+  // suggestion would reorder the queue, we apply that reorder immediately so
+  // that firstFourPlayers always reflects the freshest match.
+  //
+  // For singles: we compute the best opponent for queue[0] and reorder if
+  // needed.
+  // ---------------------------------------------------------------------------
+  const playAllSuggestion = useMemo<PlayAllSuggestion | null>(() => {
+    if (queueMode !== 'playall' || gameMode !== 'doubles') return null;
+    return suggestNextDoublesMatch(queue, playAllRel);
+  }, [queueMode, gameMode, queue, playAllRel]);
+
+  // Apply doubles queue reorder when the suggestion differs from the current front
+  useEffect(() => {
+    if (!playAllSuggestion) return;
+    const suggested = playAllSuggestion.reorderedQueue;
+    // Only reorder if the front-4 actually changed
+    const currentFront = queue.slice(0, 4).join(',');
+    const suggestedFront = suggested.slice(0, 4).join(',');
+    if (currentFront !== suggestedFront) {
+      setQueue(suggested);
+    }
+    // We intentionally only depend on the suggestion, not `queue` directly,
+    // to avoid a re-render loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playAllSuggestion]);
+
+  // Singles Play-All: reorder queue so the freshest opponent is at position 1
+  useEffect(() => {
+    if (queueMode !== 'playall' || gameMode !== 'singles' || queue.length < 2) return;
+    const result = suggestNextSinglesMatch(queue, playAllRel);
+    if (!result) return;
+    const currentFront = queue.slice(0, 2).join(',');
+    const suggestedFront = result.reorderedQueue.slice(0, 2).join(',');
+    if (currentFront !== suggestedFront) {
+      setQueue(result.reorderedQueue);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playAllRel, queueMode, gameMode]);
+
+  // Memoize first four players
   const firstFourPlayers = useMemo(() => queue.slice(0, 4), [queue]);
 
-  // Apply dark mode class
+  // Apply dark mode
   useEffect(() => {
     if (darkMode) {
       document.body.classList.add('dark-mode');
@@ -303,7 +389,9 @@ function QueueSystemContent() {
     }
   }, [gameModeFromUrl, setGameMode, router]);
 
+  // ---------------------------------------------------------------------------
   // Player input handlers
+  // ---------------------------------------------------------------------------
   const addPlayer = () => {
     const trimmed = currentName.trim();
     if (!trimmed) return;
@@ -331,10 +419,9 @@ function QueueSystemContent() {
       return;
     }
     try {
-      setPlayers(tempPlayers);
+      setPlayers(tempPlayers); // also resets playAllRel
       setTempPlayers([]);
       setMatchHistory([]);
-      setRecentPairs([]);
       setTournamentActive(false);
       setTournamentWinner(null);
       setTournamentMatches([]);
@@ -344,6 +431,9 @@ function QueueSystemContent() {
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Tournament helpers (unchanged)
+  // ---------------------------------------------------------------------------
   const initTournament = (playerList: string[]) => {
     const shuffled = [...playerList];
     for (let i = shuffled.length - 1; i > 0; i--) {
@@ -353,13 +443,13 @@ function QueueSystemContent() {
     const matches: TournamentMatch[] = [];
     for (let i = 0; i < shuffled.length; i += 2) {
       const player2 = shuffled[i + 1] || null;
-      const winner = player2 === null ? shuffled[i] : null; // auto‑win for bye
+      const winner = player2 === null ? shuffled[i] : null;
       matches.push({
         id: Date.now() + i,
         round: 0,
         player1: shuffled[i],
-        player2: player2,
-        winner: winner,
+        player2,
+        winner,
       });
     }
     setTournamentMatches(matches);
@@ -373,29 +463,25 @@ function QueueSystemContent() {
     );
     setTournamentMatches(updatedMatches);
 
-    // Add to history
     const newEntry: MatchHistoryEntry = {
       id: Date.now(),
       mode: 'Tournament',
       players: `${match.player1} vs ${match.player2 || 'Bye'}`,
-      winner: winner,
+      winner,
       timestamp: new Date().toLocaleTimeString(),
     };
     setMatchHistory(prev => [newEntry, ...prev]);
 
-    // Group matches by round
     const matchesByRound: { [round: number]: TournamentMatch[] } = {};
     updatedMatches.forEach(m => {
       if (!matchesByRound[m.round]) matchesByRound[m.round] = [];
       matchesByRound[m.round].push(m);
     });
 
-    // Find the smallest round that still has an unfinished match
     const roundsWithUnfinished = Object.keys(matchesByRound)
       .map(Number)
       .filter(round => matchesByRound[round].some(m => !m.winner));
 
-    // If no unfinished matches remain, the tournament is complete
     if (roundsWithUnfinished.length === 0) {
       const champion = updatedMatches[updatedMatches.length - 1]?.winner;
       setTournamentWinner(champion);
@@ -408,8 +494,6 @@ function QueueSystemContent() {
     const matchesInCurrentRound = matchesByRound[currentRound];
     const allFinished = matchesInCurrentRound.every(m => m.winner !== null);
 
-    // When the current round is fully finished and there are multiple matches,
-    // create the next round
     if (allFinished && matchesInCurrentRound.length > 1) {
       const winners = matchesInCurrentRound.map(m => m.winner as string);
       const nextRound = currentRound + 1;
@@ -433,53 +517,37 @@ function QueueSystemContent() {
     } else {
       try {
         randomizeQueue();
-        if (queueMode === 'playall') setRecentPairs([]);
+        // In Play-All mode, reset relationship history on a manual reshuffle
+        // so the new random order gets a fresh slate.
+        if (queueMode === 'playall') resetPlayAllRelationships();
       } catch (err) {
         alert((err as Error).message);
       }
     }
   };
 
-  const enforcePlayAll = (currentQueue: string[]): string[] => {
-    if (queueMode !== 'playall' || currentQueue.length < 2) return currentQueue;
-    const nextPair = [currentQueue[0], currentQueue[1]];
-    const pairKey = nextPair.sort().join('|');
-    if (recentPairs.includes(pairKey)) {
-      const newQueue = [...currentQueue];
-      const second = newQueue[1];
-      newQueue.splice(1, 1);
-      const randomIndex = Math.floor(Math.random() * (newQueue.length - 1)) + 2;
-      newQueue.splice(randomIndex, 0, second);
-      return newQueue;
-    }
-    return currentQueue;
-  };
-
+  // ---------------------------------------------------------------------------
+  // Match handlers
+  // ---------------------------------------------------------------------------
   const handleSinglesMatch = (winner: string) => {
     try {
+      const p1 = queue[0];
+      const p2 = queue[1];
+
       playSingles(winner);
-      const newQueue = [...queue];
-      const [p1, p2] = newQueue;
-      newQueue.splice(0, 2);
-      const loser = winner === p1 ? p2 : p1;
-      newQueue.unshift(loser);
-      newQueue.push(winner);
-      let finalQueue = newQueue;
-      if (queueMode === 'playall') finalQueue = enforcePlayAll(newQueue);
-      if (finalQueue !== newQueue) setQueue(finalQueue);
 
       const newEntry: MatchHistoryEntry = {
         id: Date.now(),
         mode: 'Singles',
-        players: `${queue[0]} vs ${queue[1]}`,
-        winner: winner,
+        players: `${p1} vs ${p2}`,
+        winner,
         timestamp: new Date().toLocaleTimeString(),
       };
       setMatchHistory(prev => [newEntry, ...prev]);
 
+      // Record for Play-All AFTER updating queue state
       if (queueMode === 'playall') {
-        const pairKey = [queue[0], queue[1]].sort().join('|');
-        setRecentPairs(prev => [...prev, pairKey]);
+        recordPlayAllSingles(p1, p2);
       }
 
       setModalWinner(`${winner} wins!`);
@@ -491,18 +559,14 @@ function QueueSystemContent() {
 
   const handleDoublesMatch = (teamA: string[], teamB: string[], winningTeam: 'A' | 'B') => {
     try {
-      playDoubles(teamA, teamB, winningTeam);
-      const newQueue = [...queue];
-      newQueue.splice(0, 4);
-      const winners = winningTeam === 'A' ? teamA : teamB;
-      const losers = winningTeam === 'A' ? teamB : teamA;
-      const updatedQueue = [...losers, ...newQueue, ...winners];
-      let finalQueue = updatedQueue;
-      if (queueMode === 'playall') finalQueue = enforcePlayAll(updatedQueue);
-      if (finalQueue !== updatedQueue) setQueue(finalQueue);
+      // Snapshot teams before state updates
+      const snapshotTeamA = [...teamA];
+      const snapshotTeamB = [...teamB];
 
-      const winnerNames = winningTeam === 'A' ? teamA.join(' & ') : teamB.join(' & ');
-      const playersStr = `${teamA.join(' & ')} vs ${teamB.join(' & ')}`;
+      playDoubles(snapshotTeamA, snapshotTeamB, winningTeam);
+
+      const winnerNames = winningTeam === 'A' ? snapshotTeamA.join(' & ') : snapshotTeamB.join(' & ');
+      const playersStr = `${snapshotTeamA.join(' & ')} vs ${snapshotTeamB.join(' & ')}`;
       const newEntry: MatchHistoryEntry = {
         id: Date.now(),
         mode: 'Doubles',
@@ -512,9 +576,9 @@ function QueueSystemContent() {
       };
       setMatchHistory(prev => [newEntry, ...prev]);
 
+      // Record for Play-All — this triggers the suggestion to recompute
       if (queueMode === 'playall') {
-        const allPlayers = [...teamA, ...teamB].sort().join('|');
-        setRecentPairs(prev => [...prev, allPlayers]);
+        recordPlayAllDoubles(snapshotTeamA, snapshotTeamB);
       }
 
       setModalWinner(`${winnerNames} win!`);
@@ -533,9 +597,13 @@ function QueueSystemContent() {
       setTournamentWinner(null);
       setTournamentMatches([]);
     }
+    // When entering Play-All fresh, clear any leftover relationship data
+    if (mode === 'playall') resetPlayAllRelationships();
   };
 
+  // ---------------------------------------------------------------------------
   // Player input screen
+  // ---------------------------------------------------------------------------
   if (players.length === 0) {
     return (
       <div className={`queue-system setup-page ${darkMode ? 'dark' : ''}`}>
@@ -617,7 +685,9 @@ function QueueSystemContent() {
     </div>
   );
 
+  // ---------------------------------------------------------------------------
   // Tournament view
+  // ---------------------------------------------------------------------------
   if (queueMode === 'tournament' && tournamentActive) {
     const matchesByRound: { [round: number]: TournamentMatch[] } = {};
     tournamentMatches.forEach(m => {
@@ -707,7 +777,9 @@ function QueueSystemContent() {
     );
   }
 
-  // Regular queue view
+  // ---------------------------------------------------------------------------
+  // Regular queue view (Default + Play-All)
+  // ---------------------------------------------------------------------------
   return (
     <div className={`queue-system game-view ${darkMode ? 'dark' : ''}`}>
       <button className="dark-mode-toggle" onClick={() => setDarkMode(!darkMode)}>
@@ -721,14 +793,25 @@ function QueueSystemContent() {
       <div className="main-layout">
         <div className="queue-area">
           <h1>{gameMode === 'singles' ? 'Singles' : 'Doubles'} Queue</h1>
-          <button onClick={handleRandomize} className="randomize-btn">
-            🎲 Randomize Queue
-          </button>
+
+          <div className="queue-header-row">
+            {queueMode === 'playall' ? (
+              <button onClick={() => { randomizeQueue(); resetPlayAllRelationships(); }} className="randomize-btn">
+                🔄 Reset Play-All History
+              </button>
+            ) : (
+              <button onClick={handleRandomize} className="randomize-btn">
+                🎲 Randomize Queue
+              </button>
+            )}
+          </div>
+
           <div className="pairings-container">
             <h3>Upcoming Matches</h3>
             {gameMode === 'singles' && <SinglesTable queue={queue} />}
             {gameMode === 'doubles' && <DoublesTable queue={queue} />}
           </div>
+
           {gameMode === 'singles' && queue.length >= 2 && (
             <div className="match-section">
               <h3>
@@ -740,15 +823,21 @@ function QueueSystemContent() {
               </div>
             </div>
           )}
+
           {gameMode === 'doubles' && queue.length >= 4 && (
-            <div className="match-section">
-              <h3>Next Match: Form Teams</h3>
-              <DoublesMatch firstFour={firstFourPlayers} onMatch={handleDoublesMatch} />
-            </div>
+            <DoublesMatch
+              firstFour={firstFourPlayers}
+              suggestedTeamA={playAllSuggestion?.suggestedTeamA ?? null}
+              suggestedTeamB={playAllSuggestion?.suggestedTeamB ?? null}
+              playAllScore={playAllSuggestion?.score ?? null}
+              onMatch={handleDoublesMatch}
+            />
           )}
+
           {gameMode === 'singles' && queue.length < 2 && <p>Not enough players for a match.</p>}
           {gameMode === 'doubles' && queue.length < 4 && <p>Not enough players for a match.</p>}
         </div>
+
         {showHistory && (
           <div className="history-area">
             <h3>Match History</h3>
@@ -779,7 +868,9 @@ function QueueSystemContent() {
   );
 }
 
+// ---------------------------------------------------------------------------
 // Main export with Suspense boundary
+// ---------------------------------------------------------------------------
 export default function QueueSystem() {
   return (
     <Suspense fallback={<div>Loading queue system...</div>}>
