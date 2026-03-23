@@ -797,7 +797,7 @@ function QueueSystemContent() {
           <div className="queue-header-row">
             {queueMode === 'playall' ? (
               <button onClick={() => { randomizeQueue(); resetPlayAllRelationships(); }} className="randomize-btn">
-                🔄 Reset Play-All History
+                🔄 Reset Play-All 
               </button>
             ) : (
               <button onClick={handleRandomize} className="randomize-btn">
