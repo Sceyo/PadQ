@@ -9,6 +9,7 @@
   margin: 0;
   padding: 20px;
   font-family: Arial, sans-serif;
+  text-align: center; /* Ensures all text is centered */
 }
 
 .homepage h1 {
@@ -52,4 +53,30 @@
 
 .doubles {
   background-color: #4ecdc4;
+}
+
+/* Mobile adjustments */
+@media (max-width: 600px) {
+  .homepage h1 {
+    font-size: 2rem;        /* Smaller heading */
+  }
+
+  .homepage .description {
+    font-size: 1rem;        /* Smaller description text */
+    padding: 0 10px;        /* Add some side padding */
+  }
+
+  .mode-buttons {
+    flex-direction: column; /* Stack buttons vertically */
+    gap: 15px;
+    width: 100%;            /* Take full width */
+    align-items: center;    /* Center buttons */
+  }
+
+  .mode-btn {
+    font-size: 1.2rem;      /* Slightly smaller button text */
+    padding: 12px 24px;     /* Adjust padding */
+    width: 80%;             /* Buttons take 80% of container width */
+    max-width: 280px;       /* But not too wide */
+  }
 }

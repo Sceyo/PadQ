@@ -1,5 +1,4 @@
 /* QueueSystem.css */
-
 :root {
   --bg-color-1: #667eea;
   --bg-color-2: #764ba2;
@@ -543,6 +542,262 @@ body.dark-mode .player-btn-unassigned {
   filter: brightness(0.9);
   cursor: pointer;
 }
+
+.bracket-fallback {
+  display: flex;
+  flex-direction: row;
+  gap: 24px;
+  overflow-x: auto;
+  padding: 16px;
+}
+
+.bracket-round-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 160px;
+}
+
+.bracket-round-col h4 {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+.bracket-match-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+}
+
+.bracket-match-card.done {
+  border-color: #d1fae5;
+  background: #f0fdf4;
+}
+
+.bwinner {
+  font-weight: 700;
+  color: #16a34a;
+}
+
+.bvs {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  text-align: center;
+}
+
+/* ── Bracket container ── */
+.bracket-container {
+  display: flex;
+  flex-direction: row;
+  gap: 0;
+  overflow-x: auto;
+  padding: 24px 16px;
+  align-items: flex-start;
+}
+
+.bracket-round {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+}
+
+.bracket-round-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+  text-align: center;
+  padding: 0 12px 12px;
+}
+
+.bracket-round-matches {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1;
+  gap: 8px;
+  padding: 0 8px;
+}
+
+/* ── Individual match card ── */
+.bracket-match {
+  background: #ffffff;
+  border: 1.5px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  transition: border-color 0.2s;
+}
+
+.bracket-match--done {
+  border-color: #bbf7d0;
+}
+
+.bracket-match--bye {
+  opacity: 0.5;
+}
+
+.bracket-player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  min-height: 36px;
+  transition: background 0.2s;
+}
+
+.bracket-player--winner {
+  background: #dcfce7;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.bracket-player--loser {
+  color: #9ca3af;
+  text-decoration: line-through;
+}
+
+.bracket-divider {
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.bracket-tbd {
+  color: #d1d5db;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.bracket-bye {
+  color: #d1d5db;
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.bracket-win-icon {
+  color: #16a34a;
+  font-size: 0.8rem;
+  margin-left: 6px;
+}
+
+/* Dark mode */
+.dark-mode .bracket-match {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.dark-mode .bracket-match--done {
+  border-color: #166534;
+}
+
+.dark-mode .bracket-player {
+  color: #f3f4f6;
+}
+
+.dark-mode .bracket-player--winner {
+  background: #14532d;
+  color: #86efac;
+}
+
+.dark-mode .bracket-player--loser {
+  color: #6b7280;
+}
+
+.dark-mode .bracket-divider {
+  background: #374151;
+}
+
+/* ── Elimination type sub-tab ── */
+.elim-selector {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 8px 0 4px;
+}
+
+.elim-btn {
+  padding: 6px 18px;
+  border-radius: 20px;
+  border: 1.5px solid #d1d5db;
+  background: transparent;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  color: #6b7280;
+  transition: all 0.15s;
+}
+
+.elim-btn.active {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── Double elimination layout ── */
+.bracket-de-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.bracket-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+  padding: 4px 8px;
+  margin-bottom: -8px;
+}
+
+.bracket-match--losers {
+  border-color: #fca5a5;
+}
+
+.bracket-match--losers .bracket-player--winner {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.bracket-match--gf {
+  border: 2px solid #f59e0b;
+  box-shadow: 0 0 12px rgba(245,158,11,0.25);
+}
+
+.bracket-match--gf .bracket-player--winner {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* ── Mode description ── */
+.mode-description {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 4px 0 12px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border-left: 3px solid #e5e7eb;
+}
+
+.dark-mode .mode-description {
+  background: #1f2937;
+  border-left-color: #374151;
+  color: #9ca3af;
+}
+
 
 /* Responsive adjustments */
 @media (max-width: 800px) {
