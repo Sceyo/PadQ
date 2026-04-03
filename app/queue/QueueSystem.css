@@ -412,3 +412,905 @@ body.dark-mode {
   .score-btn--minus{width:32px;height:32px;}
   .scoreboard-toolbar{flex-direction:column;align-items:flex-start;}
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Firebase Session Bar — add to bottom of QueueSystem.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Session status bar ───────────────────────────────────── */
+.session-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--border);
+  background: var(--card-alt);
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--txt-2);
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+/* Host bar — subtle green tint */
+.session-bar--host {
+  border-color: rgba(34, 197, 94, 0.3);
+  background: rgba(34, 197, 94, 0.04);
+}
+
+/* Viewer bar — subtle blue tint */
+.session-bar--viewer {
+  border-color: rgba(59, 130, 246, 0.3);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+/* Join bar (no session yet) */
+.session-bar--join {
+  border-style: dashed;
+}
+
+/* ── Connection dot ────────────────────────────────────────── */
+.session-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+
+.session-dot--live {
+  background: var(--success);
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+  animation: dotPulse 2s ease-in-out infinite;
+}
+
+.session-dot--offline {
+  background: var(--warning);
+}
+
+@keyframes dotPulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25); }
+  50%       { box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.08); }
+}
+
+/* ── Status text ───────────────────────────────────────────── */
+.session-status-text {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--txt-3);
+  margin-right: 4px;
+}
+
+/* ── Room code ─────────────────────────────────────────────── */
+.session-label {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--txt-3);
+}
+
+.session-code {
+  font-family: 'Bebas Neue', 'Impact', monospace;
+  font-size: 1.1rem;
+  letter-spacing: 0.12em;
+  color: var(--txt-1);
+  background: var(--btn);
+  border: 1px solid var(--border);
+  padding: 2px 10px;
+  border-radius: var(--r-sm);
+  user-select: all;   /* tap to select on mobile */
+}
+
+/* ── Copy button ───────────────────────────────────────────── */
+.session-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--border);
+  background: var(--btn);
+  color: var(--txt-2);
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.session-copy-btn:hover {
+  background: var(--btn-hover);
+  color: var(--txt-1);
+}
+
+/* ── Role badge ────────────────────────────────────────────── */
+.session-role-badge {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  text-transform: uppercase;
+  margin-left: auto;
+}
+
+.session-role-badge--viewer {
+  background: rgba(59, 130, 246, 0.12);
+  color: #1d4ed8;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.dark-mode .session-role-badge { color: #86efac; }
+.dark-mode .session-role-badge--viewer { color: #93c5fd; }
+
+/* ── Join input (viewer join bar) ──────────────────────────── */
+.session-join-input {
+  flex: 1;
+  min-width: 120px;
+  max-width: 180px;
+  padding: 6px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  background: var(--card);
+  color: var(--txt-1);
+  font-family: 'Bebas Neue', monospace;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.session-join-input:focus { border-color: var(--accent); }
+.session-join-input::placeholder { letter-spacing: 0.02em; font-size: 0.75rem; font-family: 'Inter', sans-serif; font-weight: 500; }
+
+.session-join-btn {
+  padding: 7px 18px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: var(--accent);
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 0.15s;
+}
+.session-join-btn:hover:enabled { opacity: 0.88; }
+.session-join-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Viewer-mode overlay (read-only indicator) ─────────────── */
+/* Add pointer-events:none to interactive elements when !isHost */
+.viewer-mode .match-buttons button,
+.viewer-mode .match-action-btn,
+.viewer-mode .randomize-btn,
+.viewer-mode .scoreboard-toggle,
+.viewer-mode .score-btn,
+.viewer-mode .live-panel-toggle,
+.viewer-mode .control-btn--danger {
+  pointer-events: none;
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Viewer sees a subtle banner explaining read-only mode */
+.viewer-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  background: rgba(59, 130, 246, 0.07);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  border-radius: var(--r-sm);
+  font-size: 0.78rem;
+  color: var(--txt-2);
+}
+
+@media (max-width: 600px) {
+  .session-bar { gap: 6px; }
+  .session-code { font-size: 0.95rem; }
+  .session-join-input { max-width: 140px; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   QueueSystem ADDITIONS v3
+   Paste these at the BOTTOM of QueueSystem.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Top-right controls cluster ──────────────────────────────
+   Replaces the absolute-positioned dark-mode-toggle.
+   Both the dark-mode button AND the Share button live here.
+   ─────────────────────────────────────────────────────────── */
+.topright-controls {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 20;
+}
+
+/* Override the old absolute positioning since we're inside a flex row now */
+.topright-controls .dark-mode-toggle {
+  position: static;
+  top: auto;
+  right: auto;
+}
+
+/* ── Share trigger button ─────────────────────────────────── */
+.share-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--r-sm, 8px);
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: var(--btn, #f1f5f9);
+  color: var(--txt-2, #64748b);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.share-trigger:hover {
+  background: var(--btn-hover, #e2e8f0);
+  color: var(--txt-1, #1e293b);
+}
+.share-trigger--active {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+.share-trigger--active:hover {
+  background: var(--accent-h, #4f46e5);
+}
+
+/* ── Share popover ────────────────────────────────────────── */
+.share-popover-wrap {
+  position: relative;
+}
+
+.share-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  width: 260px;
+  background: var(--modal-bg, #ffffff);
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: var(--r-lg, 18px);
+  box-shadow: var(--sh-lg, 0 12px 48px rgba(0,0,0,.12));
+  z-index: 100;
+  overflow: hidden;
+  animation: sharePopIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes sharePopIn {
+  from { opacity: 0; transform: scale(0.9) translateY(-6px); }
+  to   { opacity: 1; transform: scale(1)   translateY(0); }
+}
+
+/* Dark mode popover */
+body.dark-mode .share-popover {
+  background: #13131f;
+  border-color: rgba(167,139,250,.25);
+}
+
+.share-popover-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+body.dark-mode .share-popover-header { border-bottom-color: rgba(255,255,255,.07); }
+
+.share-popover-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--txt-1, #1e293b);
+}
+
+.share-popover-close {
+  background: var(--btn, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 7px;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--txt-3, #94a3b8);
+  transition: background 0.15s;
+}
+.share-popover-close:hover { background: var(--btn-hover, #e2e8f0); }
+
+/* Tabs inside popover */
+.share-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+body.dark-mode .share-tabs { border-bottom-color: rgba(255,255,255,.07); }
+
+.share-tab {
+  flex: 1;
+  padding: 9px;
+  background: transparent; border: none;
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  cursor: pointer; font-size: 0.76rem; font-weight: 600;
+  color: var(--txt-3, #94a3b8); font-family: inherit;
+  transition: color 0.15s, border-color 0.15s;
+}
+.share-tab:hover { color: var(--txt-1, #1e293b); }
+.share-tab.active { color: var(--accent, #6366f1); border-bottom-color: var(--accent, #6366f1); }
+
+/* Code tab */
+.share-code-view {
+  padding: 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+}
+
+.share-hint {
+  font-size: 0.72rem;
+  color: var(--txt-3, #94a3b8);
+  margin: 0; text-align: center; line-height: 1.4;
+}
+.share-hint--sm { font-size: 0.66rem; }
+
+.share-code-display {
+  font-family: 'Bebas Neue', 'Impact', monospace;
+  font-size: 2.8rem;
+  letter-spacing: 0.2em;
+  color: var(--txt-1, #1e293b);
+  background: var(--card-alt, rgba(248,250,252,.92));
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: var(--r-md, 12px);
+  padding: 10px 20px;
+  width: 100%; text-align: center;
+  user-select: all;
+}
+body.dark-mode .share-code-display {
+  background: rgba(255,255,255,.06);
+  color: #f0f4ff;
+}
+
+/* QR tab */
+.share-qr-view {
+  padding: 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+
+.share-qr-wrap {
+  background: var(--card-alt, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--r-md, 12px);
+  padding: 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+body.dark-mode .share-qr-wrap {
+  background: rgba(255,255,255,.04);
+  border-color: rgba(255,255,255,.1);
+}
+
+/* Action row */
+.share-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.share-action {
+  flex: 1;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 8px 10px; border-radius: var(--r-sm, 8px);
+  font-size: 0.74rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+  text-decoration: none; transition: opacity 0.15s;
+  border: 1.5px solid transparent;
+}
+.share-action--copy {
+  background: rgba(99,102,241,0.1);
+  color: var(--accent, #6366f1);
+  border-color: rgba(99,102,241,0.25);
+}
+.share-action--copy:hover { opacity: 0.8; }
+
+.share-action--open {
+  background: rgba(34,197,94,0.1);
+  color: var(--success, #22c55e);
+  border-color: rgba(34,197,94,0.25);
+}
+.share-action--open:hover { opacity: 0.8; }
+
+/* ── Updated SessionBar (no join input variant) ───────────── */
+
+/* Remove the old join-input styles that are no longer needed */
+/* (Kept in case they appear elsewhere; they just won't render) */
+.session-bar--join { display: none !important; }
+
+/* ── Viewer banner ────────────────────────────────────────── */
+.viewer-banner {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  background: rgba(59,130,246,0.07);
+  border: 1px solid rgba(59,130,246,0.2);
+  border-radius: var(--r-sm, 8px);
+  font-size: 0.78rem;
+  color: var(--txt-2, #64748b);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   QueueSystem.css ADDITIONS — append to bottom of QueueSystem.css
+   Covers: deuce badge, viewer scoreboard, QR light-mode fix
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Deuce badge ──────────────────────────────────────────── */
+/* Shown centre-scoreboard when both sides reach limit−1 */
+.deuce-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  animation: pulseDeuce 1s ease-in-out infinite;
+  white-space: nowrap;
+}
+@keyframes pulseDeuce {
+  0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(245,158,11,0); }
+  50%       { opacity: .85; box-shadow: 0 0 0 4px rgba(245,158,11,.2); }
+}
+
+/* Deuce border glow on the whole scoreboard */
+.scoreboard--deuce {
+  box-shadow: 0 0 0 2px var(--warning, #f59e0b);
+  transition: box-shadow 0.3s;
+}
+
+/* ── Viewer scoreboard ────────────────────────────────────── */
+/* Read-only score shown to viewers when host has scoring active */
+.scoreboard-wrap--viewer {
+  margin: 12px 0;
+  padding: 14px 16px;
+  background: var(--card-alt, rgba(248,250,252,.92));
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: var(--r-md, 12px);
+}
+
+.scoreboard-viewer-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--txt-3, #94a3b8);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  margin-bottom: 12px;
+}
+
+/* Viewer scoreboard — no buttons, just the numbers */
+.scoreboard--viewer {
+  display: flex;
+  align-items: stretch;
+  border: 1.5px solid var(--border, #e2e8f0);
+  border-radius: var(--r-md, 12px);
+  overflow: hidden;
+}
+
+.scoreboard--viewer .score-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 12px;
+  gap: 8px;
+}
+.scoreboard--viewer .score-side--a {
+  background: rgba(34,197,94,.05);
+  border-right: 1px solid var(--border, #e2e8f0);
+}
+.scoreboard--viewer .score-side--b {
+  background: rgba(59,130,246,.05);
+}
+.scoreboard--viewer .score-side--winner {
+  background: rgba(34,197,94,.14) !important;
+}
+.scoreboard--viewer .score-player-name {
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--txt-2, #64748b);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  text-align: center;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.scoreboard--viewer .score-display {
+  font-family: 'Bebas Neue', 'Impact', monospace;
+  font-size: 3.2rem;
+  line-height: 1;
+  color: var(--txt-1, #1e293b);
+  font-variant-numeric: tabular-nums;
+  transition: color .2s;
+}
+.scoreboard--viewer .score-side--winner .score-display {
+  color: var(--success, #22c55e);
+}
+.scoreboard--viewer .score-centre {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 10px;
+  gap: 8px;
+  min-width: 64px;
+}
+
+/* ── QR code light-mode fix ───────────────────────────────── */
+/* The QR wrap in the share popover needs a white background in
+   light mode so the dark fgColor (#1e293b) is visible against it.
+   In dark mode we override with a light background too. */
+.share-qr-wrap {
+  background: #ffffff !important;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--r-md, 12px);
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dark mode: keep white bg for QR readability (QR always needs contrast) */
+body.dark-mode .share-qr-wrap {
+  background: #ffffff !important;
+  border-color: rgba(255,255,255,.15);
+}
+
+/* ── Dark mode viewer scoreboard overrides ────────────────── */
+body.dark-mode .scoreboard-wrap--viewer {
+  background: var(--card-alt, rgba(24,27,44,.92));
+  border-color: var(--border, #2d3348);
+}
+body.dark-mode .scoreboard--viewer {
+  border-color: var(--border, #2d3348);
+}
+body.dark-mode .scoreboard--viewer .score-side--a {
+  background: rgba(34,197,94,.07);
+  border-right-color: var(--border, #2d3348);
+}
+body.dark-mode .scoreboard--viewer .score-side--b {
+  background: rgba(59,130,246,.07);
+}
+body.dark-mode .scoreboard--viewer .score-side--winner {
+  background: rgba(34,197,94,.18) !important;
+}
+body.dark-mode .scoreboard--viewer .score-display {
+  color: var(--txt-1, #f0f4ff);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   QueueSystem.css ADDITIONS — v4
+   Append to bottom of QueueSystem.css
+
+   Covers:
+     • .score-team-badge   — "Team A" / "Team B" label above name
+     • Hydration fix note  — darkMode default
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Team A / B badges above each score column ─────────────
+   Sits above the player name inside each score-side.
+   Green tint for A, blue tint for B — matches the team chips
+   already used in the DoublesMatch builder.
+   ─────────────────────────────────────────────────────────── */
+.score-team-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 99px;
+  margin-bottom: 2px;
+  flex-shrink: 0;
+}
+
+.score-team-badge--a {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.score-team-badge--b {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Dark mode overrides */
+body.dark-mode .score-team-badge--a {
+  background: rgba(34, 197, 94, 0.12);
+  color: #86efac;
+  border-color: rgba(34, 197, 94, 0.25);
+}
+body.dark-mode .score-team-badge--b {
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+/* When the side wins, bump up the badge contrast slightly */
+.score-side--winner .score-team-badge--a {
+  background: rgba(34, 197, 94, 0.28);
+  border-color: rgba(34, 197, 94, 0.5);
+}
+.score-side--winner .score-team-badge--b {
+  background: rgba(59, 130, 246, 0.28);
+  border-color: rgba(59, 130, 246, 0.5);
+}
+
+/* Also apply to the viewer (read-only) scoreboard */
+.scoreboard--viewer .score-team-badge--a,
+.scoreboard--viewer .score-team-badge--b {
+  font-size: 0.58rem;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Task 4 — Hard Reset button CSS
+   Append to bottom of QueueSystem.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* Sits in .topright-controls alongside dark-mode-toggle and ShareButton */
+.hard-reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: var(--r-sm, 8px);
+  border: 1.5px solid rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--danger, #ef4444);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.03em;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+  white-space: nowrap;
+}
+.hard-reset-btn:hover {
+  background: rgba(239, 68, 68, 0.16);
+  border-color: rgba(239, 68, 68, 0.6);
+  transform: translateY(-1px);
+}
+.hard-reset-btn:active {
+  transform: scale(0.96);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PADQ UI additions — append to:
+     • watch.css      → for viewer live score hero + match labels
+     • QueueSystem.css → for host match label + on-court label
+   ═══════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════════
+   VIEWER — Big live score hero (watch.css additions)
+   ════════════════════════════════════════════════════════════ */
+
+.w-live-score-hero {
+  background: rgba(99, 102, 241, 0.07);
+  border: 1.5px solid rgba(99, 102, 241, 0.25);
+  border-radius: 20px;
+  padding: 28px 24px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+/* "LIVE SCORE" badge with pulsing dot */
+.w-live-score-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a78bfa;
+}
+
+.w-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2);
+  animation: wLivePulse 1.5s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes wLivePulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(34,197,94,.2); }
+  50%       { box-shadow: 0 0 0 7px rgba(34,197,94,.05); }
+}
+
+.w-deuce-pill {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 800;
+  padding: 2px 9px;
+  border-radius: 99px;
+  letter-spacing: 0.08em;
+  animation: wDeucePulse 1s ease-in-out infinite;
+}
+@keyframes wDeucePulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+
+/* The main score board — 3-column layout */
+.w-live-score-board {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.w-live-side {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 16px;
+  gap: 8px;
+  transition: background 0.3s;
+}
+.w-live-side:first-child {
+  background: rgba(34, 197, 94, 0.06);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+.w-live-side:last-child {
+  background: rgba(59, 130, 246, 0.06);
+}
+.w-live-side--winner {
+  background: rgba(34, 197, 94, 0.18) !important;
+}
+
+.w-live-team-label {
+  font-size: 0.58rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 99px;
+}
+.w-live-side:first-child .w-live-team-label {
+  background: rgba(34, 197, 94, 0.15);
+  color: #86efac;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.w-live-side:last-child .w-live-team-label {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.w-live-player-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-align: center;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* THE BIG NUMBER — the hero element */
+.w-live-score-num {
+  font-family: 'Bebas Neue', 'Impact', monospace;
+  font-size: 5.5rem;           /* very large — this is the highlight */
+  line-height: 1;
+  color: #f0f4ff;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  transition: color 0.2s, transform 0.15s;
+}
+.w-live-side--winner .w-live-score-num {
+  color: #22c55e;
+  transform: scale(1.08);
+}
+
+/* Centre column */
+.w-live-centre {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 12px;
+  gap: 8px;
+  min-width: 68px;
+}
+.w-live-limit-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #4b5563;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 99px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+.w-live-gameover {
+  font-size: 0.62rem;
+  font-weight: 800;
+  color: #22c55e;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-align: center;
+  animation: wDeucePulse 1.2s ease-in-out infinite;
+}
+
+/* Match label column in upcoming table (viewer) */
+.w-match-label {
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.w-next-row .w-match-label {
+  color: #22c55e;
+  font-weight: 700;
+}
+
+/* ════════════════════════════════════════════════════════════
+   HOST — Match label + On Court label (QueueSystem.css additions)
+   ════════════════════════════════════════════════════════════ */
+
+/* The Match column in pairing tables */
+.match-label-cell {
+  font-size: 0.73rem;
+  font-weight: 600;
+  color: var(--txt-3, #94a3b8);
+  white-space: nowrap;
+  min-width: 110px;
+}
+.next-match .match-label-cell {
+  color: var(--success, #22c55e);
+}
+
+/* "▶ On Court" green pill inside the first row */
+.on-court-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: 99px;
+  padding: 2px 10px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Dark mode overrides */
+body.dark-mode .on-court-label {
+  background: rgba(34, 197, 94, 0.1);
+  color: #86efac;
+}

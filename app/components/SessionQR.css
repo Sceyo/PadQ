@@ -1,0 +1,111 @@
+/* ─────────────────────────────────────────────────────────
+   SessionQR.css — QR code modal for host
+   Add these rules to QueueSystem.css (bottom) or import here
+   ─────────────────────────────────────────────────────────  */
+
+/* Trigger button inside SessionBar */
+.sqr-trigger {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: var(--r-sm, 8px);
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--btn, #f1f5f9); color: var(--txt-2, #64748b);
+  font-size: .72rem; font-weight: 600; cursor: pointer;
+  font-family: inherit; transition: background .15s, color .15s;
+}
+.sqr-trigger:hover { background: var(--btn-hover, #e2e8f0); color: var(--txt-1, #1e293b); }
+
+/* Modal overlay */
+.sqr-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65); backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 2000; padding: 20px;
+  animation: sqrFadeIn .18s ease;
+}
+@keyframes sqrFadeIn { from{opacity:0} to{opacity:1} }
+
+.sqr-modal {
+  background: #13131f;
+  border: 1.5px solid rgba(167,139,250,.25);
+  border-radius: 22px;
+  width: 100%; max-width: 340px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px rgba(0,0,0,.7);
+  animation: sqrPop .22s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes sqrPop { from{opacity:0;transform:scale(.88)} to{opacity:1;transform:scale(1)} }
+
+/* Header */
+.sqr-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.sqr-title {
+  display: flex; align-items: center; gap: 7px;
+  font-family: 'Bebas Neue', 'Impact', sans-serif;
+  font-size: 1.1rem; letter-spacing: .07em; color: #f0f4ff;
+}
+.sqr-close {
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+  border-radius: 7px; width: 30px; height: 30px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: #6b7280; transition: background .15s, color .15s;
+}
+.sqr-close:hover { background: rgba(255,255,255,.12); color: #f0f4ff; }
+
+/* QR canvas */
+.sqr-qr-wrap {
+  display: flex; justify-content: center;
+  padding: 24px 20px 16px;
+  background: rgba(255,255,255,.03);
+}
+
+/* Room code */
+.sqr-room-code-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 0 20px 16px;
+}
+.sqr-room-label {
+  font-size: .65rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .1em; color: #4b5563;
+}
+.sqr-room-code {
+  font-family: 'Bebas Neue', monospace;
+  font-size: 2.2rem; letter-spacing: .2em; color: #f0f4ff;
+}
+
+/* Action buttons */
+.sqr-actions {
+  display: flex; gap: 8px; padding: 0 20px 16px;
+}
+.sqr-action-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px; border-radius: 10px;
+  font-size: .78rem; font-weight: 600; cursor: pointer;
+  font-family: inherit; text-decoration: none; transition: opacity .15s;
+}
+.sqr-copy {
+  background: rgba(167,139,250,.15); color: #a78bfa;
+  border: 1.5px solid rgba(167,139,250,.3);
+}
+.sqr-copy:hover { opacity: .8; }
+.sqr-open {
+  background: rgba(34,197,94,.12); color: #22c55e;
+  border: 1.5px solid rgba(34,197,94,.25);
+}
+.sqr-open:hover { opacity: .8; }
+
+/* Hint */
+.sqr-hint {
+  font-size: .72rem; color: #374151; text-align: center;
+  padding: 10px 20px 18px; margin: 0;
+  border-top: 1px solid rgba(255,255,255,.05);
+  line-height: 1.6;
+}
+.sqr-url {
+  font-family: monospace; color: #6b7280;
+  background: rgba(255,255,255,.04);
+  padding: 1px 6px; border-radius: 4px;
+  font-size: .7rem;
+}
