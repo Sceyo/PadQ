@@ -161,7 +161,7 @@ const BracketSection: React.FC<{
                     </div>
                     <div className="w-bracket-divider" />
                     <div className={['w-bracket-player', p2Won ? 'winner' : m.winner ? 'loser' : ''].filter(Boolean).join(' ')}>
-                      <span>{m.isBye ? <span className="bye-label">BYE</span> : m.player2 ?? <span className="tbd">TBD</span>}</span>
+                      <span>{m.isBye ? <span className="bye-label">No Player</span> : m.player2 ?? <span className="tbd">TBD</span>}</span>
                       {p2Won && <Check size={11} />}
                     </div>
                   </div>
@@ -185,11 +185,11 @@ function WatchPageContent() {
   const sessionId = (params?.sessionId as string ?? '').toUpperCase();
 
   // ── Firebase state ──────────────────────────────────────
-  const [session,     setSession]     = useState<SessionDoc | null>(null);
-  const [history,     setHistory]     = useState<MatchHistoryEntry[]>([]);
-  const [status,      setStatus]      = useState<'loading' | 'live' | 'error' | 'ended'>('loading');
-  const [errorMsg,    setErrorMsg]    = useState('');
-  const [showHistory, setShowHistory] = useState(true);
+  const [session,         setSession]         = useState<SessionDoc | null>(null);
+  const [history,         setHistory]         = useState<MatchHistoryEntry[]>([]);
+  const [status,          setStatus]          = useState<'loading' | 'live' | 'reconnecting' | 'error' | 'ended' | 'expired'>('loading');
+  const [errorMsg,        setErrorMsg]        = useState('');
+  const [showHistory,     setShowHistory]     = useState(true);
 
   // ── Guardrail: validate session exists before subscribing ──
 
@@ -207,7 +207,7 @@ function WatchPageContent() {
     loadSession(sessionId).then(data => {
       if (!data) {
         setStatus('error');
-        setErrorMsg(`Session "${sessionId}" not found. The host may not have started yet.`);
+        setErrorMsg(`Session "${sessionId}" not found. It may have expired or the code is wrong.`);
         return;
       }
 
@@ -215,16 +215,23 @@ function WatchPageContent() {
       setSession(data);
       setStatus('live');
 
-      // Real-time listener for session document
+      // Real-time listener — handles updates, deletion, and errors
       unsubSession = subscribeToSession(
         sessionId,
+        // onChange: normal update
         (updated) => {
           setSession(updated);
           setStatus('live');
         },
+        // onError: connection dropped — show reconnecting state
         (err) => {
-          console.error('[Watch] session snapshot error', err);
-          setStatus('ended');
+          console.error('[Watch] snapshot error', err);
+          setStatus('reconnecting');
+        },
+        // onDeleted: TTL fired or host hard-reset — session is gone
+        () => {
+          setStatus('expired');
+          setSession(null);
         },
       );
 
@@ -258,6 +265,34 @@ function WatchPageContent() {
       <div className="watch-shell watch-shell--center">
         <Loader2 size={36} className="w-spin" />
         <p>Connecting to session <strong>{sessionId}</strong>…</p>
+      </div>
+    );
+  }
+
+  // Reconnecting — connection dropped, Firestore retrying automatically
+  if (status === 'reconnecting') {
+    return (
+      <div className="watch-shell watch-shell--center">
+        <Loader2 size={36} className="w-spin" />
+        <p style={{ color: '#f59e0b' }}>Reconnecting to session <strong>{sessionId}</strong>…</p>
+        <p style={{ fontSize: '0.78rem', color: '#6b7280' }}>Please wait — this usually takes a few seconds.</p>
+      </div>
+    );
+  }
+
+  // Expired — TTL deleted the session, or host hard-reset
+  if (status === 'expired') {
+    return (
+      <div className="watch-shell watch-shell--center">
+        <AlertCircle size={40} className="w-error-icon" />
+        <h2 className="w-error-title">Session Ended</h2>
+        <p className="w-error-msg">
+          This session has expired or been closed by the host.
+          Sessions are automatically removed after 30 minutes of inactivity.
+        </p>
+        <button className="w-back-btn" onClick={() => router.push('/')}>
+          <ArrowLeft size={14} /> Back to Home
+        </button>
       </div>
     );
   }

@@ -1,21 +1,13 @@
-// firestore.rules
+// firestore.rules — PADQ v3
 // ═══════════════════════════════════════════════════════════
-// PADQ — Firestore Security Rules  v2
-//
 // Deploy:  firebase deploy --only firestore:rules
 //
-// WHY THE PREVIOUS RULES FAILED:
-//  The old "create" rule required hostToken.size() == 36
-//  (UUID with hyphens). This worked for crypto.randomUUID()
-//  but the rule validator sometimes rejects it in strict mode.
-//  More importantly — if you're getting "Missing or insufficient
-//  permissions" on CREATE, it means the rule never matched.
-//
-// THIS VERSION:
-//  • Allows any authenticated-ish create (just needs hostToken string)
-//  • Update/delete still locked to the hostToken holder
-//  • Reads are fully public (viewers need no token)
-//  • History subcollection write validated against parent hostToken
+// WHAT'S NEW IN v3:
+//  • lastActiveAt field stamped on every host write (TTL clock)
+//  • Firestore TTL auto-deletes sessions idle for 30+ minutes
+//    (configured in Firebase Console — see SETUP.md)
+//  • Firestore TTL bypasses security rules entirely — no change
+//    needed here for TTL deletes to work
 // ═══════════════════════════════════════════════════════════
 
 rules_version = '2';
@@ -27,26 +19,24 @@ service cloud.firestore {
       // ── READ: anyone with the session ID can read ──────────
       allow read: if true;
 
-      // ── CREATE: anyone can create a new session document
-      //    as long as it includes a non-empty hostToken string.
-      //    No length restriction — avoids the UUID length bug.
+      // ── CREATE: requires a non-empty hostToken ─────────────
       allow create: if request.resource.data.hostToken is string
                     && request.resource.data.hostToken.size() > 0;
 
-      // ── UPDATE / DELETE: only the original host can mutate.
+      // ── UPDATE: only the original host can mutate.
       //    The incoming write must carry the same hostToken
-      //    that's already stored in the document.
+      //    already stored. lastActiveAt is always included — fine.
       allow update: if request.resource.data.hostToken == resource.data.hostToken;
+
+      // ── DELETE: client-initiated deletes (e.g. hard reset).
+      //    TTL-initiated deletes bypass rules entirely — they always succeed.
       allow delete: if request.resource.data.hostToken == resource.data.hostToken;
 
       // ── History subcollection ──────────────────────────────
-      // Reads: fully public (spectators see match history)
-      // Writes: validated against parent session's hostToken
       match /history/{entryId} {
         allow read: if true;
         allow create: if get(/databases/$(database)/documents/sessions/$(sessionId))
                          .data.hostToken == request.resource.data.hostToken;
-        // History entries are append-only — no update or delete
         allow update, delete: if false;
       }
     }

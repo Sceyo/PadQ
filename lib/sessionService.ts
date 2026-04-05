@@ -15,6 +15,7 @@ import {
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   runTransaction,
   serverTimestamp,
@@ -78,11 +79,17 @@ export interface SessionDoc {
   tournamentMatches: TournamentMatch[];
   tournamentActive: boolean;
   tournamentWinner: string | null;
-  liveScore?: LiveScoreState | null;   // ← live score for viewer sync
+  liveScore?: LiveScoreState | null;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
+  /**
+   * lastActiveAt — stamped on EVERY host write.
+   * Used by Firestore TTL policy to auto-delete idle sessions.
+   * Configure TTL in Firebase Console → Firestore → TTL policies:
+   *   Collection: sessions  |  Field: lastActiveAt  |  TTL: 30 minutes
+   * (See SETUP.md for exact steps — it's 3 clicks, no Cloud Functions needed)
+   */
   lastActiveAt?: Timestamp;
-  expiresAt?: Timestamp;
 }
 
 // ── Helpers ───────────────────────────────────────────────
@@ -109,20 +116,17 @@ const sessionRef = (id: string) => doc(db, 'sessions', id);
  * Returns { sessionId, hostToken } — host saves both to localStorage.
  */
 export async function createSession(
-  data: Omit<SessionDoc, 'hostToken' | 'createdAt' | 'updatedAt'>,
+  data: Omit<SessionDoc, 'hostToken' | 'createdAt' | 'updatedAt' | 'lastActiveAt'>,
 ): Promise<{ sessionId: string; hostToken: string }> {
-  const sessionId  = generateRoomCode();     // short, shareable
-  const hostToken  = generateId();           // long, secret
-
-  const now = Date.now();
+  const sessionId  = generateRoomCode();
+  const hostToken  = generateId();
 
   await setDoc(sessionRef(sessionId), {
     ...data,
     hostToken,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    lastActiveAt: serverTimestamp(),
-    expiresAt: new Date(now + 24 * 60 * 60 * 1000), // +24h
+    createdAt:      serverTimestamp(),
+    updatedAt:      serverTimestamp(),
+    lastActiveAt:   serverTimestamp(),   // ← TTL clock starts here
   });
 
   return { sessionId, hostToken };
@@ -153,9 +157,8 @@ export async function updateSession(
     await updateDoc(sessionRef(sessionId), {
       ...patch,
       hostToken,
-      updatedAt: serverTimestamp(),
-      lastActiveAt: serverTimestamp(),
-      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+      updatedAt:    serverTimestamp(),
+      lastActiveAt: serverTimestamp(),   // ← resets TTL countdown on every host write
     });
   } catch (err: any) {
     if (err?.code === 'failed-precondition') return;
@@ -200,9 +203,8 @@ export async function updateQueueSafely(
       tx.update(ref, {
         ...patch,
         hostToken,
-        updatedAt: serverTimestamp(),
-        lastActiveAt: serverTimestamp(),
-        expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        updatedAt:    serverTimestamp(),
+        lastActiveAt: serverTimestamp(),   // ← resets TTL countdown
       });
     });
   } catch (err: any) {
@@ -240,23 +242,71 @@ export async function addHistoryEntry(
   await addDoc(histRef, clean);
 }
 
-// ── Real-time Subscriptions ───────────────────────────────
+/**
+ * touchSession
+ * Lightweight heartbeat — only updates lastActiveAt.
+ * Call this when the host resumes a session without making a data write
+ * (e.g. reopening the tab), so the TTL clock is reset.
+ */
+export async function touchSession(
+  sessionId: string,
+  hostToken: string,
+): Promise<void> {
+  try {
+    await updateDoc(sessionRef(sessionId), {
+      hostToken,
+      lastActiveAt: serverTimestamp(),
+    });
+  } catch {
+    // Non-critical — ignore errors silently
+  }
+}
+
+/**
+ * deleteSession
+ * Permanently removes a session document.
+ * Note: Firestore TTL handles automatic cleanup — this is for
+ * explicit host-initiated deletion (e.g. hard reset).
+ */
+export async function deleteSession(
+  sessionId: string,
+  hostToken: string,
+): Promise<void> {
+  // Firestore delete rule requires hostToken in the request —
+  // we do a final update (which validates hostToken) then delete.
+  // The rules allow delete if request.resource.data.hostToken matches,
+  // so we use updateDoc first to confirm identity, then deleteDoc.
+  try {
+    await updateDoc(sessionRef(sessionId), { hostToken, lastActiveAt: serverTimestamp() });
+    await deleteDoc(sessionRef(sessionId));
+  } catch {
+    // If already deleted, ignore
+  }
+}
 
 /**
  * subscribeToSession
- * Sets up a real-time listener on the session document.
- * Calls onChange every time any field changes.
- * Returns an unsubscribe function — call it on component unmount.
+ * Real-time listener on the session document.
+ * Handles three events:
+ *   onChange  — document updated (normal operation)
+ *   onDeleted — document was deleted (TTL fired or host hard-reset)
+ *   onError   — Firestore connection error
  */
 export function subscribeToSession(
   sessionId: string,
-  onChange: (data: SessionDoc) => void,
-  onError?: (err: Error) => void,
+  onChange:  (data: SessionDoc) => void,
+  onError?:  (err: Error) => void,
+  onDeleted?: () => void,
 ): Unsubscribe {
   return onSnapshot(
     sessionRef(sessionId),
     (snap) => {
-      if (snap.exists()) onChange(snap.data() as SessionDoc);
+      if (snap.exists()) {
+        onChange(snap.data() as SessionDoc);
+      } else {
+        // Document gone — either TTL deleted it or hard reset
+        onDeleted?.();
+      }
     },
     (err) => onError?.(err),
   );

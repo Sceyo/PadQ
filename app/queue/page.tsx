@@ -45,7 +45,7 @@ import {
   Star, Sparkles, RefreshCw, Check, X, BarChart2,
   TrendingUp, Activity, Award, Shield, Zap, Clock,
   Brain, AlertTriangle, ThumbsUp, Plus, Minus,
-  Target, Settings, Copy, Wifi, QrCode, ExternalLink,
+  Target, Settings, Copy, Wifi, WifiOff, QrCode, ExternalLink,
 } from 'lucide-react';
 import useQueue, {
   suggestNextDoublesMatch,
@@ -163,10 +163,10 @@ function buildSingleElim(players: string[]): TournamentMatch[] {
   let id = Date.now();
   const matches: TournamentMatch[] = [];
   const seeded = [...players];
-  while (seeded.length < size) seeded.push('__BYE__');
+  while (seeded.length < size) seeded.push('No player');
   for (let s = 0; s < size / 2; s++) {
     const [p1, p2] = [seeded[s * 2], seeded[s * 2 + 1]];
-    const isBye = p2 === '__BYE__';
+    const isBye = p2 === 'No player';
     matches.push({ id: id++, round: 0, slot: s, bracket: 'W', player1: p1, player2: isBye ? null : p2, winner: isBye ? p1 : null, loser: null, isBye });
   }
   for (let r = 1; r < totalRounds; r++) {
@@ -204,13 +204,13 @@ function buildDoubleElim(players: string[]): TournamentMatch[] {
   let id = Date.now();
   const matches: TournamentMatch[] = [];
   const seeded = [...players];
-  while (seeded.length < size) seeded.push('__BYE__');
+  while (seeded.length < size) seeded.push('No player');
   for (let r = 0; r < wbR; r++) {
     const slots = size / Math.pow(2, r + 1);
     for (let s = 0; s < slots; s++) {
       if (r === 0) {
         const [p1, p2] = [seeded[s * 2], seeded[s * 2 + 1]];
-        const isBye = p2 === '__BYE__';
+        const isBye = p2 === 'No player';
         matches.push({ id: id++, round: r, slot: s, bracket: 'W', player1: p1, player2: isBye ? null : p2, winner: isBye ? p1 : null, loser: null, isBye });
       } else {
         matches.push({ id: id++, round: r, slot: s, bracket: 'W', player1: null, player2: null, winner: null, loser: null, isBye: false });
@@ -302,7 +302,7 @@ const BracketSection: React.FC<{ title: string; matches: TournamentMatch[]; tota
                   <div key={m.id} className={['bracket-match', m.winner ? 'bracket-match--done' : '', m.isBye ? 'bracket-match--bye' : '', bracketType === 'L' ? 'bracket-match--losers' : '', bracketType === 'GF' ? 'bracket-match--gf' : ''].filter(Boolean).join(' ')}>
                     <div className={['bracket-player', p1Won ? 'bracket-player--winner' : m.winner ? 'bracket-player--loser' : ''].filter(Boolean).join(' ')}><span>{m.player1 ?? <span className="bracket-tbd">TBD</span>}</span>{p1Won && <Check size={11} className="bracket-win-icon" />}</div>
                     <div className="bracket-divider" />
-                    <div className={['bracket-player', p2Won ? 'bracket-player--winner' : m.winner ? 'bracket-player--loser' : ''].filter(Boolean).join(' ')}><span>{m.isBye ? <span className="bracket-bye">BYE</span> : m.player2 ?? <span className="bracket-tbd">TBD</span>}</span>{p2Won && <Check size={11} className="bracket-win-icon" />}</div>
+                    <div className={['bracket-player', p2Won ? 'bracket-player--winner' : m.winner ? 'bracket-player--loser' : ''].filter(Boolean).join(' ')}><span>{m.isBye ? <span className="bracket-no-player">No Player</span> : m.player2 ?? <span className="bracket-tbd">TBD</span>}</span>{p2Won && <Check size={11} className="bracket-win-icon" />}</div>
                   </div>
                 );
               })}
@@ -767,21 +767,29 @@ const SessionBar: React.FC<{
 // ═══════════════════════════════════════════════════════════
 
 /**
- * ShareButton: sits in the top-right corner of every game view.
- * Only rendered for the host (requires sessionId + isHost).
- * Opens a popover with:
- *   • The room code in large display font
- *   • A QR code encoding the /watch/{sessionId} URL
- *   • Copy-link and open-watch-page actions
+/**
+ * ShareButton — "Go Live"
+ * ─────────────────────────────────────────────────────────
+ * Sits top-right in every game view (host only).
+ * Three ways to share:
+ *   1. Native share sheet (Web Share API — WhatsApp, SMS, etc.)
+ *   2. Room code — large display font, read it out loud
+ *   3. QR code — scan to open /watch/{sessionId}
  */
 const ShareButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
-  const [open,   setOpen]   = useState(false);
-  const [tab,    setTab]    = useState<'code' | 'qr'>('code');
-  const [copied, setCopied] = useState(false);
+  const [open,        setOpen]       = useState(false);
+  const [tab,         setTab]        = useState<'share' | 'code' | 'qr'>('share');
+  const [copied,      setCopied]     = useState(false);
+  const [justShared,  setJustShared] = useState(false);
 
-  const watchUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/watch/${sessionId}`
-    : `/watch/${sessionId}`;
+  // Build watchUrl client-side only — window is not available during SSR
+  const [watchUrl, setWatchUrl] = useState(`/watch/${sessionId}`);
+  useEffect(() => {
+    setWatchUrl(`${window.location.origin}/watch/${sessionId}`);
+  }, [sessionId]);
+
+  // Does this browser support the Web Share API?
+  const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
 
   const copyLink = () => {
     navigator.clipboard.writeText(watchUrl);
@@ -789,12 +797,26 @@ const ShareButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Close on outside click
+  // Web Share API — opens native share sheet (WhatsApp, SMS, copy, etc.)
+  const nativeShare = async () => {
+    try {
+      await navigator.share({
+        title: `PADQ — Watch Session ${sessionId}`,
+        text:  `Watch this live badminton session! Room code: ${sessionId}`,
+        url:   watchUrl,
+      });
+      setJustShared(true);
+      setTimeout(() => setJustShared(false), 2000);
+    } catch {
+      // User cancelled or API not supported — fall through silently
+    }
+  };
+
+  // Close popover on outside click
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.share-popover-wrap')) setOpen(false);
+      if (!(e.target as HTMLElement).closest('.share-popover-wrap')) setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -802,42 +824,84 @@ const ShareButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
 
   return (
     <div className="share-popover-wrap">
-      {/* ── Trigger ── */}
+
+      {/* ── Trigger — "Go Live" ── */}
       <button
-        className={`share-trigger ${open ? 'share-trigger--active' : ''}`}
+        className={`share-trigger share-trigger--live ${open ? 'share-trigger--active' : ''}`}
         onClick={() => setOpen(o => !o)}
-        title="Share session"
+        title="Share this session with viewers"
       >
-        <QrCode size={15} />
-        Share
+        <span className="go-live-dot" />
+        Go Live
       </button>
 
       {/* ── Popover ── */}
       {open && (
         <div className="share-popover">
           <div className="share-popover-header">
-            <span className="share-popover-title">Share Session</span>
+            <span className="share-popover-title">
+              <span className="go-live-dot go-live-dot--sm" /> Share Session
+            </span>
             <button className="share-popover-close" onClick={() => setOpen(false)}>
               <X size={14} />
             </button>
           </div>
 
+          {/* Room code always visible at top — quick reference */}
+          <div className="share-code-hero">
+            <span className="share-code-label">Room Code</span>
+            <span className="share-code-big">{sessionId}</span>
+          </div>
+
           {/* Tab switcher */}
           <div className="share-tabs">
+            {canNativeShare && (
+              <button className={`share-tab ${tab === 'share' ? 'active' : ''}`} onClick={() => setTab('share')}>
+                Share
+              </button>
+            )}
             <button className={`share-tab ${tab === 'code' ? 'active' : ''}`} onClick={() => setTab('code')}>
-              Code
+              Link
             </button>
             <button className={`share-tab ${tab === 'qr' ? 'active' : ''}`} onClick={() => setTab('qr')}>
               QR
             </button>
           </div>
 
-          {/* Code tab */}
+          {/* Native share tab */}
+          {tab === 'share' && canNativeShare && (
+            <div className="share-code-view">
+              <p className="share-hint">Send via WhatsApp, SMS, or any app</p>
+              <button
+                className={`share-native-btn ${justShared ? 'share-native-btn--done' : ''}`}
+                onClick={nativeShare}
+              >
+                {justShared
+                  ? <><Check size={15} /> Shared!</>
+                  : <><ExternalLink size={15} /> Share Link</>
+                }
+              </button>
+              <p className="share-hint share-hint--sm">
+                Viewers open the link → they see your queue live
+              </p>
+            </div>
+          )}
+
+          {/* Copy link tab */}
           {tab === 'code' && (
             <div className="share-code-view">
-              <p className="share-hint">Share this code with viewers</p>
-              <div className="share-code-display">{sessionId}</div>
-              <p className="share-hint share-hint--sm">They enter it at padq.app → Watch</p>
+              <p className="share-hint">Copy the full watch link</p>
+              <div className="share-url-row">
+                <span className="share-url-text">{watchUrl}</span>
+              </div>
+              <div className="share-actions">
+                <button className="share-action share-action--copy" onClick={copyLink}>
+                  {copied ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy Link</>}
+                </button>
+                <a href={watchUrl} target="_blank" rel="noopener noreferrer" className="share-action share-action--open">
+                  <ExternalLink size={13} /> Open
+                </a>
+              </div>
             </div>
           )}
 
@@ -848,31 +912,25 @@ const ShareButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
                 <QRCodeSVG
                   value={watchUrl}
                   size={180}
-                  bgColor="transparent"
+                  bgColor="#ffffff"
                   fgColor="#1e293b"
                   level="M"
                   includeMargin={false}
                 />
               </div>
-              <p className="share-hint share-hint--sm">Scan to open the watch page</p>
+              <p className="share-hint share-hint--sm">Scan to open the watch page instantly</p>
             </div>
           )}
 
-          {/* Actions */}
-          <div className="share-actions">
-            <button className="share-action share-action--copy" onClick={copyLink}>
-              {copied ? <Check size={13} /> : <Copy size={13} />}
-              {copied ? 'Copied!' : 'Copy Link'}
-            </button>
-            <a href={watchUrl} target="_blank" rel="noopener noreferrer" className="share-action share-action--open">
-              <ExternalLink size={13} /> Watch Page
-            </a>
-          </div>
+          <p className="share-footer">
+            Viewers see the queue live — read only, no sign-in needed.
+          </p>
         </div>
       )}
     </div>
   );
 };
+
 
 // ═══════════════════════════════════════════════════════════
 // § 13  MAIN ORCHESTRATOR
@@ -918,6 +976,8 @@ function QueueSystemContent() {
   const [activeTab,    setActiveTab]    = useState<GameTab>('queue');
   // Live score — host writes on every point, viewers read via session.liveScore
   const [liveScore,    setLiveScore]    = useState<LiveScoreState | null>(null);
+  // Show a "Your session is live — share it!" nudge for 10s after session starts
+  const [showSharePrompt, setShowSharePrompt] = useState(false);
 
   // Persisted state — local fallbacks when not connected
   const [localQueueMode,        setLocalQueueMode]        = useState<QueueMode>('default');
@@ -1019,14 +1079,31 @@ function QueueSystemContent() {
       setLocalTournamentM(initialBracket); setLocalTournamentActive(true);
     }
     await session.startSession({ gameMode: gameMode ?? 'singles', queueMode: localQueueMode, elimType: localElimType, players: tempPlayers, queue: tempPlayers, playAllRel: {}, tournamentMatches: initialBracket, tournamentActive: localQueueMode === 'tournament', tournamentWinner: null });
+    // Show the share prompt for 10 seconds so the host knows to invite viewers
+    setShowSharePrompt(true);
+    setTimeout(() => setShowSharePrompt(false), 10000);
   };
 
   const initTournament = useCallback((playerList: string[], type: EliminationType) => {
     const shuffled = shuffleArray(playerList);
-    const bracket  = type === 'single' ? buildSingleElim(shuffled) : buildDoubleElim(shuffled);
+    // For doubles: pair consecutive players into team strings e.g. "Alice & Bob"
+    // For singles: use individual player names directly
+    const entrants = gameMode === 'doubles'
+      ? shuffled.reduce<string[]>((acc, _, i) => {
+          if (i % 2 === 0) {
+            // Pair player i with player i+1; if odd one out, they get a solo slot
+            acc.push(i + 1 < shuffled.length
+              ? `${shuffled[i]} & ${shuffled[i + 1]}`
+              : shuffled[i]);
+          }
+          return acc;
+        }, [])
+      : shuffled;
+    const bracket = type === 'single' ? buildSingleElim(entrants) : buildDoubleElim(entrants);
     setTournamentMatches(bracket); setTournamentActive(true); setTournamentWinner(null);
+  // gameMode is stable (set from URL on mount, never changes mid-session)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [gameMode]);
 
   const handleTournamentMatch = (matchId: number, winner: string) => {
     const match = activeTournamentM.find(m => m.id === matchId)!;
@@ -1124,6 +1201,39 @@ function QueueSystemContent() {
 
         <button className="back-home" onClick={() => router.push('/')}><ArrowLeft size={14} /> Back</button>
         <SessionBar sessionId={session.sessionId} isHost={session.isHost} isConnected={session.isConnected} isSaving={session.isSaving} />
+
+        {/* Session expired — TTL deleted it while host was away */}
+        {session.isExpired && (
+          <div className="session-alert session-alert--expired">
+            <WifiOff size={14} /> Session expired. Your data has been cleared.{' '}
+            <button onClick={() => router.push('/')}>Go Home</button>
+          </div>
+        )}
+        {/* Reconnecting — Firestore connection dropped temporarily */}
+        {session.isReconnecting && !session.isExpired && (
+          <div className="session-alert session-alert--reconnecting">
+            <Wifi size={14} /> Reconnecting to session…
+          </div>
+        )}
+
+        {/* Share nudge — shown for 10s after session starts */}
+        {showSharePrompt && session.sessionId && (
+          <div className="share-prompt-banner">
+            <span className="go-live-dot go-live-dot--sm" />
+            Your session is live! Invite viewers →
+            <button className="share-prompt-btn" onClick={() => {
+              setShowSharePrompt(false);
+              // Open the share popover — trigger a click on the Go Live button
+              (document.querySelector('.share-trigger') as HTMLElement)?.click();
+            }}>
+              Go Live
+            </button>
+            <button className="share-prompt-dismiss" onClick={() => setShowSharePrompt(false)}>
+              <X size={12} />
+            </button>
+          </div>
+        )}
+
         {modeSelector}{elimSelector}{uiControls}{tabBar}
         {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
 
@@ -1145,14 +1255,19 @@ function QueueSystemContent() {
                       : `${pendingMatch.player1} vs ${pendingMatch.player2}`}
                   </h3>
 
-                  {/* Doubles: show team chips and scoring, singles: show player buttons */}
+                  {/* Doubles: show team A/B chips with labels, singles: show player buttons */}
                   {gameMode === 'doubles' ? (
                     <>
-                      {/* Display team names as chips */}
                       <div className="team-display-row">
-                        <span className="team-chip team-chip--a">{pendingMatch.player1}</span>
+                        <div className="tourn-team-block">
+                          <span className="tourn-team-label tourn-team-label--a">Team A</span>
+                          <span className="team-chip team-chip--a">{pendingMatch.player1}</span>
+                        </div>
                         <span className="vs-sep">vs</span>
-                        <span className="team-chip team-chip--b">{pendingMatch.player2}</span>
+                        <div className="tourn-team-block">
+                          <span className="tourn-team-label tourn-team-label--b">Team B</span>
+                          <span className="team-chip team-chip--b">{pendingMatch.player2}</span>
+                        </div>
                       </div>
                       <ScoreBoard
                         labelA={pendingMatch.player1!}
@@ -1167,10 +1282,10 @@ function QueueSystemContent() {
                       {session.isHost && (
                         <div className="winning-team">
                           <span className="winning-label">Winner:</span>
-                          <button onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player1!)} className="">
+                          <button onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player1!)}>
                             <Trophy size={12} /> {pendingMatch.player1}
                           </button>
-                          <button onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player2!)} className="">
+                          <button onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player2!)}>
                             <Trophy size={12} /> {pendingMatch.player2}
                           </button>
                         </div>
@@ -1228,6 +1343,38 @@ function QueueSystemContent() {
 
       <button className="back-home" onClick={() => router.push('/')}><ArrowLeft size={14} /> Back</button>
       <SessionBar sessionId={session.sessionId} isHost={session.isHost} isConnected={session.isConnected} isSaving={session.isSaving} />
+
+      {/* Session expired — TTL deleted it while host was away */}
+      {session.isExpired && (
+        <div className="session-alert session-alert--expired">
+          <WifiOff size={14} /> Session expired. Your data has been cleared.{' '}
+          <button onClick={() => router.push('/')}>Go Home</button>
+        </div>
+      )}
+      {/* Reconnecting — Firestore connection dropped temporarily */}
+      {session.isReconnecting && !session.isExpired && (
+        <div className="session-alert session-alert--reconnecting">
+          <Wifi size={14} /> Reconnecting to session…
+        </div>
+      )}
+
+      {/* Share nudge — shown for 10s after session starts */}
+      {showSharePrompt && session.sessionId && (
+        <div className="share-prompt-banner">
+          <span className="go-live-dot go-live-dot--sm" />
+          Your session is live! Invite viewers →
+          <button className="share-prompt-btn" onClick={() => {
+            setShowSharePrompt(false);
+            (document.querySelector('.share-trigger') as HTMLElement)?.click();
+          }}>
+            Go Live
+          </button>
+          <button className="share-prompt-dismiss" onClick={() => setShowSharePrompt(false)}>
+            <X size={12} />
+          </button>
+        </div>
+      )}
+
       {modeSelector}{uiControls}{tabBar}
       {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
 

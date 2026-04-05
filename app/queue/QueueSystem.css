@@ -1314,3 +1314,319 @@ body.dark-mode .on-court-label {
   background: rgba(34, 197, 94, 0.1);
   color: #86efac;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   PADQ — Session Lifecycle CSS
+   Append to bottom of QueueSystem.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Session alert banners ───────────────────────────────────
+   Shown when session expires (TTL) or connection drops
+   ─────────────────────────────────────────────────────────── */
+.session-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: var(--r-sm, 8px);
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+/* Expired — red, session is gone permanently */
+.session-alert--expired {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: var(--danger, #ef4444);
+}
+.session-alert--expired button {
+  margin-left: auto;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger, #ef4444);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.session-alert--expired button:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+/* Reconnecting — amber, temporary connection drop */
+.session-alert--reconnecting {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+  animation: reconnectPulse 1.8s ease-in-out infinite;
+}
+@keyframes reconnectPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.65; }
+}
+
+/* ── Bracket: No Player label ────────────────────────────────
+   Replaces the old "BYE" text in tournament bracket slots
+   ─────────────────────────────────────────────────────────── */
+.bracket-no-player {
+  font-size: 0.7rem;
+  font-style: italic;
+  font-weight: 400;
+  color: var(--txt-3, #94a3b8);
+  opacity: 0.6;
+}
+
+/* Also update the watch page bye-label to match */
+.bye-label {
+  font-size: 0.7rem;
+  font-style: italic;
+  font-weight: 400;
+  color: #6b7280;
+  opacity: 0.6;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   Tournament doubles team display — append to QueueSystem.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* Wraps the "Team A" label + chip together vertically */
+.tourn-team-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
+/* "Team A" / "Team B" small badge above the chip */
+.tourn-team-label {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 10px;
+  border-radius: 99px;
+}
+.tourn-team-label--a {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+.tourn-team-label--b {
+  background: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+/* Dark mode already handled by the existing team-chip colours */
+body.dark-mode .tourn-team-label--a { color: #86efac; }
+body.dark-mode .tourn-team-label--b { color: #93c5fd; }
+
+/* ═══════════════════════════════════════════════════════════
+   PADQ — Go Live / Share CSS
+   Append to bottom of QueueSystem.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Pulsing green "live" dot ─────────────────────────────── */
+.go-live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
+  animation: goLivePulse 1.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.go-live-dot--sm {
+  width: 6px;
+  height: 6px;
+}
+@keyframes goLivePulse {
+  0%, 100% { box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25); }
+  50%       { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0.06); }
+}
+
+/* ── "Go Live" trigger button ─────────────────────────────── */
+/* Overrides the base .share-trigger to add the live accent */
+.share-trigger--live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: var(--r-sm, 8px);
+  border: 1.5px solid rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.08);
+  color: #22c55e;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  letter-spacing: 0.02em;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
+  white-space: nowrap;
+}
+.share-trigger--live:hover {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: rgba(34, 197, 94, 0.65);
+  transform: translateY(-1px);
+}
+.share-trigger--live.share-trigger--active {
+  background: #22c55e;
+  border-color: #22c55e;
+  color: #fff;
+}
+.share-trigger--live.share-trigger--active .go-live-dot {
+  background: #fff;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+/* ── Room code hero inside popover ───────────────────────── */
+/* Sits above the tabs — always visible, quick reference */
+.share-code-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 14px 16px 10px;
+  background: rgba(34, 197, 94, 0.05);
+  border-bottom: 1px solid var(--border, #e2e8f0);
+}
+body.dark-mode .share-code-hero {
+  background: rgba(34, 197, 94, 0.06);
+  border-bottom-color: rgba(255, 255, 255, 0.07);
+}
+
+.share-code-label {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--txt-3, #94a3b8);
+}
+
+.share-code-big {
+  font-family: 'Bebas Neue', 'Impact', monospace;
+  font-size: 2.6rem;
+  letter-spacing: 0.2em;
+  color: var(--txt-1, #1e293b);
+  line-height: 1;
+  user-select: all;
+}
+body.dark-mode .share-code-big { color: #f0f4ff; }
+
+/* ── Native share button ──────────────────────────────────── */
+.share-native-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: var(--r-md, 12px);
+  border: 1.5px solid rgba(34, 197, 94, 0.35);
+  background: rgba(34, 197, 94, 0.1);
+  color: #22c55e;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, transform 0.12s;
+}
+.share-native-btn:hover { background: rgba(34, 197, 94, 0.18); transform: translateY(-1px); }
+.share-native-btn--done {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(34, 197, 94, 0.6);
+}
+
+/* ── Share URL row ────────────────────────────────────────── */
+.share-url-row {
+  background: var(--card-alt, rgba(248, 250, 252, 0.92));
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--r-sm, 8px);
+  padding: 8px 12px;
+  overflow: hidden;
+}
+body.dark-mode .share-url-row {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.share-url-text {
+  font-size: 0.72rem;
+  color: var(--txt-3, #94a3b8);
+  font-family: monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* ── Share popover footer ─────────────────────────────────── */
+.share-footer {
+  font-size: 0.7rem;
+  color: var(--txt-3, #94a3b8);
+  text-align: center;
+  padding: 10px 16px 14px;
+  margin: 0;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+body.dark-mode .share-footer { border-top-color: rgba(255, 255, 255, 0.07); }
+
+/* ── "Your session is live" share prompt banner ───────────── */
+/* Appears for 10 seconds right after the host starts the queue */
+.share-prompt-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  background: rgba(34, 197, 94, 0.07);
+  border: 1.5px solid rgba(34, 197, 94, 0.25);
+  border-radius: var(--r-sm, 8px);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--txt-2, #64748b);
+  animation: promptSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes promptSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.share-prompt-btn {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 99px;
+  border: 1.5px solid rgba(34, 197, 94, 0.4);
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+  font-size: 0.76rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.share-prompt-btn:hover { background: rgba(34, 197, 94, 0.22); }
+
+.share-prompt-dismiss {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--txt-3, #94a3b8);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.share-prompt-dismiss:hover { opacity: 1; }

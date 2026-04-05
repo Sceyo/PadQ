@@ -23,6 +23,7 @@ import {
   updateSession,
   updateQueueSafely,
   addHistoryEntry,
+  touchSession,
   subscribeToSession,
   subscribeToHistory,
   saveHostToStorage,
@@ -45,6 +46,8 @@ export interface SessionState {
   isHost:            boolean;
   isConnected:       boolean;   // true once first Firestore snapshot arrives
   isSaving:          boolean;   // true while a write is in-flight
+  isReconnecting:    boolean;   // true when onSnapshot drops and is retrying
+  isExpired:         boolean;   // true when session was deleted (TTL or hard reset)
 
   // Persisted fields (mirrors Firestore document)
   players:           string[];
@@ -75,6 +78,8 @@ const INITIAL_STATE: SessionState = {
   isHost:            false,
   isConnected:       false,
   isSaving:          false,
+  isReconnecting:    false,
+  isExpired:         false,
   players:           [],
   queue:             [],
   playAllRel:        {},
@@ -125,14 +130,30 @@ export function useSession(): SessionState & SessionActions {
     // Main document — all queue/tournament/mode fields
     unsubSessionRef.current = subscribeToSession(
       sessionId,
+      // onChange: normal update
       (data) => {
         setState(prev => ({
           ...prev,
-          isConnected: true,
+          isConnected:    true,
+          isReconnecting: false,
+          isExpired:      false,
           ...docToState(data),
         }));
       },
-      (err) => console.error('[useSession] onSnapshot error:', err),
+      // onError: Firestore connection dropped — show "Reconnecting…"
+      (err) => {
+        console.error('[useSession] onSnapshot error:', err);
+        setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
+      },
+      // onDeleted: TTL fired or document deleted — mark as expired
+      () => {
+        console.warn('[useSession] session document deleted (TTL or hard reset)');
+        clearHostFromStorage();
+        setState(prev => ({
+          ...INITIAL_STATE,
+          isExpired: true,
+        }));
+      },
     );
 
     // History subcollection — match results, ordered newest-first
@@ -149,13 +170,19 @@ export function useSession(): SessionState & SessionActions {
 
     loadSession(sessionId).then(data => {
       if (!data) {
-        // Session was deleted from Firestore — clear stale storage
+        // Session expired (TTL deleted it) or never existed.
+        // Clear stale storage so the host starts fresh.
         clearHostFromStorage();
+        setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
         return;
       }
 
       sessionIdRef.current = sessionId;
       hostTokenRef.current = hostToken;
+
+      // Touch the session so TTL clock resets on resume.
+      // Fire-and-forget — don't await, don't block the UI.
+      touchSession(sessionId, hostToken);
 
       setState(prev => ({
         ...prev,
@@ -214,17 +241,13 @@ export function useSession(): SessionState & SessionActions {
   /**
    * joinSession
    * Called by a viewer entering a room code.
-   * Returns false if the session doesn't exist in Firestore.
-   *
-   * FIX: we destructure `hostToken` out of `data` before spreading
-   * so the viewer's `hostToken: null` is never overwritten.
-   * Previously: { hostToken: null, ...data } — data.hostToken
-   *             would overwrite the null (TS error 2783).
-   * Now:        we explicitly exclude hostToken from the spread.
+   * Returns false if the session doesn't exist (expired or invalid code).
    */
   const joinSession = useCallback(async (sessionId: string): Promise<boolean> => {
     const upperCode = sessionId.toUpperCase();
     const data = await loadSession(upperCode);
+
+    // Session not found — expired via TTL or bad code
     if (!data) return false;
 
     sessionIdRef.current = upperCode;
@@ -237,9 +260,10 @@ export function useSession(): SessionState & SessionActions {
     setState(prev => ({
       ...prev,
       sessionId:   upperCode,
-      hostToken:   null,      // viewers never get the secret
+      hostToken:   null,
       isHost:      false,
-      isConnected: false,     // will flip true on first snapshot
+      isConnected: false,
+      isExpired:   false,
       ...docToState(safeData as SessionDoc),
     }));
 
