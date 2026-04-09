@@ -235,10 +235,14 @@ function WatchPageContent() {
         },
       );
 
-      // Real-time listener for history subcollection
-      unsubHistory = subscribeToHistory(sessionId, (entries) => {
-        setHistory(entries);
-      });
+      // Real-time listener for history subcollection.
+      // OPTIMIZATION: Only subscribe when viewer opens the history panel.
+      // Saves Firestore reads for viewers who only watch the queue/bracket.
+      if (showHistory) {
+        unsubHistory = subscribeToHistory(sessionId, (entries) => {
+          setHistory(entries);
+        });
+      }
     });
 
     return () => {
@@ -311,6 +315,34 @@ function WatchPageContent() {
   }
 
   if (!session) return null;
+
+  // ── isLive guardrail ─────────────────────────────────────
+  // If host hasn't clicked "Go Live", show a holding screen.
+  // Real-time subscription is still active — page auto-updates
+  // the moment the host goes live (session.isLive flips to true).
+  if (!session.isLive) {
+    return (
+      <div className="watch-shell watch-shell--center">
+        <div className="w-not-live-icon">📡</div>
+        <h2 className="w-error-title" style={{ color: '#f0f4ff' }}>Session Not Live Yet</h2>
+        <p className="w-error-msg">
+          The host hasn't started broadcasting yet.<br />
+          This page will update automatically when they go live.
+        </p>
+        <div className="w-not-live-room">
+          <span className="w-not-live-label">Room</span>
+          <span className="w-not-live-code">{sessionId}</span>
+        </div>
+        <div className="w-not-live-waiting">
+          <Loader2 size={14} className="w-spin" style={{ color: '#6b7280' }} />
+          <span>Waiting for host…</span>
+        </div>
+        <button className="w-back-btn" onClick={() => router.push('/')}>
+          <ArrowLeft size={14} /> Back to Home
+        </button>
+      </div>
+    );
+  }
 
   // ── What the viewer sees — mirrors the HOST's current view ─
   // Guardrail: viewer cannot switch modes. They always see

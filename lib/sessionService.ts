@@ -13,9 +13,11 @@
 import {
   doc,
   getDoc,
+  getDocs,
   setDoc,
   updateDoc,
   deleteDoc,
+  writeBatch,
   onSnapshot,
   runTransaction,
   serverTimestamp,
@@ -80,6 +82,13 @@ export interface SessionDoc {
   tournamentActive: boolean;
   tournamentWinner: string | null;
   liveScore?: LiveScoreState | null;
+  /**
+   * isLive — set to true only when the host explicitly clicks "Go Live".
+   * When false, the session exists in Firestore but viewers are blocked
+   * from connecting — the watch page shows "Session not live yet".
+   * This prevents accidental exposure before the host is ready.
+   */
+  isLive?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   /**
@@ -124,9 +133,10 @@ export async function createSession(
   await setDoc(sessionRef(sessionId), {
     ...data,
     hostToken,
-    createdAt:      serverTimestamp(),
-    updatedAt:      serverTimestamp(),
-    lastActiveAt:   serverTimestamp(),   // ← TTL clock starts here
+    isLive:       false,           // ← host must explicitly go live
+    createdAt:    serverTimestamp(),
+    updatedAt:    serverTimestamp(),
+    lastActiveAt: serverTimestamp(),
   });
 
   return { sessionId, hostToken };
@@ -282,6 +292,23 @@ export async function deleteSession(
   } catch {
     // If already deleted, ignore
   }
+}
+
+/**
+ * clearHistory
+ * Deletes all documents in the history subcollection using a batch.
+ * Firestore batch deletes up to 500 docs atomically.
+ * Called when the host clicks "Clear History".
+ */
+export async function clearHistory(
+  sessionId: string,
+): Promise<void> {
+  const histRef = collection(db, 'sessions', sessionId, 'history');
+  const snap = await getDocs(histRef);
+  if (snap.empty) return;
+  const batch = writeBatch(db);
+  snap.docs.forEach(d => batch.delete(d.ref));
+  await batch.commit();
 }
 
 /**

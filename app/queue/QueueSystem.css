@@ -1630,3 +1630,399 @@ body.dark-mode .share-footer { border-top-color: rgba(255, 255, 255, 0.07); }
   transition: opacity 0.15s;
 }
 .share-prompt-dismiss:hover { opacity: 1; }
+
+/* ═══════════════════════════════════════════════════════════
+   PADQ — Go Live v2 + Watch Page CSS
+   ═══════════════════════════════════════════════════════════
+   TWO SECTIONS:
+     A) Append to QueueSystem.css  → host Go Live button states
+     B) Append to watch.css        → "not live yet" screen
+   ═══════════════════════════════════════════════════════════ */
+
+/* ════════════════════════════════════════════════════════════
+   A) QueueSystem.css additions
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Go Live pulsing dot ──────────────────────────────────── */
+.go-live-dot {
+  display: inline-block; width: 8px; height: 8px;
+  border-radius: 50%; background: #22c55e;
+  box-shadow: 0 0 0 2px rgba(34,197,94,.25);
+  animation: goLivePulse 1.6s ease-in-out infinite; flex-shrink: 0;
+}
+.go-live-dot--sm { width: 6px; height: 6px; }
+@keyframes goLivePulse {
+  0%,100% { box-shadow: 0 0 0 2px rgba(34,197,94,.25); }
+  50%     { box-shadow: 0 0 0 6px rgba(34,197,94,.06); }
+}
+
+/* ── OFF state — grey "Go Live" ───────────────────────────── */
+.share-trigger--offline {
+  display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px;
+  border-radius: var(--r-sm,8px); border: 1.5px solid var(--border,#e2e8f0);
+  background: var(--btn,#f1f5f9); color: var(--txt-2,#64748b);
+  font-size: .78rem; font-weight: 600; cursor: pointer; font-family: inherit;
+  transition: background .15s, border-color .15s, color .15s; white-space: nowrap;
+}
+.share-trigger--offline:hover { background: var(--btn-hover,#e2e8f0); color: var(--txt-1,#1e293b); border-color: rgba(99,102,241,.35); }
+body.dark-mode .share-trigger--offline { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); color: #9ca3af; }
+body.dark-mode .share-trigger--offline:hover { background: rgba(255,255,255,.1); color: #f0f4ff; }
+
+/* ── ON state — green "● LIVE" ───────────────────────────── */
+.share-trigger--is-live {
+  display: inline-flex; align-items: center; gap: 7px; padding: 7px 13px;
+  border-radius: var(--r-sm,8px); border: 1.5px solid rgba(34,197,94,.5);
+  background: rgba(34,197,94,.12); color: #22c55e;
+  font-size: .78rem; font-weight: 800; cursor: pointer; font-family: inherit;
+  letter-spacing: .04em; white-space: nowrap;
+  box-shadow: 0 0 12px rgba(34,197,94,.15);
+  transition: background .15s, box-shadow .15s;
+}
+.share-trigger--is-live:hover { background: rgba(34,197,94,.2); box-shadow: 0 0 18px rgba(34,197,94,.25); }
+.share-trigger--is-live.share-trigger--active { background: #22c55e; color: #fff; box-shadow: 0 0 20px rgba(34,197,94,.4); }
+.share-trigger--is-live.share-trigger--active .go-live-dot { background: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,.3); }
+
+/* ── Room code hero ───────────────────────────────────────── */
+.share-code-hero { display:flex; flex-direction:column; align-items:center; gap:3px; padding:14px 16px 10px; background:rgba(34,197,94,.05); border-bottom:1px solid var(--border,#e2e8f0); }
+body.dark-mode .share-code-hero { background:rgba(34,197,94,.06); border-bottom-color:rgba(255,255,255,.07); }
+.share-code-label { font-size:.6rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--txt-3,#94a3b8); }
+.share-code-big { font-family:'Bebas Neue','Impact',monospace; font-size:2.6rem; letter-spacing:.2em; color:var(--txt-1,#1e293b); line-height:1; user-select:all; }
+body.dark-mode .share-code-big { color:#f0f4ff; }
+
+/* ── Native share button ──────────────────────────────────── */
+.share-native-btn { display:inline-flex; align-items:center; justify-content:center; gap:7px; width:100%; padding:11px 16px; border-radius:var(--r-md,12px); border:1.5px solid rgba(34,197,94,.35); background:rgba(34,197,94,.1); color:#22c55e; font-size:.85rem; font-weight:700; cursor:pointer; font-family:inherit; transition:background .15s,transform .12s; }
+.share-native-btn:hover { background:rgba(34,197,94,.18); transform:translateY(-1px); }
+.share-native-btn--done { background:rgba(34,197,94,.18); border-color:rgba(34,197,94,.6); }
+
+/* ── URL row ─────────────────────────────────────────────── */
+.share-url-row { background:var(--card-alt,rgba(248,250,252,.92)); border:1px solid var(--border,#e2e8f0); border-radius:var(--r-sm,8px); padding:8px 12px; overflow:hidden; }
+body.dark-mode .share-url-row { background:rgba(255,255,255,.05); border-color:rgba(255,255,255,.1); }
+.share-url-text { font-size:.72rem; color:var(--txt-3,#94a3b8); font-family:monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:block; }
+
+/* ── End Live Session ─────────────────────────────────────── */
+.share-end-row { padding:10px 14px 14px; border-top:1px solid var(--border,#e2e8f0); display:flex; justify-content:center; }
+body.dark-mode .share-end-row { border-top-color:rgba(255,255,255,.07); }
+.share-end-btn { font-size:.72rem; font-weight:600; color:var(--danger,#ef4444); background:rgba(239,68,68,.06); border:1px solid rgba(239,68,68,.2); border-radius:99px; padding:5px 16px; cursor:pointer; font-family:inherit; transition:background .15s; }
+.share-end-btn:hover { background:rgba(239,68,68,.12); }
+
+/* ════════════════════════════════════════════════════════════
+   B) watch.css additions — "Not Live Yet" screen
+   ════════════════════════════════════════════════════════════ */
+
+.w-not-live-icon { font-size:2.8rem; margin-bottom:4px; animation:notLivePulse 2.5s ease-in-out infinite; }
+@keyframes notLivePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.65;transform:scale(.95)} }
+
+.w-not-live-room { display:flex; flex-direction:column; align-items:center; gap:4px; margin:8px 0; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:12px; padding:12px 32px; }
+.w-not-live-label { font-size:.62rem; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:#4b5563; }
+.w-not-live-code { font-family:'Bebas Neue',monospace; font-size:2.2rem; letter-spacing:.18em; color:#f0f4ff; user-select:all; }
+
+.w-not-live-waiting { display:flex; align-items:center; gap:7px; font-size:.75rem; color:#6b7280; margin:4px 0 12px; }
+
+/* ═══════════════════════════════════════════════════════════
+   PADQ — Mobile + UI Fixes
+   Append to bottom of QueueSystem.css
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Session dot colour fix ───────────────────────────────────
+   The green dot in the session bar was reading as "Live" to users.
+   Connected = blue, not green. Green is reserved for the Go Live button.
+   ─────────────────────────────────────────────────────────── */
+.session-dot--live {
+  background: #6366f1 !important;           /* indigo = connected, not live */
+  box-shadow: 0 0 0 2px rgba(99,102,241,.2) !important;
+  animation: none !important;               /* no pulse — just a status indicator */
+}
+.session-dot--offline {
+  background: #4b5563 !important;
+  box-shadow: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — centres content, improves touch targets
+   ═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+
+  /* ── Global layout ────────────────────────────────────────── */
+  .queue-system {
+    padding: 12px 14px 24px;
+  }
+
+  /* ── Top bar controls ─────────────────────────────────────── */
+  .topright-controls {
+    top: 12px;
+    right: 12px;
+    gap: 6px;
+  }
+  .back-home {
+    top: 14px;
+    left: 14px;
+  }
+
+  /* ── Session bar ──────────────────────────────────────────── */
+  .session-bar {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px 10px;
+    padding: 8px 12px;
+    margin: 48px 0 8px;       /* clear the topright-controls above */
+    border-radius: 12px;
+    font-size: 0.72rem;
+  }
+  .session-label { display: none; } /* hide "Room:" label, keep the code */
+  .session-code  { font-size: 1rem; letter-spacing: .1em; }
+
+  /* ── Mode selector ────────────────────────────────────────── */
+  .mode-selector {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+  }
+  .mode-btn {
+    flex: 1 1 auto;
+    min-width: 80px;
+    justify-content: center;
+    padding: 8px 10px;
+    font-size: 0.72rem;
+  }
+
+  /* ── UI controls row ──────────────────────────────────────── */
+  .ui-controls {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+  }
+  .control-btn {
+    flex: 1 1 auto;
+    min-width: 100px;
+    justify-content: center;
+    padding: 8px 12px;
+    font-size: 0.72rem;
+  }
+
+  /* ── Tab bar ──────────────────────────────────────────────── */
+  .tab-bar {
+    justify-content: center;
+  }
+  .tab-btn {
+    flex: 1;
+    justify-content: center;
+    font-size: 0.75rem;
+  }
+
+  /* ── Main layout stack ────────────────────────────────────── */
+  .main-layout {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  /* ── Queue title ──────────────────────────────────────────── */
+  .queue-title {
+    font-size: 1.4rem;
+    text-align: center;
+  }
+
+  /* ── Current match section ────────────────────────────────── */
+  .current-match-players {
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+  }
+  .vs-sep {
+    font-size: 0.8rem;
+  }
+
+  /* ── Pairing table ────────────────────────────────────────── */
+  .pairing-table {
+    font-size: 0.75rem;
+  }
+  .pairing-table th,
+  .pairing-table td {
+    padding: 8px 8px;
+  }
+  .match-label-cell {
+    font-size: 0.65rem;
+    min-width: 80px;
+  }
+
+  /* ── Scoreboard ───────────────────────────────────────────── */
+  .scoreboard {
+    gap: 0;
+  }
+  .score-display {
+    font-size: 3.5rem !important;
+  }
+  .score-player-name {
+    font-size: 0.7rem !important;
+    max-width: 90px;
+  }
+  .score-side {
+    padding: 14px 8px;
+  }
+  .scoreboard-toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+  .score-limit-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  /* ── Team display row ─────────────────────────────────────── */
+  .team-display-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .team-chip {
+    width: 100%;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* ── Player buttons ───────────────────────────────────────── */
+  .player-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+  .player-btn-team-a,
+  .player-btn-team-b,
+  .player-btn-unassigned {
+    flex: 1 1 auto;
+    min-width: 80px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  /* ── Winner / match buttons ───────────────────────────────── */
+  .match-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+  .match-buttons button {
+    flex: 1 1 auto;
+    justify-content: center;
+  }
+  .winning-team {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  /* ── Bracket scroll ───────────────────────────────────────── */
+  .bracket-container {
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+  .bracket-round {
+    min-width: 120px;
+  }
+  .bracket-player {
+    font-size: 0.72rem;
+    padding: 6px 8px;
+  }
+
+  /* ── Analytics table ──────────────────────────────────────── */
+  .analytics-table-scroll {
+    overflow-x: auto;
+  }
+  .analytics-table {
+    font-size: 0.72rem;
+    min-width: 480px;
+  }
+
+  /* ── History panel ────────────────────────────────────────── */
+  .history-area {
+    margin-top: 0;
+  }
+  .history-item {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  /* ── Smart suggestions ────────────────────────────────────── */
+  .smart-card {
+    font-size: 0.74rem;
+    padding: 10px 12px;
+  }
+
+  /* ── Live tools row ───────────────────────────────────────── */
+  .live-tools-row {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+  .live-panel-toggle {
+    font-size: 0.72rem;
+  }
+
+  /* ── Setup page ───────────────────────────────────────────── */
+  .setup-hero {
+    text-align: center;
+    padding-top: 56px;
+  }
+  .app-name {
+    font-size: 1.6rem;
+    text-align: center;
+  }
+  .player-input-container {
+    width: 100%;
+  }
+  .input-group {
+    width: 100%;
+  }
+  .input-group input {
+    font-size: 0.88rem;
+  }
+
+  /* ── Share popover ────────────────────────────────────────── */
+  .share-popover {
+    right: -10px;
+    width: min(280px, calc(100vw - 24px));
+  }
+
+  /* ── Hard Reset button text — shorten on mobile ────────────── */
+  .hard-reset-btn span:last-child {
+    display: none;
+  }
+  .hard-reset-btn::after {
+    content: 'Reset';
+  }
+
+  /* ── Elim selector ────────────────────────────────────────── */
+  .elim-selector {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .elim-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+    min-width: 100px;
+  }
+}
+
+/* Slightly larger phones and up — tablet tweaks */
+@media (min-width: 641px) and (max-width: 900px) {
+  .main-layout {
+    flex-direction: column;
+  }
+  .session-bar {
+    font-size: 0.8rem;
+  }
+  .score-display {
+    font-size: 3.8rem !important;
+  }
+}

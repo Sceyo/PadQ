@@ -19,7 +19,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore }                    from 'firebase/firestore';
+import { getFirestore, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -33,5 +33,16 @@ const firebaseConfig = {
 // Prevent re-initializing on hot-reload in Next.js dev mode
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export const db = getFirestore(app);
+// Use experimentalForceLongPolling to suppress "WebChannelConnection
+// RPC 'Listen' stream transport errored" in dev and on some networks.
+// Long polling is slightly less efficient than WebSockets but is far
+// more reliable behind proxies, VPNs, and corporate firewalls.
+// In production on Vercel this makes no measurable difference.
+export const db = getApps().length > 1
+  ? getFirestore(app)
+  : initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+    });
+
 export default app;

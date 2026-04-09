@@ -23,6 +23,7 @@ import {
   updateSession,
   updateQueueSafely,
   addHistoryEntry,
+  clearHistory,
   touchSession,
   subscribeToSession,
   subscribeToHistory,
@@ -60,6 +61,7 @@ export interface SessionState {
   tournamentWinner:  string | null;
   matchHistory:      MatchHistoryEntry[];
   liveScore:         LiveScoreState | null;
+  isLive:            boolean;   // true only after host explicitly clicks "Go Live"
 }
 
 export interface SessionActions {
@@ -68,6 +70,7 @@ export interface SessionActions {
   endSession:        () => void;
   commitMatchResult: (patch: Partial<SessionDoc>, entry: Omit<MatchHistoryEntry, 'hostToken'>) => Promise<void>;
   syncField:         (patch: Partial<Omit<SessionDoc, 'hostToken' | 'createdAt'>>) => Promise<void>;
+  clearMatchHistory: () => Promise<void>;
 }
 
 // ── Initial state ──────────────────────────────────────────
@@ -90,6 +93,7 @@ const INITIAL_STATE: SessionState = {
   tournamentWinner:  null,
   matchHistory:      [],
   liveScore:         null,
+  isLive:            false,
 };
 
 // ── Hook ───────────────────────────────────────────────────
@@ -118,6 +122,7 @@ export function useSession(): SessionState & SessionActions {
     tournamentActive:  data.tournamentActive  ?? false,
     tournamentWinner:  data.tournamentWinner  ?? null,
     liveScore:         data.liveScore         ?? null,
+    isLive:            data.isLive            ?? false,
   });
 
   // ── Listener setup ─────────────────────────────────────────
@@ -335,6 +340,30 @@ export function useSession(): SessionState & SessionActions {
     }
   }, []);
 
+  /**
+   * clearMatchHistory
+   * Deletes all history documents from Firestore subcollection
+   * AND clears the local matchHistory state immediately.
+   * The onSnapshot listener will fire with an empty array after the batch delete,
+   * which keeps everything in sync.
+   */
+  const clearMatchHistory = useCallback(async () => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) {
+      // No Firebase session — just clear local state
+      setState(prev => ({ ...prev, matchHistory: [] }));
+      return;
+    }
+    // Clear local immediately so UI updates without waiting for Firestore
+    setState(prev => ({ ...prev, matchHistory: [] }));
+    try {
+      await clearHistory(sessionId);
+      // onSnapshot will fire with empty array, confirming the clear
+    } catch (err) {
+      console.error('[useSession] clearMatchHistory error:', err);
+    }
+  }, []);
+
   return {
     ...state,
     startSession,
@@ -342,5 +371,6 @@ export function useSession(): SessionState & SessionActions {
     endSession,
     commitMatchResult,
     syncField,
+    clearMatchHistory,
   };
 }

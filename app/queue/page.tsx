@@ -34,7 +34,7 @@
  */
 
 import React, {
-  useState, useEffect, useLayoutEffect, useMemo, useCallback, Suspense,
+  useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef, Suspense,
 } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { QRCodeSVG } from 'qrcode.react';   // npm install qrcode.react
@@ -163,10 +163,10 @@ function buildSingleElim(players: string[]): TournamentMatch[] {
   let id = Date.now();
   const matches: TournamentMatch[] = [];
   const seeded = [...players];
-  while (seeded.length < size) seeded.push('No player');
+  while (seeded.length < size) seeded.push('__BYE__');
   for (let s = 0; s < size / 2; s++) {
     const [p1, p2] = [seeded[s * 2], seeded[s * 2 + 1]];
-    const isBye = p2 === 'No player';
+    const isBye = p2 === '__BYE__';
     matches.push({ id: id++, round: 0, slot: s, bracket: 'W', player1: p1, player2: isBye ? null : p2, winner: isBye ? p1 : null, loser: null, isBye });
   }
   for (let r = 1; r < totalRounds; r++) {
@@ -204,13 +204,13 @@ function buildDoubleElim(players: string[]): TournamentMatch[] {
   let id = Date.now();
   const matches: TournamentMatch[] = [];
   const seeded = [...players];
-  while (seeded.length < size) seeded.push('No player');
+  while (seeded.length < size) seeded.push('__BYE__');
   for (let r = 0; r < wbR; r++) {
     const slots = size / Math.pow(2, r + 1);
     for (let s = 0; s < slots; s++) {
       if (r === 0) {
         const [p1, p2] = [seeded[s * 2], seeded[s * 2 + 1]];
-        const isBye = p2 === 'No player';
+        const isBye = p2 === '__BYE__';
         matches.push({ id: id++, round: r, slot: s, bracket: 'W', player1: p1, player2: isBye ? null : p2, winner: isBye ? p1 : null, loser: null, isBye });
       } else {
         matches.push({ id: id++, round: r, slot: s, bracket: 'W', player1: null, player2: null, winner: null, loser: null, isBye: false });
@@ -745,13 +745,13 @@ const SessionBar: React.FC<{
   isConnected: boolean;
   isSaving:    boolean;
 }> = ({ sessionId, isHost, isConnected, isSaving }) => {
-  if (!sessionId) return null;   // ← nothing shown before session starts
+  if (!sessionId) return null;
 
   return (
     <div className={`session-bar ${isHost ? 'session-bar--host' : 'session-bar--viewer'}`}>
       <span className={`session-dot ${isConnected ? 'session-dot--live' : 'session-dot--offline'}`} />
       <span className="session-status-text">
-        {isSaving ? 'Saving…' : isConnected ? 'Live' : 'Connecting…'}
+        {isSaving ? 'Saving…' : isConnected ? 'Connected' : 'Connecting…'}
       </span>
       <span className="session-label">Room:</span>
       <span className="session-code">{sessionId}</span>
@@ -768,28 +768,44 @@ const SessionBar: React.FC<{
 
 /**
 /**
- * ShareButton — "Go Live"
+ * ShareButton — Explicit "Go Live" toggle
  * ─────────────────────────────────────────────────────────
- * Sits top-right in every game view (host only).
- * Three ways to share:
- *   1. Native share sheet (Web Share API — WhatsApp, SMS, etc.)
- *   2. Room code — large display font, read it out loud
- *   3. QR code — scan to open /watch/{sessionId}
+ * BEHAVIOUR:
+ *   • Default state: "Go Live" button (grey). Session exists in
+ *     Firestore but isLive=false. Viewers cannot connect yet.
+ *   • After clicking Go Live: button turns green "● LIVE".
+ *     isLive written to Firestore. Popover shows room code/QR/share.
+ *     Viewers can now join via the watch page.
+ *   • Clicking again: toggles off ("Go Live" grey). isLive=false.
+ *     Existing viewer connections continue until they refresh.
+ *
+ * OPTIMIZATIONS:
+ *   • QR code only renders when QR tab is active (lazy)
+ *   • watchUrl computed once on mount, not on every render
  */
-const ShareButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
-  const [open,        setOpen]       = useState(false);
-  const [tab,         setTab]        = useState<'share' | 'code' | 'qr'>('share');
-  const [copied,      setCopied]     = useState(false);
-  const [justShared,  setJustShared] = useState(false);
+const ShareButton: React.FC<{
+  sessionId: string;
+  isLive:    boolean;
+  onToggle:  (live: boolean) => void;
+}> = ({ sessionId, isLive, onToggle }) => {
+  const [open,       setOpen]      = useState(false);
+  const [tab,        setTab]       = useState<'share' | 'code' | 'qr'>('share');
+  const [copied,     setCopied]    = useState(false);
+  const [justShared, setJustShared] = useState(false);
 
-  // Build watchUrl client-side only — window is not available during SSR
+  // Build watchUrl client-side only — window is undefined during SSR
   const [watchUrl, setWatchUrl] = useState(`/watch/${sessionId}`);
   useEffect(() => {
     setWatchUrl(`${window.location.origin}/watch/${sessionId}`);
   }, [sessionId]);
 
-  // Does this browser support the Web Share API?
   const canNativeShare = typeof navigator !== 'undefined' && !!navigator.share;
+
+  const handleGoLive = () => {
+    const next = !isLive;
+    onToggle(next);
+    if (next) setOpen(true);   // auto-open popover when going live
+  };
 
   const copyLink = () => {
     navigator.clipboard.writeText(watchUrl);
@@ -797,19 +813,16 @@ const ShareButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Web Share API — opens native share sheet (WhatsApp, SMS, copy, etc.)
   const nativeShare = async () => {
     try {
       await navigator.share({
         title: `PADQ — Watch Session ${sessionId}`,
-        text:  `Watch this live badminton session! Room code: ${sessionId}`,
+        text:  `Watch this live session! Room code: ${sessionId}`,
         url:   watchUrl,
       });
       setJustShared(true);
       setTimeout(() => setJustShared(false), 2000);
-    } catch {
-      // User cancelled or API not supported — fall through silently
-    }
+    } catch { /* user cancelled */ }
   };
 
   // Close popover on outside click
@@ -825,69 +838,57 @@ const ShareButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
   return (
     <div className="share-popover-wrap">
 
-      {/* ── Trigger — "Go Live" ── */}
+      {/* ── Go Live / LIVE toggle button ── */}
       <button
-        className={`share-trigger share-trigger--live ${open ? 'share-trigger--active' : ''}`}
-        onClick={() => setOpen(o => !o)}
-        title="Share this session with viewers"
+        className={`share-trigger ${isLive ? 'share-trigger--is-live' : 'share-trigger--offline'} ${open && isLive ? 'share-trigger--active' : ''}`}
+        onClick={isLive ? () => setOpen(o => !o) : handleGoLive}
+        title={isLive ? 'Session is live — click to manage sharing' : 'Go live so viewers can join'}
       >
-        <span className="go-live-dot" />
-        Go Live
+        {isLive
+          ? <><span className="go-live-dot" /> LIVE</>
+          : <><QrCode size={13} /> Go Live</>
+        }
       </button>
 
-      {/* ── Popover ── */}
-      {open && (
+      {/* ── Popover — only shown when LIVE ── */}
+      {open && isLive && (
         <div className="share-popover">
           <div className="share-popover-header">
             <span className="share-popover-title">
-              <span className="go-live-dot go-live-dot--sm" /> Share Session
+              <span className="go-live-dot go-live-dot--sm" /> Session Live
             </span>
             <button className="share-popover-close" onClick={() => setOpen(false)}>
               <X size={14} />
             </button>
           </div>
 
-          {/* Room code always visible at top — quick reference */}
+          {/* Room code — always pinned at top */}
           <div className="share-code-hero">
             <span className="share-code-label">Room Code</span>
             <span className="share-code-big">{sessionId}</span>
           </div>
 
-          {/* Tab switcher */}
+          {/* Tabs */}
           <div className="share-tabs">
             {canNativeShare && (
-              <button className={`share-tab ${tab === 'share' ? 'active' : ''}`} onClick={() => setTab('share')}>
-                Share
-              </button>
+              <button className={`share-tab ${tab === 'share' ? 'active' : ''}`} onClick={() => setTab('share')}>Share</button>
             )}
-            <button className={`share-tab ${tab === 'code' ? 'active' : ''}`} onClick={() => setTab('code')}>
-              Link
-            </button>
-            <button className={`share-tab ${tab === 'qr' ? 'active' : ''}`} onClick={() => setTab('qr')}>
-              QR
-            </button>
+            <button className={`share-tab ${tab === 'code' ? 'active' : ''}`} onClick={() => setTab('code')}>Link</button>
+            <button className={`share-tab ${tab === 'qr' ? 'active' : ''}`} onClick={() => setTab('qr')}>QR</button>
           </div>
 
-          {/* Native share tab */}
+          {/* Native share */}
           {tab === 'share' && canNativeShare && (
             <div className="share-code-view">
               <p className="share-hint">Send via WhatsApp, SMS, or any app</p>
-              <button
-                className={`share-native-btn ${justShared ? 'share-native-btn--done' : ''}`}
-                onClick={nativeShare}
-              >
-                {justShared
-                  ? <><Check size={15} /> Shared!</>
-                  : <><ExternalLink size={15} /> Share Link</>
-                }
+              <button className={`share-native-btn ${justShared ? 'share-native-btn--done' : ''}`} onClick={nativeShare}>
+                {justShared ? <><Check size={15} /> Shared!</> : <><ExternalLink size={15} /> Share Link</>}
               </button>
-              <p className="share-hint share-hint--sm">
-                Viewers open the link → they see your queue live
-              </p>
+              <p className="share-hint share-hint--sm">Viewers open the link → watch live</p>
             </div>
           )}
 
-          {/* Copy link tab */}
+          {/* Copy link */}
           {tab === 'code' && (
             <div className="share-code-view">
               <p className="share-hint">Copy the full watch link</p>
@@ -905,26 +906,22 @@ const ShareButton: React.FC<{ sessionId: string }> = ({ sessionId }) => {
             </div>
           )}
 
-          {/* QR tab */}
+          {/* QR — only rendered when tab is active */}
           {tab === 'qr' && (
             <div className="share-qr-view">
               <div className="share-qr-wrap">
-                <QRCodeSVG
-                  value={watchUrl}
-                  size={180}
-                  bgColor="#ffffff"
-                  fgColor="#1e293b"
-                  level="M"
-                  includeMargin={false}
-                />
+                <QRCodeSVG value={watchUrl} size={180} bgColor="#ffffff" fgColor="#1e293b" level="M" includeMargin={false} />
               </div>
               <p className="share-hint share-hint--sm">Scan to open the watch page instantly</p>
             </div>
           )}
 
-          <p className="share-footer">
-            Viewers see the queue live — read only, no sign-in needed.
-          </p>
+          {/* End session */}
+          <div className="share-end-row">
+            <button className="share-end-btn" onClick={() => { onToggle(false); setOpen(false); }}>
+              End Live Session
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -959,10 +956,14 @@ function QueueSystemContent() {
   }, [session.players, session.isConnected]);
 
   useEffect(() => {
-    if (!session.isConnected || !session.queue.length) return;
+    // Don't sync FROM Firebase while a commit is in-flight.
+    // During isSaving, the local queue is already correct (advanced by
+    // playSingles/playDoubles). The Firebase snapshot we'd receive here
+    // would be the PRE-match queue (not yet updated), causing a revert.
+    if (!session.isConnected || !session.queue.length || session.isSaving) return;
     if (session.queue.join(',') !== queue.join(',')) setQueue(session.queue);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.queue, session.isConnected]);
+  }, [session.queue, session.isConnected, session.isSaving]);
 
   // UI-only state (never persisted)
   const [tempPlayers,  setTempPlayers]  = useState<string[]>([]);
@@ -976,8 +977,29 @@ function QueueSystemContent() {
   const [activeTab,    setActiveTab]    = useState<GameTab>('queue');
   // Live score — host writes on every point, viewers read via session.liveScore
   const [liveScore,    setLiveScore]    = useState<LiveScoreState | null>(null);
-  // Show a "Your session is live — share it!" nudge for 10s after session starts
-  const [showSharePrompt, setShowSharePrompt] = useState(false);
+  // isLive — mirrors session.isLive. Separate local copy so UI updates instantly.
+  const [isLiveLocal,  setIsLiveLocal]  = useState(false);
+
+  // Sync session.isLive → local (e.g. when host resumes an already-live session)
+  useEffect(() => { setIsLiveLocal(session.isLive ?? false); }, [session.isLive]);
+
+  // Toggle Go Live — writes isLive to Firestore immediately
+  const handleGoLive = (live: boolean) => {
+    setIsLiveLocal(live);
+    if (session.sessionId) session.syncField({ isLive: live });
+  };
+
+  // Debounce score writes — score updates fire on every tap.
+  // We write to Firestore at most every 300ms to avoid flooding writes.
+  const scoreWriteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleScoreChange = (score: LiveScoreState | null) => {
+    setLiveScore(score);
+    if (!session.sessionId) return;
+    if (scoreWriteTimer.current) clearTimeout(scoreWriteTimer.current);
+    scoreWriteTimer.current = setTimeout(() => {
+      session.syncField({ liveScore: score });
+    }, 300);
+  };
 
   // Persisted state — local fallbacks when not connected
   const [localQueueMode,        setLocalQueueMode]        = useState<QueueMode>('default');
@@ -993,17 +1015,20 @@ function QueueSystemContent() {
   const setTournamentMatches = (tm: TournamentMatch[]) => { setLocalTournamentM(tm); if (session.sessionId) session.syncField({ tournamentMatches: tm }); };
   const setTournamentActive  = (v: boolean)      => { setLocalTournamentActive(v); if (session.sessionId) session.syncField({ tournamentActive: v }); };
   const setTournamentWinner  = (w: string | null) => { setLocalTournamentWinner(w); if (session.sessionId) session.syncField({ tournamentWinner: w }); };
-  const addHistory = (entry: MatchHistoryEntry) => {
+  const addHistory = (entry: MatchHistoryEntry, newQueue?: string[]) => {
     setLocalHistory(prev => [entry, ...prev]);
-    if (session.sessionId) session.commitMatchResult({ queue }, { id: entry.id, mode: entry.mode, players: entry.players, winner: entry.winner, score: entry.score, timestamp: entry.timestamp });
+    // CRITICAL: Use newQueue (the already-advanced queue from playSingles/playDoubles)
+    // NOT the `queue` closure variable — that still holds the PRE-match queue at the
+    // time this function was defined. Passing the old queue to Firestore causes
+    // onSnapshot to sync it back, overwriting the local queue advance.
+    const queueToCommit = newQueue ?? queue;
+    if (session.sessionId) session.commitMatchResult(
+      { queue: queueToCommit },
+      { id: entry.id, mode: entry.mode, players: entry.players, winner: entry.winner, score: entry.score, timestamp: entry.timestamp }
+    );
   };
 
-  // Push live score to Firebase so viewers see it in real-time.
-  // Called by ScoreBoard's onScoreChange on every point.
-  const handleScoreChange = (score: LiveScoreState | null) => {
-    setLiveScore(score);
-    if (session.sessionId) session.syncField({ liveScore: score });
-  };
+  // Push live score to Firebase — debounced above in state declarations
 
   // Resolve active values
   const activeQueueMode        = session.isConnected ? session.queueMode         : localQueueMode;
@@ -1078,10 +1103,7 @@ function QueueSystemContent() {
       initialBracket = localElimType === 'single' ? buildSingleElim(bracketEntrants) : buildDoubleElim(bracketEntrants);
       setLocalTournamentM(initialBracket); setLocalTournamentActive(true);
     }
-    await session.startSession({ gameMode: gameMode ?? 'singles', queueMode: localQueueMode, elimType: localElimType, players: tempPlayers, queue: tempPlayers, playAllRel: {}, tournamentMatches: initialBracket, tournamentActive: localQueueMode === 'tournament', tournamentWinner: null });
-    // Show the share prompt for 10 seconds so the host knows to invite viewers
-    setShowSharePrompt(true);
-    setTimeout(() => setShowSharePrompt(false), 10000);
+    await session.startSession({ gameMode: gameMode ?? 'singles', queueMode: localQueueMode, elimType: localElimType, players: tempPlayers, queue: tempPlayers, playAllRel: {}, tournamentMatches: initialBracket, tournamentActive: localQueueMode === 'tournament', tournamentWinner: null, isLive: false });
   };
 
   const initTournament = useCallback((playerList: string[], type: EliminationType) => {
@@ -1107,7 +1129,11 @@ function QueueSystemContent() {
 
   const handleTournamentMatch = (matchId: number, winner: string) => {
     const match = activeTournamentM.find(m => m.id === matchId)!;
-    addHistory({ id: Date.now(), mode: 'Tournament', players: `${match.player1} vs ${match.player2 || 'Bye'}`, winner, timestamp: new Date().toLocaleTimeString() });
+    // Tournament doesn't rotate the queue, so pass current queue as-is
+    addHistory(
+      { id: Date.now(), mode: 'Tournament', players: `${match.player1} vs ${match.player2 || 'Bye'}`, winner, timestamp: new Date().toLocaleTimeString() },
+      queue
+    );
     const updated = activeElimType === 'single' ? recordSingleWinner(activeTournamentM, matchId, winner) : recordDoubleWinner(activeTournamentM, matchId, winner);
     setTournamentMatches(updated);
     const gfMatch = updated.find(m => m.bracket === 'GF');
@@ -1126,13 +1152,49 @@ function QueueSystemContent() {
     else if (newMode !== 'tournament') { setTournamentActive(false); setTournamentWinner(null); setTournamentMatches([]); }
     if (newMode === 'playall') resetPlayAllRelationships();
   };
-  const handleSinglesMatch = (winner: string, score?: string) => { const [p1, p2] = [queue[0], queue[1]]; playSingles(winner); if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2); addHistory({ id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`, winner, score, timestamp: new Date().toLocaleTimeString() }); setModalWinner(`${winner} wins!`); setModalScore(score); setModalOpen(true); };
-  const handleDoublesMatch = (a: string[], b: string[], w: 'A' | 'B', score?: string) => { playDoubles([...a], [...b], w); if (activeQueueMode === 'playall') recordPlayAllDoubles(a, b); const winnerNames = w === 'A' ? a.join(' & ') : b.join(' & '); addHistory({ id: Date.now(), mode: 'Doubles', players: `${a.join(' & ')} vs ${b.join(' & ')}`, winner: winnerNames, score, timestamp: new Date().toLocaleTimeString() }); setModalWinner(`${winnerNames} win!`); setModalScore(score); setModalOpen(true); };
+  const handleSinglesMatch = (winner: string, score?: string) => {
+    const [p1, p2] = [queue[0], queue[1]];
+    // playSingles advances useQueue's internal queue state.
+    // We compute the new queue manually here so we can pass it
+    // to addHistory synchronously — before React re-renders.
+    // Default mode: winner → back, loser → front of remaining players.
+    // The exact rotation mirrors what playSingles does internally.
+    playSingles(winner);
+    if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
+    // Derive the post-match queue: remove the two playing, then reinsert
+    const rest = queue.slice(2);
+    const loser = winner === p1 ? p2 : p1;
+    const newQueue = [loser, ...rest, winner];
+    addHistory(
+      { id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`, winner, score, timestamp: new Date().toLocaleTimeString() },
+      newQueue
+    );
+    setModalWinner(`${winner} wins!`); setModalScore(score); setModalOpen(true);
+  };
+  const handleDoublesMatch = (a: string[], b: string[], w: 'A' | 'B', score?: string) => {
+    playDoubles([...a], [...b], w);
+    if (activeQueueMode === 'playall') recordPlayAllDoubles(a, b);
+    const winnerTeam = w === 'A' ? a : b;
+    const loserTeam  = w === 'A' ? b : a;
+    const winnerNames = winnerTeam.join(' & ');
+    // Derive the post-match queue: remove first 4, losers → front, winners → back
+    const rest = queue.slice(4);
+    const newQueue = [...loserTeam, ...rest, ...winnerTeam];
+    addHistory(
+      { id: Date.now(), mode: 'Doubles', players: `${a.join(' & ')} vs ${b.join(' & ')}`, winner: winnerNames, score, timestamp: new Date().toLocaleTimeString() },
+      newQueue
+    );
+    setModalWinner(`${winnerNames} win!`); setModalScore(score); setModalOpen(true);
+  };
   const handleAddPlayerLive = (name: string) => { if (players.includes(name)) { alert('Player already exists'); return; } const np = [...players, name], nq = [...queue, name]; setPlayers(np); setQueue(nq); if (session.sessionId) session.syncField({ players: np, queue: nq }); };
-  const handleFullReset = () => {
-    if (!confirm('Reset everything and return to player setup?')) return;
-    session.endSession();
-    window.location.reload();
+  // Clear History — wipes match log only. Queue, players, and session stay intact.
+  const handleFullReset = async () => {
+    if (!confirm('Clear all match history? The queue and players will stay.')) return;
+    // 1. Clear local display immediately — no waiting for Firebase
+    setLocalHistory([]);
+    // 2. Delete from Firestore — this also triggers onSnapshot to push [] back,
+    //    which keeps session.matchHistory in sync for all connected clients.
+    await session.clearMatchHistory();
   };
 
   // Task 4: Hard Reset — clears ALL localStorage, sessionStorage, and reloads.
@@ -1151,7 +1213,7 @@ function QueueSystemContent() {
   const canControl = !session.sessionId || session.isHost;
   const modeSelector = (<div className="mode-selector">{(['default', 'tournament', 'playall'] as const).map(m => (<button key={m} className={`mode-btn ${activeQueueMode === m ? 'active' : ''}`} onClick={() => canControl && handleModeChange(m)} disabled={!canControl}>{m === 'default' && <><Swords size={12} /> Default</>}{m === 'tournament' && <><Trophy size={12} /> Tournament</>}{m === 'playall' && <><Star size={12} /> Play‑all</>}</button>))}</div>);
   const elimSelector = activeQueueMode === 'tournament' && (<div className="elim-selector">{(['single', 'double'] as const).map(t => (<button key={t} className={`elim-btn ${activeElimType === t ? 'active' : ''}`} onClick={() => canControl && handleElimTypeChange(t)}>{t === 'single' ? 'Single Elim' : 'Double Elim'}</button>))}</div>);
-  const uiControls = (<div className="ui-controls"><button className="control-btn" onClick={() => setShowHistory(h => !h)}><History size={12} /> {showHistory ? 'Hide' : 'Show'} History</button>{(session.isHost || !session.sessionId) && (<button className="control-btn control-btn--danger" onClick={handleFullReset}><RotateCcw size={12} /> Reset</button>)}</div>);
+  const uiControls = (<div className="ui-controls"><button className="control-btn" onClick={() => setShowHistory(h => !h)}><History size={12} /> {showHistory ? 'Hide' : 'Show'} History</button>{(session.isHost || !session.sessionId) /* && (<button className="control-btn control-btn--danger" onClick={handleFullReset}><Trash2 size={12} /> Clear History</button>)*/}</div>);
   const tabBar = (<div className="tab-bar"><button className={`tab-btn ${activeTab === 'queue' ? 'active' : ''}`} onClick={() => setActiveTab('queue')}><Swords size={12} /> Queue</button><button className={`tab-btn ${activeTab === 'analytics' ? 'active' : ''}`} onClick={() => setActiveTab('analytics')}><BarChart2 size={12} /> Stats</button></div>);
   const historyPanel = showHistory && (<div className="history-area"><h3><History size={13} /> History</h3>{activeHistory.length === 0 ? <p className="muted-hint">No matches played yet.</p> : (<ul className="history-list">{activeHistory.map(e => (<li key={e.id} className="history-item"><div className="history-time">{e.timestamp}</div><div className="history-match">{e.players}</div><div className="history-winner"><Trophy size={11} /> {e.winner}</div>{e.score && <div className="history-score">{e.score}</div>}</li>))}</ul>)}</div>);
 
@@ -1191,7 +1253,7 @@ function QueueSystemContent() {
         {/* Top-right corner: dark mode + share button */}
         <div className="topright-controls">
           <button className="dark-mode-toggle" onClick={() => setDarkMode(d => !d)}>{darkMode ? <Sun size={17} /> : <Moon size={17} />}</button>
-          {session.isHost && session.sessionId && <ShareButton sessionId={session.sessionId} />}
+          {session.isHost && session.sessionId && <ShareButton sessionId={session.sessionId!} isLive={isLiveLocal} onToggle={handleGoLive} />}
           {canControl && (
             <button className="hard-reset-btn" onClick={handleHardReset} title="Hard Reset — clears all cached data">
               <RotateCcw size={13} /> Hard Reset
@@ -1213,24 +1275,6 @@ function QueueSystemContent() {
         {session.isReconnecting && !session.isExpired && (
           <div className="session-alert session-alert--reconnecting">
             <Wifi size={14} /> Reconnecting to session…
-          </div>
-        )}
-
-        {/* Share nudge — shown for 10s after session starts */}
-        {showSharePrompt && session.sessionId && (
-          <div className="share-prompt-banner">
-            <span className="go-live-dot go-live-dot--sm" />
-            Your session is live! Invite viewers →
-            <button className="share-prompt-btn" onClick={() => {
-              setShowSharePrompt(false);
-              // Open the share popover — trigger a click on the Go Live button
-              (document.querySelector('.share-trigger') as HTMLElement)?.click();
-            }}>
-              Go Live
-            </button>
-            <button className="share-prompt-dismiss" onClick={() => setShowSharePrompt(false)}>
-              <X size={12} />
-            </button>
           </div>
         )}
 
@@ -1333,7 +1377,7 @@ function QueueSystemContent() {
       {/* Top-right corner: dark mode + share button */}
       <div className="topright-controls">
         <button className="dark-mode-toggle" onClick={() => setDarkMode(d => !d)}>{darkMode ? <Sun size={17} /> : <Moon size={17} />}</button>
-        {session.isHost && session.sessionId && <ShareButton sessionId={session.sessionId} />}
+        {session.isHost && session.sessionId && <ShareButton sessionId={session.sessionId!} isLive={isLiveLocal} onToggle={handleGoLive} />}
         {canControl && (
           <button className="hard-reset-btn" onClick={handleHardReset} title="Hard Reset — clears all cached data">
             <RotateCcw size={13} /> Hard Reset
@@ -1355,23 +1399,6 @@ function QueueSystemContent() {
       {session.isReconnecting && !session.isExpired && (
         <div className="session-alert session-alert--reconnecting">
           <Wifi size={14} /> Reconnecting to session…
-        </div>
-      )}
-
-      {/* Share nudge — shown for 10s after session starts */}
-      {showSharePrompt && session.sessionId && (
-        <div className="share-prompt-banner">
-          <span className="go-live-dot go-live-dot--sm" />
-          Your session is live! Invite viewers →
-          <button className="share-prompt-btn" onClick={() => {
-            setShowSharePrompt(false);
-            (document.querySelector('.share-trigger') as HTMLElement)?.click();
-          }}>
-            Go Live
-          </button>
-          <button className="share-prompt-dismiss" onClick={() => setShowSharePrompt(false)}>
-            <X size={12} />
-          </button>
         </div>
       )}
 

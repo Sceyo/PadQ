@@ -185,7 +185,7 @@ export default function HomePage() {
             loading="eager"
             priority
             className="hp-logo-img"
-            style={{ width: '100%', height: 'auto', maxWidth: '320px' }}
+            style={{ width: "100%", height: "auto" }}
           />
         </div>
 
