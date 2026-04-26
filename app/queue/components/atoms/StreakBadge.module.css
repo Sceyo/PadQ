@@ -1,0 +1,12 @@
+/* atoms/StreakBadge.module.css */
+.streakBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--warning);
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--warning) 15%, transparent);
+}

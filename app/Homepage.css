@@ -49,7 +49,7 @@
 .hp-logo-img {
   width: 100%;
   height: auto;
-  max-width: 220px;         /* tighter — prevents logo taking too much vertical space */
+  max-width: 320px;         /* tighter — prevents logo taking too much vertical space */
   display: block;
 }
 
@@ -60,6 +60,7 @@
   color: #9ca3af;
   max-width: 400px;
   margin: 0;
+  
 }
 
 /* ── Mode cards ──────────────────────────────────────────── */

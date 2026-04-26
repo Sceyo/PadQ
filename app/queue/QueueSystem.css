@@ -2026,3 +2026,410 @@ body.dark-mode .share-end-row { border-top-color:rgba(255,255,255,.07); }
     font-size: 3.8rem !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════
+   TASK 2 — Randomize Partners toggle removed.
+   CSS classes (.randomize-partners-btn, .rp-pip) are no longer
+   rendered; removed to keep the stylesheet clean.
+   ═══════════════════════════════════════════════════════════ */
+
+
+/* ═══════════════════════════════════════════════════════════
+   TASK 3 — User Guide Modal (updated)
+   • guide-close-x: icon-only X button in top-right corner
+   • guide-modal: taller height for better readability
+   ═══════════════════════════════════════════════════════════ */
+
+/* ? help button — same family as hard-reset-btn / dark-mode-toggle */
+.help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: var(--btn, #f1f5f9);
+  color: var(--txt-2, #64748b);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, transform 0.15s;
+  flex-shrink: 0;
+}
+.help-btn:hover {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+  transform: scale(1.1);
+}
+body.dark-mode .help-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #9ca3af;
+}
+body.dark-mode .help-btn:hover {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+
+/* Guide modal — extends base .modal-content */
+.guide-modal {
+  width: min(500px, calc(100vw - 32px));
+  /* Taller than before for better readability */
+  max-height: min(680px, calc(100vh - 48px));
+  padding: 0;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* Header row: title left, X button right */
+.guide-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  flex-shrink: 0;
+}
+body.dark-mode .guide-header {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+.guide-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--txt-1, #1e293b);
+}
+
+/* X close button — icon-only, top-right of header */
+.guide-close-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: var(--btn, #f1f5f9);
+  color: var(--txt-3, #94a3b8);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.guide-close-x:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: var(--danger, #ef4444);
+}
+body.dark-mode .guide-close-x {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #6b7280;
+}
+body.dark-mode .guide-close-x:hover {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+}
+
+/* Section navigation — row of emoji pills */
+.guide-nav {
+  display: flex;
+  gap: 4px;
+  padding: 10px 16px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--border, #e2e8f0);
+  flex-shrink: 0;
+  scrollbar-width: none;
+}
+.guide-nav::-webkit-scrollbar { display: none; }
+body.dark-mode .guide-nav {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+.guide-nav-btn {
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: var(--btn, #f1f5f9);
+  color: var(--txt-2, #64748b);
+  font-size: 0.88rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s;
+}
+.guide-nav-btn:hover {
+  background: var(--btn-hover, #e2e8f0);
+}
+.guide-nav-btn.active {
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.5);
+}
+body.dark-mode .guide-nav-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #9ca3af;
+}
+body.dark-mode .guide-nav-btn.active {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: rgba(99, 102, 241, 0.5);
+  color: #a5b4fc;
+}
+
+/* Body — scrollable, flex-grows to fill available height */
+.guide-body {
+  padding: 22px 24px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.guide-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0 0 14px;
+  color: var(--txt-1, #1e293b);
+  line-height: 1.3;
+}
+
+.guide-section-body {
+  font-size: 0.86rem;
+  color: var(--txt-2, #64748b);
+  line-height: 1.8;
+  margin: 0;
+  white-space: pre-line;
+}
+
+/* Footer — prev / page counter / next */
+.guide-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--border, #e2e8f0);
+  flex-shrink: 0;
+}
+body.dark-mode .guide-footer {
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.guide-arrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: 99px;
+  border: 1.5px solid var(--border, #e2e8f0);
+  background: var(--btn, #f1f5f9);
+  color: var(--txt-2, #64748b);
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.guide-arrow:hover:not(:disabled) {
+  background: var(--accent, #6366f1);
+  border-color: var(--accent, #6366f1);
+  color: #fff;
+}
+.guide-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.guide-pager {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--txt-3, #94a3b8);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dark mode guide */
+body.dark-mode .guide-section-title { color: #f0f4ff; }
+body.dark-mode .guide-section-body  { color: #94a3b8; }
+body.dark-mode .guide-arrow {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #9ca3af;
+}
+
+/* Mobile */
+@media (max-width: 640px) {
+  .guide-modal {
+    width: calc(100vw - 24px);
+    max-height: calc(100vh - 32px);
+  }
+  .guide-nav  { padding: 8px 12px; }
+  .guide-body { padding: 16px; }
+  .guide-footer { padding: 10px 14px 14px; }
+  .guide-section-title { font-size: 0.92rem; }
+  .guide-section-body  { font-size: 0.8rem; }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PADDLE STATUS PANEL  (§ 8c)
+   Sits below the mode description in Default doubles mode.
+   Shows current cycle phase, W/L pools, and waiting players.
+   ═══════════════════════════════════════════════════════════ */
+
+.paddle-status {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: var(--card-alt);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 0.8rem;
+}
+
+/* Header row: phase label + waiting badge */
+.paddle-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.paddle-phase-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--txt-2);
+}
+
+.paddle-waiting-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--warning, #f59e0b);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 99px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+/* Pool rows container */
+.paddle-pools {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Single W or L pool row */
+.paddle-pool {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: var(--r-sm);
+  flex-wrap: wrap;
+}
+
+/* W pool — green tint */
+.paddle-pool--w {
+  background: rgba(34, 197, 94, 0.06);
+  border: 1px solid rgba(34, 197, 94, 0.2);
+}
+
+/* L pool — red tint */
+.paddle-pool--l {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}
+
+/* "W" / "L" tag badge */
+.paddle-pool-tag {
+  font-size: 0.65rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  padding: 2px 8px;
+  border-radius: 99px;
+  flex-shrink: 0;
+}
+
+.paddle-pool--w .paddle-pool-tag {
+  background: rgba(34, 197, 94, 0.15);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+.paddle-pool--l .paddle-pool-tag {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--danger, #ef4444);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+body.dark-mode .paddle-pool--w .paddle-pool-tag { color: #86efac; }
+body.dark-mode .paddle-pool--l .paddle-pool-tag { color: #fca5a5; }
+
+/* Pairs inside a pool */
+.paddle-pool-pairs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Individual pair chip */
+.paddle-pair {
+  font-size: 0.76rem;
+  font-weight: 500;
+  color: var(--txt-2);
+  background: var(--btn);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 2px 10px;
+  white-space: nowrap;
+}
+
+/* Active pair (head of pool — plays next) */
+.paddle-pair--active {
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.1);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+/* Unplayed players row */
+.paddle-unplayed {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+
+.paddle-unplayed-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--txt-3);
+  white-space: nowrap;
+}
+
+.paddle-unplayed-names {
+  font-size: 0.78rem;
+  color: var(--txt-2);
+}
+
+/* Dark mode pool backgrounds */
+body.dark-mode .paddle-pool--w { background: rgba(34, 197, 94, 0.07); border-color: rgba(34, 197, 94, 0.15); }
+body.dark-mode .paddle-pool--l { background: rgba(239, 68, 68, 0.07); border-color: rgba(239, 68, 68, 0.15); }
+
+/* Mobile */
+@media (max-width: 640px) {
+  .paddle-status { padding: 10px 12px; }
+  .paddle-pool   { padding: 6px 10px; }
+  .paddle-pair   { font-size: 0.7rem; }
+}

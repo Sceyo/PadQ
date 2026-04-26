@@ -1,0 +1,58 @@
+/* AnalyticsDashboard.module.css */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+.statCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+.statValue { font-size: 2rem; font-weight: 800; color: var(--accent); }
+.statLabel { font-size: 0.75rem; color: var(--text-muted); margin-top: var(--space-1); }
+
+/* Original analytics styles */
+.analyticsPanel { padding: 4px 0 28px; }
+.analyticsSectionLabel {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .7rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .09em; color: var(--txt-3); margin-bottom: 12px;
+}
+.analyticsTableScroll { overflow-x: auto; }
+.analyticsTable {
+  width: 100%; border-collapse: collapse; font-size: .82rem;
+}
+.analyticsTable th {
+  padding: 8px 10px; text-align: left; font-size: .65rem;
+  font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--txt-3); background: var(--th-bg);
+  border-bottom: 2px solid var(--border); white-space: nowrap;
+}
+.analyticsTable td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+.analyticsTable tr.analyticsTop td { background: rgba(99,102,241,.04); }
+.colRankNum { color: var(--txt-3); font-variant-numeric: tabular-nums; width: 28px; }
+.colWins { color: var(--success); font-weight: 700; }
+.colLosses { color: var(--danger); font-weight: 700; }
+.colStreakZero { color: var(--txt-3); }
+.winrateCell {
+  display: flex; flex-direction: column; gap: 4px; min-width: 80px;
+}
+.winrateCell span { font-size: .75rem; font-weight: 600; }
+.statBarTrack {
+  height: 5px; background: var(--border); border-radius: 99px;
+  overflow: hidden; min-width: 60px;
+}
+.statBarFill { height: 100%; border-radius: 99px; transition: width .4s ease; }
+.frequencyChart { display: flex; flex-direction: column; gap: 8px; }
+.freqRow {
+  display: flex; align-items: center; gap: 10px;
+}
+.freqName {
+  font-size: .78rem; font-weight: 500; min-width: 88px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.freqCount {
+  font-size: .7rem; color: var(--txt-3); min-width: 28px; text-align: right;
+}

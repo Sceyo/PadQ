@@ -1,0 +1,45 @@
+/* WinnerModal.module.css */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.68);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+.card {
+  background: var(--modal-bg);
+  padding: 36px;
+  border-radius: var(--radius-lg);
+  text-align: center;
+  min-width: 300px;
+  box-shadow: var(--shadow-lg);
+  display: flex; flex-direction: column; align-items: center;
+  animation: popIn .24s cubic-bezier(.34,1.56,.64,1) forwards;
+}
+.trophy { color: var(--warning); margin-bottom: 8px; font-size: 4rem; }
+.winnerName {
+  font-size: 1.65rem; font-weight: 700; margin: 10px 0 6px;
+  color: var(--accent);
+}
+.modalScore {
+  font-size: 1.1rem; font-weight: 700; color: var(--txt-2);
+  margin: 0 0 16px; font-variant-numeric: tabular-nums;
+}
+.modalControls {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 20px; width: 100%;
+}
+.autoCloseToggle {
+  display: flex; align-items: center; gap: 7px;
+  font-size: .8rem; cursor: pointer; color: var(--txt-2);
+}
+.closeModalBtn {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--danger); color: #fff; border: none;
+  padding: 8px 18px; border-radius: var(--radius-sm);
+  font-size: .82rem; font-weight: 600; cursor: pointer;
+}
+@keyframes popIn {
+  from { opacity: 0; transform: scale(.88) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}

@@ -180,8 +180,8 @@ export default function HomePage() {
           <Image
             src="/PADQ.png"
             alt="PADQ"
-            width={320}
-            height={320}
+            width={520}
+            height={520}
             loading="eager"
             priority
             className="hp-logo-img"

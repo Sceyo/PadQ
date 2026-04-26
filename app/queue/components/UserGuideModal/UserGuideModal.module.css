@@ -1,0 +1,95 @@
+/* UserGuideModal.module.css */
+.helpBtn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; border-radius: 50%;
+  border: 1.5px solid var(--border); background: var(--btn);
+  color: var(--txt-2); font-size: 0.9rem; font-weight: 700;
+  cursor: pointer; transition: all 0.15s;
+}
+.helpBtn:hover {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  transform: scale(1.1);
+}
+
+.guideModal {
+  width: min(500px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 48px));
+  padding: 0; text-align: left; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.guideHeader {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px 12px; border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.guideTitle {
+  font-size: 0.78rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--txt-1);
+}
+.guideCloseX {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1.5px solid var(--border); background: var(--btn);
+  color: var(--txt-3); cursor: pointer;
+}
+.guideCloseX:hover { background: rgba(239,68,68,0.1); border-color: rgba(239,68,68,0.4); color: var(--danger); }
+
+.guideNav {
+  display: flex; gap: 4px; padding: 10px 16px;
+  overflow-x: auto; border-bottom: 1px solid var(--border);
+  flex-shrink: 0; scrollbar-width: none;
+}
+.guideNavBtn {
+  padding: 4px 10px; border-radius: 99px;
+  border: 1.5px solid var(--border); background: var(--btn);
+  color: var(--txt-2); font-size: 0.88rem; cursor: pointer;
+  white-space: nowrap;
+}
+.guideNavBtn.active {
+  background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.5);
+}
+.guideBody {
+  padding: 22px 24px; flex: 1; overflow-y: auto;
+}
+.guideSectionTitle {
+  font-size: 1rem; font-weight: 700; margin: 0 0 14px;
+  color: var(--txt-1);
+}
+.guideSectionBody {
+  font-size: 0.86rem; color: var(--txt-2); line-height: 1.8;
+  white-space: pre-line;
+}
+.guideFooter {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 20px 16px; border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.guideArrow {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 6px 14px; border-radius: 99px;
+  border: 1.5px solid var(--border); background: var(--btn);
+  color: var(--txt-2); font-size: 0.76rem; font-weight: 600;
+  cursor: pointer;
+}
+.guideArrow:hover:not(:disabled) { background: var(--accent); border-color: var(--accent); color: #fff; }
+.guideArrow:disabled { opacity: 0.35; cursor: not-allowed; }
+.guidePager {
+  font-size: 0.72rem; font-weight: 600; color: var(--txt-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dark mode */
+body.dark-mode .guideHeader, body.dark-mode .guideNav, body.dark-mode .guideFooter {
+  border-color: rgba(255,255,255,0.08);
+}
+body.dark-mode .guideNavBtn {
+  background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.1);
+  color: #9ca3af;
+}
+body.dark-mode .guideNavBtn.active { background: rgba(99,102,241,0.18); color: #a5b4fc; }
+body.dark-mode .guideSectionTitle { color: #f0f4ff; }
+body.dark-mode .guideSectionBody { color: #94a3b8; }
+body.dark-mode .guideArrow {
+  background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12);
+  color: #9ca3af;
+}

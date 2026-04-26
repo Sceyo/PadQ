@@ -1,0 +1,297 @@
+/* Mobile responsive overrides for all components */
+
+/*═══════════════════════════════════════════════════════════ */
+
+@media (max-width: 640px) {
+
+  /* ── Global layout ────────────────────────────────────────── */  
+  .queue-system {  
+    padding: 12px 14px 24px;  
+  }
+
+  /* ── Top bar controls ─────────────────────────────────────── */  
+  .topright-controls {  
+    top: 12px;  
+    right: 12px;  
+    gap: 6px;  
+  }  
+  .back-home {  
+    top: 14px;  
+    left: 14px;  
+  }
+
+  /* ── Session bar ──────────────────────────────────────────── */  
+  .session-bar {  
+    flex-wrap: wrap;  
+    justify-content: center;  
+    gap: 6px 10px;  
+    padding: 8px 12px;  
+    margin: 48px 0 8px;       /* clear the topright-controls above */  
+    border-radius: 12px;  
+    font-size: 0.72rem;  
+  }  
+  .session-label { display: none; } /* hide "Room:" label, keep the code */  
+  .session-code  { font-size: 1rem; letter-spacing: .1em; }
+
+  /* ── Mode selector ────────────────────────────────────────── */  
+  .mode-selector {  
+    display: flex;  
+    flex-wrap: wrap;  
+    justify-content: center;  
+    gap: 6px;  
+    width: 100%;  
+  }  
+  .mode-btn {  
+    flex: 1 1 auto;  
+    min-width: 80px;  
+    justify-content: center;  
+    padding: 8px 10px;  
+    font-size: 0.72rem;  
+  }
+
+  /* ── UI controls row ──────────────────────────────────────── */  
+  .ui-controls {  
+    display: flex;  
+    flex-wrap: wrap;  
+    justify-content: center;  
+    gap: 6px;  
+    width: 100%;  
+  }  
+  .control-btn {  
+    flex: 1 1 auto;  
+    min-width: 100px;  
+    justify-content: center;  
+    padding: 8px 12px;  
+    font-size: 0.72rem;  
+  }
+
+  /* ── Tab bar ──────────────────────────────────────────────── */  
+  .tab-bar {  
+    justify-content: center;  
+  }  
+  .tab-btn {  
+    flex: 1;  
+    justify-content: center;  
+    font-size: 0.75rem;  
+  }
+
+  /* ── Main layout stack ────────────────────────────────────── */  
+  .main-layout {  
+    flex-direction: column;  
+    gap: 16px;  
+  }
+
+  /* ── Queue title ──────────────────────────────────────────── */  
+  .queue-title {  
+    font-size: 1.4rem;  
+    text-align: center;  
+  }
+
+  /* ── Current match section ────────────────────────────────── */  
+  .current-match-players {  
+    flex-direction: column;  
+    align-items: center;  
+    gap: 6px;  
+    text-align: center;  
+  }  
+  .vs-sep {  
+    font-size: 0.8rem;  
+  }
+
+  /* ── Pairing table ────────────────────────────────────────── */  
+  .pairing-table {  
+    font-size: 0.75rem;  
+  }  
+  .pairing-table th,  
+  .pairing-table td {  
+    padding: 8px 8px;  
+  }  
+  .match-label-cell {  
+    font-size: 0.65rem;  
+    min-width: 80px;  
+  }
+
+  /* ── Scoreboard ───────────────────────────────────────────── */  
+  .scoreboard {  
+    gap: 0;  
+  }  
+  .score-display {  
+    font-size: 3.5rem !important;  
+  }  
+  .score-player-name {  
+    font-size: 0.7rem !important;  
+    max-width: 90px;  
+  }  
+  .score-side {  
+    padding: 14px 8px;  
+  }  
+  .scoreboard-toolbar {  
+    flex-wrap: wrap;  
+    gap: 6px;  
+    justify-content: center;  
+  }  
+  .score-limit-row {  
+    flex-wrap: wrap;  
+    justify-content: center;  
+    gap: 4px;  
+  }
+
+  /* ── Team display row ─────────────────────────────────────── */  
+  .team-display-row {  
+    flex-direction: column;  
+    align-items: center;  
+    gap: 8px;  
+  }  
+  .team-chip {  
+    width: 100%;  
+    text-align: center;  
+    justify-content: center;  
+  }
+
+  /* ── Player buttons ───────────────────────────────────────── */  
+  .player-buttons {  
+    display: flex;  
+    flex-wrap: wrap;  
+    justify-content: center;  
+    gap: 6px;  
+  }  
+  .player-btn-team-a,  
+  .player-btn-team-b,  
+  .player-btn-unassigned {  
+    flex: 1 1 auto;  
+    min-width: 80px;  
+    justify-content: center;  
+    text-align: center;  
+  }
+
+  /* ── Winner / match buttons ───────────────────────────────── */  
+  .match-buttons {  
+    display: flex;  
+    flex-wrap: wrap;  
+    gap: 8px;  
+    justify-content: center;  
+  }  
+  .match-buttons button {  
+    flex: 1 1 auto;  
+    justify-content: center;  
+  }  
+  .winning-team {  
+    flex-wrap: wrap;  
+    justify-content: center;  
+    gap: 6px;  
+  }
+
+  /* ── Bracket scroll ───────────────────────────────────────── */  
+  .bracket-container {  
+    overflow-x: auto;  
+    padding-bottom: 8px;  
+  }  
+  .bracket-round {  
+    min-width: 120px;  
+  }  
+  .bracket-player {  
+    font-size: 0.72rem;  
+    padding: 6px 8px;  
+  }
+
+  /* ── Analytics table ──────────────────────────────────────── */  
+  .analytics-table-scroll {  
+    overflow-x: auto;  
+  }  
+  .analytics-table {  
+    font-size: 0.72rem;  
+    min-width: 480px;  
+  }
+
+  /* ── History panel ────────────────────────────────────────── */  
+  .history-area {  
+    margin-top: 0;  
+  }  
+  .history-item {  
+    flex-wrap: wrap;  
+    gap: 4px;  
+  }
+
+  /* ── Smart suggestions ────────────────────────────────────── */  
+  .smart-card {  
+    font-size: 0.74rem;  
+    padding: 10px 12px;  
+  }
+
+  /* ── Live tools row ───────────────────────────────────────── */  
+  .live-tools-row {  
+    flex-wrap: wrap;  
+    gap: 6px;  
+    justify-content: center;  
+  }  
+  .live-panel-toggle {  
+    font-size: 0.72rem;  
+  }
+
+  /* ── Setup page ───────────────────────────────────────────── */  
+  .setup-hero {  
+    text-align: center;  
+    padding-top: 56px;  
+  }  
+  .app-name {  
+    font-size: 1.6rem;  
+    text-align: center;  
+  }  
+  .player-input-container {  
+    width: 100%;  
+  }  
+  .input-group {  
+    width: 100%;  
+  }  
+  .input-group input {  
+    font-size: 0.88rem;  
+  }
+
+  /* ── Share popover ────────────────────────────────────────── */  
+  .share-popover {  
+    right: -10px;  
+    width: min(280px, calc(100vw - 24px));  
+  }
+
+  /* ── Hard Reset button text — shorten on mobile ────────────── */  
+  .hard-reset-btn span:last-child {  
+    display: none;  
+  }  
+  .hard-reset-btn::after {  
+    content: 'Reset';  
+  }
+
+  /* ── Elim selector ────────────────────────────────────────── */  
+  .elim-selector {  
+    display: flex;  
+    justify-content: center;  
+    gap: 6px;  
+    flex-wrap: wrap;  
+  }  
+  .elim-btn {  
+    flex: 1 1 auto;  
+    justify-content: center;  
+    min-width: 100px;  
+  }  
+}
+
+/* Slightly larger phones and up — tablet tweaks */  
+@media (min-width: 641px) and (max-width: 900px) {  
+  .main-layout {  
+    flex-direction: column;  
+  }  
+  .session-bar {  
+    font-size: 0.8rem;  
+  }  
+  .score-display {  
+    font-size: 3.8rem !important;  
+  }  
+}
+
+/* ═══════════════════════════════════════════════════════════  
+   TASK 2 — Randomize Partners toggle removed.  
+   CSS classes (.randomize-partners-btn, .rp-pip) are no longer  
+   rendered; removed to keep the stylesheet clean.  
+   ═══════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════*/

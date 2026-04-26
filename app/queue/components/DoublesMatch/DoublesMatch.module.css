@@ -1,0 +1,72 @@
+/* DoublesMatch.module.css */
+.matchSection {
+  margin-top: 0; margin-bottom: 20px; padding: 22px;
+  border: 1.5px solid var(--border); border-radius: var(--radius-md);
+  background: var(--card-alt);
+}
+.matchSectionTitle {
+  display: flex; align-items: center; gap: 7px;
+  font-size: .92rem; font-weight: 700; margin: 0 0 16px; color: var(--txt-1);
+}
+.currentMatchPlayers {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 1rem; font-weight: 700; margin-bottom: 16px; flex-wrap: wrap;
+}
+.matchButtons {
+  display: flex; gap: 10px; flex-wrap: wrap;
+}
+.matchButtons button {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 10px 20px; font-size: .85rem; font-weight: 600;
+  border-radius: var(--radius-sm); border: 1.5px solid var(--border);
+  background: var(--btn); color: var(--txt-1); cursor: pointer;
+}
+.matchButtons button:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.teamDisplayRow {
+  display: flex; align-items: center; gap: 10px; margin: 12px 0; flex-wrap: wrap;
+}
+.teamChip {
+  display: inline-flex; align-items: center; padding: 4px 12px;
+  border-radius: 99px; font-size: .85rem; font-weight: 600;
+}
+.teamChipA { background: rgba(34,197,94,.12); color: #15803d; }
+.teamChipB { background: rgba(59,130,246,.12); color: #1d4ed8; }
+.vsSep { font-size: .75rem; color: var(--txt-3); }
+
+.playerButtons {
+  display: flex; gap: 7px; flex-wrap: wrap; margin: 12px 0;
+}
+.playerBtnTeamA, .playerBtnTeamB, .playerBtnUnassigned {
+  padding: 8px 14px; border-radius: var(--radius-sm);
+  border: 2px solid transparent; font-size: .82rem; font-weight: 600;
+  cursor: pointer;
+}
+.playerBtnTeamA { background: rgba(34,197,94,.15); border-color: #22c55e; }
+.playerBtnTeamB { background: rgba(59,130,246,.15); border-color: #3b82f6; }
+.playerBtnUnassigned { background: var(--btn); border-color: var(--border); }
+
+.winningTeam {
+  display: flex; align-items: center; gap: 8px; margin: 14px 0; flex-wrap: wrap;
+}
+.winningLabel { font-size: .8rem; font-weight: 700; color: var(--txt-2); }
+.winningTeam button {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 7px 16px; border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border); background: var(--btn);
+  font-size: .8rem; font-weight: 600; cursor: pointer;
+}
+.selectedWinner { background: var(--success) !important; color: #fff !important; border-color: var(--success) !important; }
+
+.matchActionBtn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--warning); color: #fff; border: none;
+  padding: 10px 22px; font-size: .85rem; font-weight: 600;
+  border-radius: var(--radius-sm); cursor: pointer;
+}
+
+/* Dark mode */
+body.dark-mode .teamChipA { color: #86efac; }
+body.dark-mode .teamChipB { color: #93c5fd; }
+body.dark-mode .playerBtnTeamA { background: rgba(34,197,94,.1); }
+body.dark-mode .playerBtnTeamB { background: rgba(59,130,246,.1); }

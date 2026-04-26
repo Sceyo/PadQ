@@ -1,0 +1,35 @@
+/* SinglesStatusPanel.module.css */
+.root {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+.kingRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 700;
+  color: var(--warning);
+}
+.streakPips { display: flex; gap: 4px; }
+.pip        { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+.pip.filled { background: var(--warning); }
+.queue {
+  margin-top: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.queueItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: .875rem;
+}
+.position {
+  width: 1.5rem;
+  text-align: right;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}

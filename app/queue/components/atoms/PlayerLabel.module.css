@@ -1,0 +1,6 @@
+/* atoms/PlayerLabel.module.css */
+.playerLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
