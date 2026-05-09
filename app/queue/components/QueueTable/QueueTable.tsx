@@ -1,36 +1,57 @@
-'use client';
+import React from 'react';
+import type { PlayerStat } from '../../lib/types';
+import { PlayerLabel } from '../atoms/PlayerLabel';
 
-import PlayerLabel from '../atoms/PlayerLabel';
-import RankBadge from '../atoms/RankBadge';
-import styles from './QueueTable.module.css';
-import type { Player } from '@/types';
-
-interface Props {
-  players: Player[];
-  courtId: string;
-  isHost: boolean;
-  onReorder?: (from: number, to: number) => void;
-}
-
-export default function QueueTable({ players, courtId, isHost, onReorder }: Props) {
+export const SinglesTable: React.FC<{ queue: string[]; statsMap: Record<string, PlayerStat> }> = ({ queue, statsMap }) => {
+  const pairs = [];
+  for (let i = 0; i < queue.length; i += 2)
+    pairs.push({ n: i / 2 + 1, p1: queue[i], p2: i + 1 < queue.length ? queue[i + 1] : 'Bye' });
   return (
-    <div className={styles.container}>
-      <h3 className={styles.heading}>Queue ({players.length})</h3>
-      <ul className={styles.list}>
-        {players.map((p, idx) => (
-          <li key={p.id} className={styles.row}>
-            <span className={styles.position}>#{idx + 1}</span>
-            <PlayerLabel name={p.name} isActive={idx === 0} />
-            <RankBadge rank={p.rank} />
-            {isHost && onReorder && (
-              <div className={styles.reorder}>
-                <button onClick={() => onReorder(idx, Math.max(0, idx - 1))} aria-label="Move up">▲</button>
-                <button onClick={() => onReorder(idx, Math.min(players.length - 1, idx + 1))} aria-label="Move down">▼</button>
-              </div>
-            )}
-          </li>
+    <table className="pairing-table">
+      <thead><tr><th>Match</th><th>Player 1</th><th>Player 2</th></tr></thead>
+      <tbody>
+        {pairs.map(p => (
+          <tr key={`match-${p.n}`} className={p.n === 1 ? 'next-match' : ''}>
+            <td className="match-label-cell">
+              {p.n === 1 ? <span className="on-court-label">▶ On Court</span> : `Upcoming Match ${p.n - 1}`}
+            </td>
+            <td><PlayerLabel name={p.p1} statsMap={statsMap} /></td>
+            <td><PlayerLabel name={p.p2} statsMap={statsMap} /></td>
+          </tr>
         ))}
-      </ul>
-    </div>
+      </tbody>
+    </table>
   );
-}
+};
+
+export const DoublesTable: React.FC<{ queue: string[]; statsMap: Record<string, PlayerStat> }> = ({ queue, statsMap }) => {
+  const matches = [];
+  for (let i = 0; i < queue.length; i += 4) {
+    if (i + 3 < queue.length) matches.push({ n: i / 4 + 1, a: [queue[i], queue[i + 1]], b: [queue[i + 2], queue[i + 3]] });
+    else { const rem = queue.slice(i); matches.push({ n: i / 4 + 1, a: rem.slice(0, 2), b: rem.slice(2, 4) }); }
+  }
+  const TeamCell = ({ names }: { names: string[] }) => (
+    <>{names.map((n, i) => (
+      <React.Fragment key={`${i}-${n}`}>
+        <PlayerLabel name={n} statsMap={statsMap} />
+        {i < names.length - 1 && <span className="team-amp"> & </span>}
+      </React.Fragment>
+    ))}</>
+  );
+  return (
+    <table className="pairing-table">
+      <thead><tr><th>Match</th><th>Team A</th><th>Team B</th></tr></thead>
+      <tbody>
+        {matches.map(m => (
+          <tr key={`match-${m.n}`} className={m.n === 1 ? 'next-match' : ''}>
+            <td className="match-label-cell">
+              {m.n === 1 ? <span className="on-court-label">▶ On Court</span> : `Upcoming Match ${m.n - 1}`}
+            </td>
+            <td>{m.a.length ? <TeamCell names={m.a} /> : '—'}</td>
+            <td>{m.b.length ? <TeamCell names={m.b} /> : '—'}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+};

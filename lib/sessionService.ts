@@ -89,6 +89,25 @@ export interface SessionDoc {
    * This prevents accidental exposure before the host is ready.
    */
   isLive?: boolean;
+  /**
+   * accessPin — optional 4-char uppercase PIN set by the host.
+   * null/undefined = anyone with the room code can view.
+   * string = viewer must enter PIN before seeing session content.
+   * Stored in plain text; sessions expire in 30 min so brute-force
+   * within that window is impractical given Firebase's rate limits.
+   */
+  accessPin?: string | null;
+  /** Display name for this court, shown in CourtTabs (host UI only). */
+  courtName?: string;
+  doublesEngineState?: Record<string, unknown> | null;
+  singlesEngineState?: Record<string, unknown> | null;
+  /**
+   * courtSlots — multi-court mode.
+   * Each slot holds the 4 players currently on that court.
+   * onCourt[0..1] = Team A, onCourt[2..3] = Team B.
+   * When undefined, the session runs in single-court mode.
+   */
+  courtSlots?: CourtSlot[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   /**
@@ -388,4 +407,81 @@ export function clearHostFromStorage() {
   localStorage.removeItem(LS_SESSION_ID);
   localStorage.removeItem(LS_HOST_TOKEN);
   localStorage.removeItem(LS_GAME_MODE);
+}
+
+// ── Multi-court types ────────────────────────────────────
+
+/**
+ * CourtSlot — one court in a multi-court session.
+ * onCourt is always 4 players ordered [teamA[0], teamA[1], teamB[0], teamB[1]].
+ */
+export interface CourtSlot {
+  id: string;        // stable identifier: 'court-0', 'court-1', …
+  name: string;      // display name: 'Court 1', 'Court 2', …
+  onCourt: string[]; // exactly 4 players when a match is live, [] when initialising
+}
+
+// ── Court Group localStorage helpers ─────────────────────
+// Tracks multiple active court sessions so a host can manage
+// more than one court from a single device.
+
+const LS_COURT_GROUP = 'padq_court_group';
+
+export interface CourtEntry {
+  sessionId: string;
+  hostToken: string;
+  gameMode: string;
+  name: string;      // "Court 1", "Court 2", etc.
+}
+
+export function loadCourtGroup(): CourtEntry[] {
+  try {
+    return JSON.parse(localStorage.getItem(LS_COURT_GROUP) ?? '[]');
+  } catch {
+    return [];
+  }
+}
+
+export function saveCourtGroup(courts: CourtEntry[]) {
+  localStorage.setItem(LS_COURT_GROUP, JSON.stringify(courts));
+}
+
+export function addCourtToGroup(entry: CourtEntry) {
+  const current = loadCourtGroup().filter(c => c.sessionId !== entry.sessionId);
+  saveCourtGroup([...current, entry]);
+}
+
+export function removeCourtFromGroup(sessionId: string) {
+  saveCourtGroup(loadCourtGroup().filter(c => c.sessionId !== sessionId));
+}
+
+export function clearCourtGroup() {
+  localStorage.removeItem(LS_COURT_GROUP);
+}
+
+// ── Club Roster localStorage helpers ─────────────────────
+// Persistent list of player names the host builds once and
+// pulls from when setting up each court — no re-typing needed.
+
+const LS_ROSTER = 'padq_roster';
+
+export function loadRoster(): string[] {
+  try { return JSON.parse(localStorage.getItem(LS_ROSTER) ?? '[]'); }
+  catch { return []; }
+}
+
+export function saveRoster(names: string[]): void {
+  localStorage.setItem(LS_ROSTER, JSON.stringify(names));
+}
+
+/** Merge new names into the roster (deduplicates, preserves order). */
+export function mergeIntoRoster(names: string[]): void {
+  const current = loadRoster();
+  const seen = new Set(current);
+  const added = names.filter(n => !seen.has(n));
+  if (added.length > 0) saveRoster([...current, ...added]);
+}
+
+export function removeFromRoster(name: string): void {
+  saveRoster(loadRoster().filter(n => n !== name));
 }

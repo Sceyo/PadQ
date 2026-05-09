@@ -1,5 +1,5 @@
-import styles from './StreakBadge.module.css';
-export default function StreakBadge({ value }: { value: number }) {
-  const label = value > 0 ? `🔥 ${value}` : value < 0 ? `❄️ ${Math.abs(value)}` : '—';
-  return <span className={styles.streak}>{label}</span>;
-}
+import React from 'react';
+import { Flame } from 'lucide-react';
+
+export const StreakBadge: React.FC<{ streak: number }> = ({ streak }) =>
+  streak < 2 ? null : <span className="streak-badge"><Flame size={11} />{streak}</span>;

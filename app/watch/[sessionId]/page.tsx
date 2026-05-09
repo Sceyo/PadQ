@@ -35,6 +35,8 @@ import {
   MatchHistoryEntry,
   TournamentMatch,
 } from '@/lib/sessionService';
+import { useSessionAccess } from '@/hooks/useSessionAccess';
+import AccessCodeModal from '@/app/queue/components/atoms/AccessCodeModal';
 import './watch.css';
 
 // ═══════════════════════════════════════════════════════════
@@ -184,6 +186,9 @@ function WatchPageContent() {
   const router    = useRouter();
   const sessionId = (params?.sessionId as string ?? '').toUpperCase();
 
+  // ── Access control: PIN gate ─────────────────────────────
+  const { access, submitPin } = useSessionAccess(sessionId);
+
   // ── Firebase state ──────────────────────────────────────
   const [session,         setSession]         = useState<SessionDoc | null>(null);
   const [history,         setHistory]         = useState<MatchHistoryEntry[]>([]);
@@ -263,6 +268,31 @@ function WatchPageContent() {
   );
 
   // ── Error / loading screens ──────────────────────────────
+
+  // ── PIN gate — must render before anything else ──────────
+  if (access === 'checking') {
+    return (
+      <div className="watch-shell watch-shell--center">
+        <Loader2 size={36} className="w-spin" />
+        <p>Checking access…</p>
+      </div>
+    );
+  }
+  if (access === 'needs-pin') {
+    return (
+      <AccessCodeModal
+        open={true}
+        label="This session is PIN-protected"
+        placeholder="Enter PIN"
+        maxLength={4}
+        onSubmit={async (pin) => {
+          const ok = await submitPin(pin);
+          if (!ok) throw new Error('Incorrect PIN. Please try again.');
+        }}
+        onClose={() => router.push('/')}
+      />
+    );
+  }
 
   if (status === 'loading') {
     return (

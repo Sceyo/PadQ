@@ -279,8 +279,8 @@ export default function useQueue() {
   }, []);
 
   const setPlayers = useCallback((newPlayers: string[]) => {
-    if (newPlayers.length < 5 || newPlayers.length > 24) {
-      throw new Error('Number of players must be between 5 and 24');
+    if (newPlayers.length < 5) {
+      throw new Error('Need at least 5 players');
     }
     const shuffledQueue = shuffleArray(newPlayers);
     setState(prev => ({

@@ -30,10 +30,12 @@ import {
   saveHostToStorage,
   loadHostFromStorage,
   clearHostFromStorage,
+  loadCourtGroup,
   SessionDoc,
   MatchHistoryEntry,
   TournamentMatch,
   LiveScoreState,
+  CourtSlot,
 } from '@/lib/sessionService';
 
 // ── Types ──────────────────────────────────────────────────
@@ -62,6 +64,9 @@ export interface SessionState {
   matchHistory:      MatchHistoryEntry[];
   liveScore:         LiveScoreState | null;
   isLive:            boolean;   // true only after host explicitly clicks "Go Live"
+  courtSlots:        CourtSlot[];  // empty = single-court mode
+  doublesEngineState: Record<string, unknown> | null;
+  singlesEngineState: Record<string, unknown> | null;
 }
 
 export interface SessionActions {
@@ -94,6 +99,9 @@ const INITIAL_STATE: SessionState = {
   matchHistory:      [],
   liveScore:         null,
   isLive:            false,
+  courtSlots:        [],
+  doublesEngineState: null,
+  singlesEngineState: null,
 };
 
 // ── Hook ───────────────────────────────────────────────────
@@ -123,6 +131,9 @@ export function useSession(): SessionState & SessionActions {
     tournamentWinner:  data.tournamentWinner  ?? null,
     liveScore:         data.liveScore         ?? null,
     isLive:            data.isLive            ?? false,
+    courtSlots:        data.courtSlots        ?? [],
+    doublesEngineState: (data.doublesEngineState as Record<string, unknown>) ?? null,
+    singlesEngineState: (data.singlesEngineState as Record<string, unknown>) ?? null,
   });
 
   // ── Listener setup ─────────────────────────────────────────
@@ -166,6 +177,22 @@ export function useSession(): SessionState & SessionActions {
       setState(prev => ({ ...prev, matchHistory: entries }));
     });
   }, []);
+
+  // ── Heartbeat: prevent TTL deletion while host is active ───
+
+  useEffect(() => {
+    if (!state.isHost) return;
+    const id = setInterval(() => {
+      const sid = sessionIdRef.current;
+      const htk = hostTokenRef.current;
+      if (sid && htk) touchSession(sid, htk);
+      // Touch all other courts in the group so idle courts don't expire
+      loadCourtGroup().forEach(c => {
+        if (c.sessionId !== sid) touchSession(c.sessionId, c.hostToken);
+      });
+    }, 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [state.isHost]);
 
   // ── Mount: resume from localStorage ────────────────────────
 
