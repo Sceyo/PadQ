@@ -110,33 +110,27 @@ These are not broken but noticeably degrade the experience or maintainability.
 
 ---
 
-### 6. No Match Undo
+### ~~6. No Match Undo~~ — RESOLVED
 
-Clicking the wrong winner is unrecoverable without manually editing history and the queue. The host has no recourse other than a hard reset.
-
-A single undo step is sufficient for 99% of cases. Store a snapshot of `{ queue, paddleState, singlesState }` in a ref immediately before each `commitMatchResult`. An "Undo Last Match" button in the `GearMenu` restores the snapshot locally and writes a corrected queue to Firestore.
+Single-step undo is implemented. Before every `handleSinglesMatch` / `handleDoublesMatch`, a snapshot of `{ queue, paddleState, singlesState }` is saved to `undoSnapshotRef`. The GearMenu shows an "Undo Last Match" item (via `canUndo` state flag) only when a snapshot exists. On undo: local queue and engine refs are restored, the Firestore queue/engine state is written back via `session.undoLastMatch`, and the latest history entry is deleted via `deleteLatestHistoryEntry` in `sessionService.ts`.
 
 ---
 
-### 7. No Player Sit-Out Feature
+### ~~7. No Player Sit-Out Feature~~ — RESOLVED
 
-Players cannot voluntarily sit out a rotation without being fully removed from the session. In real club settings this is common — someone needs a break, a drink, or is waiting for a partner.
-
-A `sittingOut: string[]` field alongside `waitingQueue` would let the host toggle players in/out without removing them from stats or history. The engines would filter `sittingOut` players from candidate pools.
+`sittingOut: string[]` added to `SessionDoc` and `SessionState`. A collapsible `SitOutPanel` component appears in the host view below the live tools row. Toggling a player out removes them from the queue and excludes them from `advancePaddleState` / `advanceSinglesState` candidate pools. Toggling them back adds them to the end of the queue. State is persisted to Firestore via `syncField` so all clients stay in sync.
 
 ---
 
-### 8. `page.tsx` Is a ~900-Line Monolith
+### ~~8. `page.tsx` Is a ~900-Line Monolith~~ — RESOLVED
 
-All three render paths (setup form, host session, viewer session), the `GearMenu` component, and every match handler function live in one file. This makes it difficult to navigate, review, and test independently.
+Four components extracted from `page.tsx`:
+- `components/GearMenu/GearMenu.tsx` — settings dropdown (now also handles Undo Last Match)
+- `components/CoordinatorOverlay/CoordinatorOverlay.tsx` — all-courts read-only overlay
+- `components/SetupView/SetupView.tsx` — player input form, PIN, roster, court count
+- `components/SitOutPanel/SitOutPanel.tsx` — new sit-out toggle panel
 
-**Suggested split**:
-- `components/SetupView.tsx` — player input form, court name, PIN, mode selection
-- `components/HostView.tsx` — active host session with match controls
-- `components/ViewerView.tsx` — read-only spectator layout
-- `GearMenu` → `components/GearMenu/GearMenu.tsx`
-
-`page.tsx` becomes a thin router between the three views.
+`page.tsx` is now a thin orchestrator: state, handlers, and the three render paths (setup, tournament, default/play-all). Render paths remain in `page.tsx` for now as they share too much internal state to extract without a Context layer.
 
 ---
 
@@ -166,7 +160,7 @@ A recovery option: show the `hostToken` as a one-time copyable "session key" at 
 
 Viewers watching on their phones have no indication when they're about to play. They must actively watch the screen.
 
-The Browser Notification API can fire a local push notification when the viewer's registered name appears in queue position 1 or 2. No backend changes needed — viewers opt in by entering their name and granting notification permission.
+**Decision: Option B — Match-start pop-up for all viewers.** Whenever a match result is committed, the watch page fires a modal announcing the next matchup (players + court name). It auto-dismisses after a few seconds. No identity system or name matching required — works like a broadcast court announcement. Every viewer sees it simultaneously and can glance to check if it involves them.
 
 ---
 
@@ -250,9 +244,9 @@ All club-scale blockers are resolved. The system is now manageable at 5-court / 
 | ~~6~~ | ~~Multi-court heartbeat gap (idle courts expire)~~ | ~~Needed~~ | ~~High~~ | ~~Low~~ | **RESOLVED** |
 | ~~1~~ | ~~No shared player pool / club roster~~ | ~~Needed~~ | ~~High (club)~~ | ~~Medium~~ | **RESOLVED** |
 | ~~2~~ | ~~No coordinator view for multi-court~~ | ~~Needed~~ | ~~Medium-High (club)~~ | ~~Medium~~ | **RESOLVED** |
-| 6 | Match undo | Improvement | High | Medium |
-| 7 | Player sit-out feature | Improvement | High | Medium |
-| 8 | `page.tsx` refactor into sub-views | Improvement | Medium | High |
+| ~~6~~ | ~~Match undo~~ | ~~Improvement~~ | ~~High~~ | ~~Medium~~ | **RESOLVED** |
+| ~~7~~ | ~~Player sit-out feature~~ | ~~Improvement~~ | ~~High~~ | ~~Medium~~ | **RESOLVED** |
+| ~~8~~ | ~~`page.tsx` refactor into sub-views~~ | ~~Improvement~~ | ~~Medium~~ | ~~High~~ | **RESOLVED** |
 | ~~9~~ | ~~Share panel links to `/watch/{sessionId}`~~ | ~~Improvement~~ | ~~Medium~~ | ~~Low~~ | **ALREADY RESOLVED** |
 | 10 | Cross-session statistics | Improvement | Medium | Medium |
 | 11 | `hostToken` recovery mechanism | Improvement | Medium | Low |
@@ -283,11 +277,12 @@ All club-scale blockers are resolved. The system is now manageable at 5-court / 
 8. ~~Shared player roster in `localStorage` with assign-to-court UI~~ — done
 9. ~~Read-only coordinator overview for all active courts~~ — done
 
-**Phase 4 — UX**
-10. Match undo (issue 6)
-11. Player sit-out (issue 7)
-12. `hostToken` recovery display (issue 11)
-13. Viewer turn notification (issue 12)
+**Phase 4 — UX** ✓ Mostly complete
+10. ~~Match undo (issue 6)~~ — done
+11. ~~Player sit-out (issue 7)~~ — done
+12. ~~`page.tsx` component split (issue 8)~~ — done (partial: GearMenu, CoordinatorOverlay, SetupView, SitOutPanel extracted)
+13. `hostToken` recovery display (issue 11) — pending
+14. Viewer match-start pop-up (issue 12, Option B) — pending
 
 **Phase 5 — Growth**
 14. Cross-session `localStorage` stats (issue 10)

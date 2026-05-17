@@ -25,6 +25,7 @@ import {
   addDoc,
   query,
   orderBy,
+  limit,
   Unsubscribe,
   Timestamp,
 } from 'firebase/firestore';
@@ -108,6 +109,7 @@ export interface SessionDoc {
    * When undefined, the session runs in single-court mode.
    */
   courtSlots?: CourtSlot[];
+  sittingOut?: string[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   /**
@@ -331,6 +333,21 @@ export async function clearHistory(
 }
 
 /**
+ * deleteLatestHistoryEntry
+ * Removes the most-recently-written history document (highest `id` value).
+ * Used by the undo feature to roll back the last match result.
+ */
+export async function deleteLatestHistoryEntry(sessionId: string): Promise<void> {
+  const q = query(
+    collection(db, 'sessions', sessionId, 'history'),
+    orderBy('id', 'desc'),
+    limit(1),
+  );
+  const snap = await getDocs(q);
+  if (!snap.empty) await deleteDoc(snap.docs[0].ref);
+}
+
+/**
  * subscribeToSession
  * Real-time listener on the session document.
  * Handles three events:
@@ -484,4 +501,48 @@ export function mergeIntoRoster(names: string[]): void {
 
 export function removeFromRoster(name: string): void {
   saveRoster(loadRoster().filter(n => n !== name));
+}
+
+// ── Career Stats localStorage helpers ─────────────────────
+// Accumulates per-player wins/losses across sessions on this device.
+// Survives session TTL expiry — keyed by player name.
+
+export interface PlayerCareerStat {
+  wins:        number;
+  losses:      number;
+  gamesPlayed: number;
+}
+
+export type CareerStatsMap = Record<string, PlayerCareerStat>;
+
+const LS_CAREER_STATS = 'padq_career_stats';
+
+export function loadCareerStats(): CareerStatsMap {
+  try { return JSON.parse(localStorage.getItem(LS_CAREER_STATS) ?? '{}'); }
+  catch { return {}; }
+}
+
+export function saveCareerStats(stats: CareerStatsMap): void {
+  localStorage.setItem(LS_CAREER_STATS, JSON.stringify(stats));
+}
+
+/**
+ * recordCareerResult
+ * Merges one match result into the persistent career stats store.
+ * `players` format: "A vs B" or "A & B vs C & D"
+ * `winner`  format: "A" or "A & B"
+ */
+export function recordCareerResult(players: string, winner: string): void {
+  const stats       = loadCareerStats();
+  const winnerNames = winner.split(' & ').map(n => n.trim());
+  const allNames    = players
+    .split(' vs ').flatMap(s => s.split(' & ')).map(n => n.trim()).filter(Boolean);
+
+  for (const name of allNames) {
+    if (!stats[name]) stats[name] = { wins: 0, losses: 0, gamesPlayed: 0 };
+    stats[name].gamesPlayed++;
+    if (winnerNames.includes(name)) stats[name].wins++;
+    else                             stats[name].losses++;
+  }
+  saveCareerStats(stats);
 }

@@ -24,6 +24,7 @@ import {
   updateQueueSafely,
   addHistoryEntry,
   clearHistory,
+  deleteLatestHistoryEntry,
   touchSession,
   subscribeToSession,
   subscribeToHistory,
@@ -67,6 +68,7 @@ export interface SessionState {
   courtSlots:        CourtSlot[];  // empty = single-court mode
   doublesEngineState: Record<string, unknown> | null;
   singlesEngineState: Record<string, unknown> | null;
+  sittingOut:        string[];
 }
 
 export interface SessionActions {
@@ -74,6 +76,7 @@ export interface SessionActions {
   joinSession:       (sessionId: string) => Promise<boolean>;
   endSession:        () => void;
   commitMatchResult: (patch: Partial<SessionDoc>, entry: Omit<MatchHistoryEntry, 'hostToken'>) => Promise<void>;
+  undoLastMatch:     (patch: Partial<SessionDoc>) => Promise<void>;
   syncField:         (patch: Partial<Omit<SessionDoc, 'hostToken' | 'createdAt'>>) => Promise<void>;
   clearMatchHistory: () => Promise<void>;
 }
@@ -102,6 +105,7 @@ const INITIAL_STATE: SessionState = {
   courtSlots:        [],
   doublesEngineState: null,
   singlesEngineState: null,
+  sittingOut:        [],
 };
 
 // ── Hook ───────────────────────────────────────────────────
@@ -134,6 +138,7 @@ export function useSession(): SessionState & SessionActions {
     courtSlots:        data.courtSlots        ?? [],
     doublesEngineState: (data.doublesEngineState as Record<string, unknown>) ?? null,
     singlesEngineState: (data.singlesEngineState as Record<string, unknown>) ?? null,
+    sittingOut:         data.sittingOut ?? [],
   });
 
   // ── Listener setup ─────────────────────────────────────────
@@ -348,6 +353,27 @@ export function useSession(): SessionState & SessionActions {
   }, []);
 
   /**
+   * undoLastMatch
+   * Restores the queue and engine state from before the last match
+   * and deletes the most recent history entry from Firestore.
+   */
+  const undoLastMatch = useCallback(async (patch: Partial<SessionDoc>) => {
+    const sessionId = sessionIdRef.current;
+    const hostToken = hostTokenRef.current;
+    if (!sessionId || !hostToken) return;
+
+    setState(prev => ({ ...prev, isSaving: true }));
+    try {
+      await updateQueueSafely(sessionId, hostToken, () => patch);
+      await deleteLatestHistoryEntry(sessionId);
+    } catch (err) {
+      console.error('[useSession] undoLastMatch error:', err);
+    } finally {
+      setState(prev => ({ ...prev, isSaving: false }));
+    }
+  }, []);
+
+  /**
    * syncField
    * Non-transactional update for fields that don't depend on
    * reading the current state first.
@@ -397,6 +423,7 @@ export function useSession(): SessionState & SessionActions {
     joinSession,
     endSession,
     commitMatchResult,
+    undoLastMatch,
     syncField,
     clearMatchHistory,
   };

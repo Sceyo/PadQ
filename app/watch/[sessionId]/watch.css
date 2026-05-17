@@ -305,6 +305,70 @@
      • QueueSystem.css → for host match label + on-court label
    ═══════════════════════════════════════════════════════════ */
 
+/* ── Match announcement overlay (Task 12) ─────────────────── */
+.w-announcement {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 9999;
+  display: flex;
+  justify-content: center;
+  padding: 16px 20px 0;
+  pointer-events: none;
+  animation: wAnnounceIn .35s cubic-bezier(.34,1.56,.64,1) both;
+}
+
+@keyframes wAnnounceIn {
+  from { transform: translateY(-100%); opacity: 0; }
+  to   { transform: translateY(0);     opacity: 1; }
+}
+
+.w-announcement-inner {
+  pointer-events: all;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  border: 1px solid rgba(255,255,255,.18);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(79,70,229,.45);
+  padding: 18px 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  max-width: 480px;
+  width: 100%;
+  position: relative;
+}
+
+.w-announcement-label {
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,.75);
+}
+
+.w-announcement-match {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #fff;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.w-announcement-close {
+  position: absolute;
+  top: 10px; right: 12px;
+  background: rgba(255,255,255,.15);
+  border: none;
+  border-radius: 50%;
+  width: 24px; height: 24px;
+  color: #fff;
+  font-size: .8rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.w-announcement-close:hover { background: rgba(255,255,255,.28); }
+
 /* ════════════════════════════════════════════════════════════
    VIEWER — Big live score hero (watch.css additions)
    ════════════════════════════════════════════════════════════ */

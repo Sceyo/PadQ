@@ -19,7 +19,7 @@
  * ═══════════════════════════════════════════════════════════
  */
 
-import React, { useState, useEffect, useMemo, Suspense } from 'react';
+import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
@@ -196,6 +196,10 @@ function WatchPageContent() {
   const [errorMsg,        setErrorMsg]        = useState('');
   const [showHistory,     setShowHistory]     = useState(true);
 
+  // ── Match announcement (Task 12) ────────────────────────
+  const [announcement,   setAnnouncement]    = useState<string | null>(null);
+  const prevMatchKeyRef = useRef<string>('');
+
   // ── Guardrail: validate session exists before subscribing ──
 
   useEffect(() => {
@@ -255,6 +259,28 @@ function WatchPageContent() {
       unsubHistory?.();
     };
   }, [sessionId]);
+
+  // ── Match change detection — fires announcement ──────────
+  useEffect(() => {
+    if (!session?.isLive) return;
+    const q  = session.queue ?? [];
+    const gm = session.gameMode;
+    let key = '';
+    if (gm === 'singles' && q.length >= 2) key = `${q[0]}|${q[1]}`;
+    else if (gm === 'doubles' && q.length >= 4) key = `${q[0]}|${q[1]}|${q[2]}|${q[3]}`;
+    if (!key) return;
+
+    if (prevMatchKeyRef.current && prevMatchKeyRef.current !== key) {
+      const text = gm === 'singles'
+        ? `${q[0]} vs ${q[1]}`
+        : `${q[0]} & ${q[1]}  vs  ${q[2]} & ${q[3]}`;
+      setAnnouncement(text);
+      const timer = setTimeout(() => setAnnouncement(null), 6000);
+      prevMatchKeyRef.current = key;
+      return () => clearTimeout(timer);
+    }
+    prevMatchKeyRef.current = key;
+  }, [session]);
 
   // ── Derived ─────────────────────────────────────────────
 
@@ -415,6 +441,17 @@ function WatchPageContent() {
 
   return (
     <div className="watch-shell">
+      {/* ── Match announcement overlay ── */}
+      {announcement && (
+        <div className="w-announcement" role="alert">
+          <div className="w-announcement-inner">
+            <div className="w-announcement-label">🏓 NEXT UP ON COURT</div>
+            <div className="w-announcement-match">{announcement}</div>
+            <button className="w-announcement-close" onClick={() => setAnnouncement(null)}>✕</button>
+          </div>
+        </div>
+      )}
+
       {/* ── Top bar ── */}
       <div className="w-topbar">
         <button className="w-back-btn" onClick={() => router.push('/')}>

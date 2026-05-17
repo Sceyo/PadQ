@@ -6,13 +6,11 @@ import React, {
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Swords, Users, Trophy, Shuffle, History,
-  Sun, Moon, ArrowLeft, Play, RotateCcw,
-  Trash2, UserPlus, Star, Sparkles, RefreshCw,
+  Sun, Moon, ArrowLeft,
+  Star, Sparkles, RefreshCw,
   BarChart2, Wifi, WifiOff,
-  Settings, HelpCircle, Copy, Check, QrCode,
-  BookOpen, LayoutGrid,
+  Check, Copy,
 } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
 import useQueue, {
   suggestNextDoublesMatch,
   suggestNextSinglesMatch,
@@ -23,9 +21,9 @@ import type { LiveScoreState } from '@/lib/sessionService';
 import {
   loadCourtGroup, addCourtToGroup,
   removeCourtFromGroup, loadHostFromStorage, saveHostToStorage,
-  subscribeToSession,
   loadRoster, mergeIntoRoster, removeFromRoster,
-  type CourtEntry, type CourtSlot, type SessionDoc,
+  loadSession, loadCareerStats, recordCareerResult,
+  type CourtEntry, type CourtSlot, type SessionDoc, type CareerStatsMap,
 } from '@/lib/sessionService';
 import './QueueSystem.css';
 
@@ -35,7 +33,7 @@ import type {
   QueueMode, GameTab, TournamentMatch,
 } from './lib/types';
 import { buildPlayerStats, generateSuggestions, shuffleArray } from './lib/playerUtils';
-import type { PaddleState, SerializablePaddleState } from './lib/doublesEngine';
+import type { PaddleState, SerializablePaddleState, Team } from './lib/doublesEngine';
 import { freshPaddleState, advancePaddleState, addPlayerToWaiting, serializePaddleState, deserializePaddleState } from './lib/doublesEngine';
 import type { SinglesState, SerializableSinglesState } from './lib/singleEngine';
 import { freshSinglesState, advanceSinglesState, serializeSinglesState, deserializeSinglesState } from './lib/singleEngine';
@@ -56,259 +54,43 @@ import { SmartSuggestions } from './components/SmartSuggestions/SmartSuggestions
 import { SessionBar } from './components/SessionBar/SessionBar';
 import { CourtTabs } from './components/CourtTabs/CourtTabs';
 import { CourtCard } from './components/CourtCard/CourtCard';
+import { GearMenu } from './components/GearMenu/GearMenu';
+import { CoordinatorOverlay } from './components/CoordinatorOverlay/CoordinatorOverlay';
+import { SetupView } from './components/SetupView/SetupView';
+import { SitOutPanel } from './components/SitOutPanel/SitOutPanel';
 
-// ═══════════════════════════════════════════════════════════
-// § 12b  GEAR / SETTINGS MENU
-// ═══════════════════════════════════════════════════════════
-
-function GearMenu({
-  sessionId, isHost, isLive, canControl,
-  onToggleLive, onHardReset, onShowGuide,
-  hasMultipleCourts, onShowCoordinator,
-}: {
-  sessionId:           string | null;
-  isHost:              boolean;
-  isLive:              boolean;
-  canControl:          boolean;
-  onToggleLive:        (live: boolean) => void;
-  onHardReset:         () => void;
-  onShowGuide:         () => void;
-  hasMultipleCourts?:  boolean;
-  onShowCoordinator?:  () => void;
-}) {
-  const [open,     setOpen]     = useState(false);
-  const [copied,   setCopied]   = useState(false);
-  const [shareTab, setShareTab] = useState<'link' | 'qr'>('link');
-  const [watchUrl, setWatchUrl] = useState('');
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (sessionId) setWatchUrl(`${window.location.origin}/watch/${sessionId}`);
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown',   onKey);
-    return () => { document.removeEventListener('mousedown', onClick); document.removeEventListener('keydown', onKey); };
-  }, [open]);
-
-  const copyLink = () => {
-    navigator.clipboard.writeText(watchUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const showLiveSection = isHost && !!sessionId;
-
-  return (
-    <div className="gear-menu-wrap" ref={menuRef}>
-      <button
-        className={`gear-menu-trigger ${open ? 'gear-menu-trigger--open' : ''}`}
-        onClick={() => setOpen(o => !o)}
-        title="Settings"
-        aria-expanded={open}
-        aria-haspopup="true"
-      >
-        <Settings size={17} />
-      </button>
-
-      {open && (
-        <div className="gear-menu-panel" role="menu">
-          {showLiveSection && (
-            <div className="gear-section--live">
-              <div className="gear-live-row">
-                <span className="gear-live-label">
-                  {isLive && <span className="go-live-dot go-live-dot--sm" />}
-                  {isLive ? 'Live' : 'Go Live'}
-                </span>
-                <button
-                  className={`gear-live-btn ${isLive ? 'gear-live-btn--on' : 'gear-live-btn--off'}`}
-                  onClick={() => onToggleLive(!isLive)}
-                >
-                  {isLive ? 'End' : 'Start'}
-                </button>
-              </div>
-
-              {isLive && (
-                <div className="gear-share-panel">
-                  <div className="gear-room-code-row">
-                    <span className="gear-room-label">Room</span>
-                    <span className="gear-room-code">{sessionId}</span>
-                  </div>
-                  <div className="gear-share-tabs">
-                    <button className={`gear-share-tab ${shareTab === 'link' ? 'active' : ''}`} onClick={() => setShareTab('link')}>
-                      <Copy size={11} /> Link
-                    </button>
-                    <button className={`gear-share-tab ${shareTab === 'qr' ? 'active' : ''}`} onClick={() => setShareTab('qr')}>
-                      <QrCode size={11} /> QR
-                    </button>
-                  </div>
-                  {shareTab === 'link' && (
-                    <button className="gear-copy-btn" onClick={copyLink}>
-                      {copied ? <><Check size={13} /> Copied!</> : <><Copy size={13} /> Copy Watch Link</>}
-                    </button>
-                  )}
-                  {shareTab === 'qr' && watchUrl && (
-                    <div className="gear-qr-wrap">
-                      <QRCodeSVG value={watchUrl} size={150} bgColor="#ffffff" fgColor="#1e293b" level="M" includeMargin={false} />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="gear-divider" />
-
-          {isHost && hasMultipleCourts && onShowCoordinator && (
-            <button
-              className="gear-menu-item"
-              role="menuitem"
-              onClick={() => { setOpen(false); onShowCoordinator(); }}
-            >
-              <LayoutGrid size={14} /> All Courts
-            </button>
-          )}
-
-          {canControl && (
-            <button
-              className="gear-menu-item gear-menu-item--danger"
-              role="menuitem"
-              onClick={() => { setOpen(false); onHardReset(); }}
-            >
-              <RotateCcw size={14} /> Hard Reset
-            </button>
-          )}
-
-          <button
-            className="gear-menu-item"
-            role="menuitem"
-            onClick={() => { setOpen(false); onShowGuide(); }}
-          >
-            <HelpCircle size={14} /> User Guide
-          </button>
-        </div>
-      )}
-    </div>
-  );
+// ── Undo snapshot type ────────────────────────────────────────
+interface UndoSnapshot {
+  queue:        string[];
+  paddleState:  PaddleState;
+  singlesState: SinglesState;
 }
 
-// ═══════════════════════════════════════════════════════════
-// § 12c  COORDINATOR OVERLAY
-// Read-only view of all active courts in the session group.
-// ═══════════════════════════════════════════════════════════
+// Deep-copy helpers so undo doesn't share references with live state
+function clonePaddleState(s: PaddleState): PaddleState {
+  return {
+    ...s,
+    w1:              [...s.w1],
+    l1:              [...s.l1],
+    waitingQueue:    [...s.waitingQueue],
+    recentPairs:     [...s.recentPairs],
+    recentMatches:   [...s.recentMatches],
+    playedThisCycle: new Set(s.playedThisCycle),
+    lastPlayedMap:   { ...s.lastPlayedMap },
+    winnersPool:     s.winnersPool.map(t => [t[0], t[1]] as Team),
+    losersPool:      s.losersPool.map(t => [t[0], t[1]] as Team),
+  };
+}
 
-function CoordinatorOverlay({
-  courts,
-  onClose,
-}: {
-  courts:  CourtEntry[];
-  onClose: () => void;
-}) {
-  const [courtData, setCourtData] = useState<Record<string, SessionDoc | null>>({});
-
-  useEffect(() => {
-    if (courts.length === 0) return;
-    const unsubs = courts.map(c =>
-      subscribeToSession(
-        c.sessionId,
-        data => setCourtData(prev => ({ ...prev, [c.sessionId]: data })),
-        ()   => {},
-        ()   => setCourtData(prev => ({ ...prev, [c.sessionId]: null })),
-      )
-    );
-    return () => unsubs.forEach(u => u());
-  }, [courts]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
-    document.addEventListener('keydown', handler);
-    return () => document.removeEventListener('keydown', handler);
-  }, [onClose]);
-
-  return (
-    <div
-      className="coord-overlay"
-      role="dialog"
-      aria-modal="true"
-      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
-    >
-      <div className="coord-panel">
-        <div className="coord-header">
-          <h2 className="coord-title"><LayoutGrid size={16} /> All Courts</h2>
-          <button className="coord-close" onClick={onClose} aria-label="Close">✕</button>
-        </div>
-        {courts.length === 0 ? (
-          <p className="muted-hint">No courts in your session group.</p>
-        ) : (
-          <div className="coord-grid">
-            {courts.map(c => {
-              const data    = courtData[c.sessionId];
-              const expired = data === null;
-              const loading = data === undefined;
-              const q       = data?.queue ?? [];
-              const n       = data?.gameMode === 'doubles' ? 4 : 2;
-              const current = q.slice(0, n);
-              const waiting = Math.max(0, (data?.players?.length ?? 0) - n);
-              const phase   = (data?.doublesEngineState as Record<string, unknown> | null)
-                ?.phase as string | undefined;
-
-              return (
-                <div
-                  key={c.sessionId}
-                  className={[
-                    'coord-card',
-                    data?.isLive ? 'coord-card--live'    : '',
-                    expired       ? 'coord-card--expired' : '',
-                  ].filter(Boolean).join(' ')}
-                >
-                  <div className="coord-card-header">
-                    <span className="coord-court-name">{c.name}</span>
-                    {data?.isLive && <span className="go-live-dot go-live-dot--sm" />}
-                  </div>
-
-                  {loading && <p className="coord-status">Connecting…</p>}
-                  {expired  && <p className="coord-status coord-status--expired">Session expired</p>}
-                  {data && (
-                    <>
-                      <div className="coord-match">
-                        {current.length >= 2 ? (
-                          data.gameMode === 'doubles' && current.length >= 4 ? (
-                            <span className="coord-teams">
-                              {current.slice(0, 2).join(' & ')}
-                              <span className="coord-vs"> vs </span>
-                              {current.slice(2, 4).join(' & ')}
-                            </span>
-                          ) : (
-                            <span className="coord-teams">
-                              {current[0]}<span className="coord-vs"> vs </span>{current[1]}
-                            </span>
-                          )
-                        ) : (
-                          <span className="coord-no-match">No active match</span>
-                        )}
-                      </div>
-                      <div className="coord-meta">
-                        <span>{data.players?.length ?? 0} players</span>
-                        {waiting > 0 && <span>{waiting} waiting</span>}
-                        {phase && <span className="coord-phase">{phase}</span>}
-                        {!data.isLive && <span className="coord-offline">Not live</span>}
-                      </div>
-                    </>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </div>
-  );
+function cloneSinglesState(s: SinglesState): SinglesState {
+  return {
+    ...s,
+    queue:           [...s.queue],
+    waitingQueue:    [...s.waitingQueue],
+    lastPlayedMap:   { ...s.lastPlayedMap },
+    winStreak:       { ...s.winStreak },
+    playedThisCycle: new Set(s.playedThisCycle),
+  };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -358,6 +140,24 @@ function QueueSystemContent() {
   const [isLiveLocal,  setIsLiveLocal]  = useState(false);
   const [showGuide,       setShowGuide]       = useState(false);
   const [showCoordinator, setShowCoordinator] = useState(false);
+
+  // ── Career stats (persists across sessions) ───────────────
+  const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadCareerStats());
+
+  // ── Host key banner (one-time, shown after startSession) ──
+  const [hostKeyToken,   setHostKeyToken]   = useState<string | null>(null);
+  const [hostKeyCopied,  setHostKeyCopied]  = useState(false);
+  const newSessionRef = useRef(false);
+
+  // Show banner once after a new session is created (not on resume)
+  useEffect(() => {
+    if (session.isHost && session.sessionId && newSessionRef.current) {
+      newSessionRef.current = false;
+      const { hostToken } = loadHostFromStorage();
+      if (hostToken) setHostKeyToken(hostToken);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.isHost, session.sessionId]);
 
   // ── Roster (setup screen) ──────────────────────────────────
   const [roster,         setRoster]         = useState<string[]>([]);
@@ -413,6 +213,20 @@ function QueueSystemContent() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.isHost, session.doublesEngineState, session.singlesEngineState]);
 
+  // ── Undo snapshot ──────────────────────────────────────────
+  const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
+  const [hasUndo, setHasUndo] = useState(false);
+
+  // ── Sit-out state ──────────────────────────────────────────
+  const [localSittingOut, setLocalSittingOut] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!session.isConnected) return;
+    setLocalSittingOut(session.sittingOut ?? []);
+  }, [session.sittingOut, session.isConnected]);
+
+  const activeSittingOut = session.isConnected ? (session.sittingOut ?? []) : localSittingOut;
+
   const getPartneredQueue = useCallback((pList: string[]) => [...pList], []);
 
   // Sync session.isLive → local
@@ -464,6 +278,8 @@ function QueueSystemContent() {
 
   const addHistory = (entry: MatchHistoryEntry, newQueue?: string[]) => {
     setLocalHistory(prev => [entry, ...prev]);
+    recordCareerResult(entry.players, entry.winner);
+    setCareerStats(loadCareerStats());
     const queueToCommit = newQueue ?? queue;
     if (session.sessionId) {
       const enginePatch = gameMode === 'doubles'
@@ -556,7 +372,6 @@ function QueueSystemContent() {
         name: `Court ${i + 1}`,
         onCourt: orderedPlayers.slice(i * 4, (i + 1) * 4),
       }));
-      // Remaining players wait
       initialQueue = orderedPlayers.slice(courtCount * 4);
       setLocalCourtSlots(initialCourtSlots);
     } else {
@@ -579,6 +394,7 @@ function QueueSystemContent() {
     }
     const pin = setupPin.trim().toUpperCase().slice(0, 4) || null;
     const courtName = courtCount > 1 ? `${courtCount} Courts` : (setupCourtName.trim() || 'Court 1');
+    newSessionRef.current = true;
     await session.startSession({
       gameMode: gameMode ?? 'singles', queueMode: localQueueMode, elimType: localElimType,
       players: tempPlayers, queue: initialQueue, playAllRel: {},
@@ -631,13 +447,55 @@ function QueueSystemContent() {
     if (newMode === 'default') { resetPaddleState(); resetSinglesState(players); }
   };
 
+  // ── Sit-out handler ────────────────────────────────────────
+  const handleToggleSitOut = (name: string) => {
+    const isSittingOut = activeSittingOut.includes(name);
+    const newSittingOut = isSittingOut
+      ? activeSittingOut.filter(n => n !== name)
+      : [...activeSittingOut, name];
+    // Sitting out: remove from queue. Returning: add to back of queue.
+    const newQueue = isSittingOut ? [...queue, name] : queue.filter(n => n !== name);
+    setLocalSittingOut(newSittingOut);
+    setQueue(newQueue);
+    if (session.sessionId) session.syncField({ sittingOut: newSittingOut, queue: newQueue });
+  };
+
+  // ── Undo handler ───────────────────────────────────────────
+  const handleUndoLastMatch = () => {
+    const snap = undoSnapshotRef.current;
+    if (!snap) return;
+    setQueue(snap.queue);
+    paddleStateRef.current = snap.paddleState;
+    setPaddleStateUI(snap.paddleState);
+    singlesStateRef.current = snap.singlesState;
+    setSinglesStateUI(snap.singlesState);
+    setLocalHistory(prev => prev.slice(1));
+    if (session.sessionId) {
+      session.undoLastMatch({
+        queue: snap.queue,
+        doublesEngineState: serializePaddleState(snap.paddleState) as unknown as Record<string, unknown>,
+        singlesEngineState: serializeSinglesState(snap.singlesState) as unknown as Record<string, unknown>,
+      });
+    }
+    undoSnapshotRef.current = null;
+    setHasUndo(false);
+  };
+
   const handleSinglesMatch = (winner: string, score?: string) => {
     const [p1, p2] = [queue[0], queue[1]];
+    // Save undo snapshot before mutating state
+    undoSnapshotRef.current = {
+      queue: [...queue],
+      paddleState: clonePaddleState(paddleStateRef.current),
+      singlesState: cloneSinglesState(singlesStateRef.current),
+    };
+    setHasUndo(true);
     playSingles(winner);
     if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
     let newQueue: string[];
     if (activeQueueMode === 'default' && gameMode === 'singles') {
-      const { nextState, newQueue: singlesQueue } = advanceSinglesState(singlesStateRef.current, winner, players);
+      const activePlayers = players.filter(p => !activeSittingOut.includes(p));
+      const { nextState, newQueue: singlesQueue } = advanceSinglesState(singlesStateRef.current, winner, activePlayers);
       singlesStateRef.current = nextState;
       setSinglesStateUI(nextState);
       newQueue = singlesQueue;
@@ -652,6 +510,13 @@ function QueueSystemContent() {
   };
 
   const handleDoublesMatch = (a: string[], b: string[], w: 'A' | 'B', score?: string) => {
+    // Save undo snapshot before mutating state
+    undoSnapshotRef.current = {
+      queue: [...queue],
+      paddleState: clonePaddleState(paddleStateRef.current),
+      singlesState: cloneSinglesState(singlesStateRef.current),
+    };
+    setHasUndo(true);
     playDoubles([...a], [...b], w);
     if (activeQueueMode === 'playall') recordPlayAllDoubles(a, b);
     const winnerTeam = (w === 'A' ? a : b) as [string, string];
@@ -662,7 +527,8 @@ function QueueSystemContent() {
       const skillMap = Object.fromEntries(
         Object.entries(statsMap).map(([name, stat]) => [name, (stat as { winRate: number }).winRate])
       );
-      const { nextState, newQueue: paddleQueue } = advancePaddleState(paddleStateRef.current, winnerTeam, loserTeam, players, skillMap);
+      const activePlayers = players.filter(p => !activeSittingOut.includes(p));
+      const { nextState, newQueue: paddleQueue } = advancePaddleState(paddleStateRef.current, winnerTeam, loserTeam, activePlayers, skillMap);
       paddleStateRef.current = nextState;
       setPaddleStateUI(nextState);
       newQueue = paddleQueue;
@@ -689,18 +555,17 @@ function QueueSystemContent() {
     const lockedSet = new Set(
       currentSlots.filter(c => c.id !== courtId).flatMap(c => c.onCourt)
     );
-    const availablePlayers = players.filter(p => !lockedSet.has(p));
+    const activePlayers = players.filter(p => !lockedSet.has(p) && !activeSittingOut.includes(p));
 
     const skillMap = Object.fromEntries(
       Object.entries(statsMap).map(([name, s]) => [name, (s as PlayerStat).winRate])
     );
     const { nextState, newQueue: engineQueue } = advancePaddleState(
-      paddleStateRef.current, winnerTeam, loserTeam, availablePlayers, skillMap
+      paddleStateRef.current, winnerTeam, loserTeam, activePlayers, skillMap
     );
     paddleStateRef.current = nextState;
     setPaddleStateUI(nextState);
 
-    // First 4 → this court's next match; remainder → shared waiting list
     const nextOnCourt  = engineQueue.slice(0, 4);
     const nextWaiting  = engineQueue.slice(4);
 
@@ -708,7 +573,6 @@ function QueueSystemContent() {
       c.id === courtId ? { ...c, onCourt: nextOnCourt } : c
     );
 
-    // Global queue = locked players on other courts + waiting list
     const lockedList = currentSlots.filter(c => c.id !== courtId).flatMap(c => c.onCourt);
     const newQueue   = [...lockedList, ...nextWaiting];
 
@@ -761,6 +625,15 @@ function QueueSystemContent() {
     window.location.href = '/';
   };
 
+  const handleRecoverHost = useCallback(async (token: string): Promise<boolean> => {
+    if (!session.sessionId) return false;
+    const data = await loadSession(session.sessionId);
+    if (!data || data.hostToken !== token) return false;
+    saveHostToStorage(session.sessionId, token, data.gameMode);
+    window.location.reload();
+    return true;
+  }, [session.sessionId]);
+
   // Save the current court to the court group once the session is created
   useEffect(() => {
     if (!session.sessionId || !session.isHost) return;
@@ -781,7 +654,6 @@ function QueueSystemContent() {
     if (targetSessionId === session.sessionId) return;
     const target = courts.find(c => c.sessionId === targetSessionId);
     if (!target) return;
-    // Swap the active credentials in localStorage then reload so useSession picks them up
     saveHostToStorage(target.sessionId, target.hostToken, target.gameMode);
     window.location.reload();
   };
@@ -792,10 +664,7 @@ function QueueSystemContent() {
     setCourts(loadCourtGroup());
   };
 
-  const handleAddCourt = () => {
-    // Go home to create a new queue session; it will auto-join the court group
-    router.push('/');
-  };
+  const handleAddCourt = () => { router.push('/'); };
 
   // ── Roster handlers ──────────────────────────────────────
 
@@ -813,6 +682,10 @@ function QueueSystemContent() {
     });
   };
 
+  const handleSelectAllRoster = () => {
+    setRosterSelected(new Set(roster.filter(n => !tempPlayers.includes(n))));
+  };
+
   const handleAddFromRoster = () => {
     const fresh = [...rosterSelected].filter(n => !tempPlayers.includes(n));
     if (fresh.length === 0) return;
@@ -828,6 +701,8 @@ function QueueSystemContent() {
 
   // ── Shared fragments ──────────────────────────────────────
   const canControl = !session.sessionId || session.isHost;
+  const canUndo    = session.isHost && hasUndo;
+
   const modeSelector = (
     <div className="mode-selector">
       {(['default', 'tournament', 'playall'] as const).map(m => (
@@ -884,169 +759,82 @@ function QueueSystemContent() {
   // ── RENDER A — Setup ──────────────────────────────────────
   if (players.length === 0) {
     return (
-      <div className={`queue-system setup-page ${darkMode ? 'dark' : ''}`}>
-        <button className="dark-mode-toggle" onClick={() => setDarkMode(d => !d)}>{darkMode ? <Sun size={17} /> : <Moon size={17} />}</button>
-        <button className="back-home" onClick={() => router.push('/')}><ArrowLeft size={14} /> Back</button>
-        <div className="setup-hero">
-          <div className="setup-hero-icon">{gameMode === 'singles' ? <Swords size={26} /> : <Users size={26} />}</div>
-          <h1 className="app-name">{gameMode === 'singles' ? 'Singles' : 'Doubles'} Queue</h1>
-          <p className="app-subtitle">Add players to get started</p>
-        </div>
-        <div className="player-input-container">
-          {/* Court count — doubles only */}
-          {gameMode === 'doubles' && (
-            <div className="setup-field-row">
-              <label className="setup-field-label">Number of courts</label>
-              <div className="court-count-selector">
-                <button
-                  className="court-count-btn court-count-adj"
-                  onClick={() => setCourtCount(c => Math.max(1, c - 1))}
-                  type="button"
-                  disabled={courtCount <= 1}
-                >−</button>
-                <span className="court-count-value">{courtCount}</span>
-                <button
-                  className="court-count-btn court-count-adj"
-                  onClick={() => setCourtCount(c => Math.min(6, c + 1))}
-                  type="button"
-                  disabled={courtCount >= 6}
-                >+</button>
-              </div>
-              {courtCount > 1 && (
-                <span className="setup-field-hint">Needs {courtCount * 4}+ players · shared waiting queue</span>
-              )}
-            </div>
-          )}
-
-          
-
-          {/* Optional access PIN */}
-          <div className="setup-field-row">
-            <label className="setup-field-label">Access PIN <span className="setup-field-hint">(optional, 4 chars)</span></label>
-            <input
-              className="setup-field-input"
-              type="text"
-              value={setupPin}
-              onChange={e => setSetupPin(e.target.value.toUpperCase().slice(0, 4))}
-              placeholder="Leave blank for open access"
-              maxLength={4}
-              autoComplete="off"
-            />
-          </div>
-
-          {/* ── Club Roster import ─────────────────────────────── */}
-          <div className="roster-row">
-            <button
-              type="button"
-              className={`roster-toggle-btn${showRoster ? ' roster-toggle-btn--active' : ''}`}
-              onClick={() => setShowRoster(s => !s)}
-            >
-              <BookOpen size={13} /> From Roster ({roster.length})
-            </button>
-            {tempPlayers.length > 0 && (
-              <button type="button" className="roster-save-btn" onClick={handleSaveToRoster}>
-                <Star size={13} /> Save to Roster
-              </button>
-            )}
-          </div>
-          {showRoster && (
-            roster.length === 0 ? (
-              <p className="muted-hint" style={{ marginBottom: 12 }}>
-                No saved players yet. Add players then click "Save to Roster".
-              </p>
-            ) : (
-              <div className="roster-panel">
-                <div className="roster-list">
-                  {roster.map((name, i) => (
-                    <label key={`roster-${i}-${name}`} className="roster-item">
-                      <input
-                        type="checkbox"
-                        checked={rosterSelected.has(name)}
-                        disabled={tempPlayers.includes(name)}
-                        onChange={() => handleRosterToggle(name)}
-                      />
-                      <span className={`roster-name${tempPlayers.includes(name) ? ' roster-name--added' : ''}`}>
-                        {name}
-                      </span>
-                      <button
-                        type="button"
-                        className="roster-remove-btn"
-                        onClick={e => { e.preventDefault(); handleRemoveFromRosterUI(name); }}
-                        title="Remove from roster"
-                      >×</button>
-                    </label>
-                  ))}
-                </div>
-                <div className="roster-actions">
-                  <button
-                    type="button"
-                    className="roster-action-btn"
-                    onClick={() => setRosterSelected(new Set(roster.filter(n => !tempPlayers.includes(n))))}
-                  >
-                    Select All
-                  </button>
-                  <button
-                    type="button"
-                    className={`roster-action-btn${rosterSelected.size > 0 ? ' roster-action-btn--primary' : ''}`}
-                    onClick={handleAddFromRoster}
-                    disabled={rosterSelected.size === 0}
-                  >
-                    Add Selected ({rosterSelected.size})
-                  </button>
-                </div>
-              </div>
-            )
-          )}
-
-          <div className="input-group">
-            <input type="text" value={currentName} onChange={e => setCurrentName(e.target.value)} placeholder="Enter player name" onKeyDown={e => e.key === 'Enter' && addTempPlayer()} />
-            <button onClick={addTempPlayer} className="add-btn"><UserPlus size={15} /></button>
-          </div>
-          <div className="input-group">
-            <input type="text" value={pasteInput} onChange={e => setPasteInput(e.target.value)} placeholder="Paste names separated by commas…" onKeyDown={e => e.key === 'Enter' && addFromPaste()} />
-            <button onClick={addFromPaste} className="add-btn add-btn--paste" title="Add all"><Users size={15} /></button>
-          </div>
-          {tempPlayers.length > 0 && (
-            <div className="players-list">
-              <h3><Users size={13} /> Players ({tempPlayers.length})</h3>
-              <ul>{tempPlayers.map((p, i) => (
-                <li key={i}><span className="setup-player-num">#{i + 1}</span><span>{p}</span><button onClick={() => removeTempPlayer(i)} className="remove-btn"><Trash2 size={12} /></button></li>
-              ))}</ul>
-            </div>
-          )}
-          <button
-            onClick={handleStartQueue}
-            className="start-btn"
-            disabled={tempPlayers.length < (gameMode === 'doubles' && courtCount > 1 ? courtCount * 4 : 5) || session.isSaving}
-          >
-            {session.isSaving
-              ? <><Wifi size={14} /> Creating session…</>
-              : <><Play size={14} /> Start Queue ({tempPlayers.length}/{gameMode === 'doubles' && courtCount > 1 ? courtCount * 4 : 5} min)</>
-            }
-          </button>
-        </div>
-      </div>
+      <SetupView
+        gameMode={gameMode}
+        darkMode={darkMode}
+        onToggleDark={() => setDarkMode(d => !d)}
+        courtCount={courtCount}
+        onCourtCountChange={setCourtCount}
+        setupPin={setupPin}
+        onPinChange={setSetupPin}
+        roster={roster}
+        showRoster={showRoster}
+        onToggleRoster={() => setShowRoster(s => !s)}
+        rosterSelected={rosterSelected}
+        onRosterToggle={handleRosterToggle}
+        onSelectAllRoster={handleSelectAllRoster}
+        onAddFromRoster={handleAddFromRoster}
+        onSaveToRoster={handleSaveToRoster}
+        onRemoveFromRoster={handleRemoveFromRosterUI}
+        tempPlayers={tempPlayers}
+        currentName={currentName}
+        onCurrentNameChange={setCurrentName}
+        pasteInput={pasteInput}
+        onPasteInputChange={setPasteInput}
+        onAddPlayer={addTempPlayer}
+        onRemoveTempPlayer={removeTempPlayer}
+        onAddFromPaste={addFromPaste}
+        onStartQueue={handleStartQueue}
+        isSaving={session.isSaving}
+        onBack={() => router.push('/')}
+      />
     );
   }
+
+  // Shared gear menu props
+  const gearMenuProps = {
+    sessionId: session.sessionId,
+    isHost: session.isHost,
+    isLive: isLiveLocal,
+    canControl,
+    onToggleLive: handleGoLive,
+    onHardReset: handleHardReset,
+    onShowGuide: () => setShowGuide(true),
+    hasMultipleCourts: courts.length >= 2,
+    onShowCoordinator: () => setShowCoordinator(true),
+    canUndo,
+    onUndo: handleUndoLastMatch,
+    onRecoverHost: !session.isHost && session.sessionId ? handleRecoverHost : undefined,
+  };
+
+  // Host key banner (shown after new session creation)
+  const hostKeyBanner = hostKeyToken ? (
+    <div className="host-key-banner">
+      <span className="host-key-label">Save your Session Key for host recovery:</span>
+      <code className="host-key-code">{hostKeyToken}</code>
+      <button
+        className="host-key-copy"
+        onClick={() => {
+          navigator.clipboard.writeText(hostKeyToken);
+          setHostKeyCopied(true);
+          setTimeout(() => setHostKeyCopied(false), 2000);
+        }}
+      >
+        {hostKeyCopied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
+      </button>
+      <button className="host-key-dismiss" onClick={() => setHostKeyToken(null)}>✕</button>
+    </div>
+  ) : null;
 
   // ── RENDER B — Tournament ─────────────────────────────────
   if (activeQueueMode === 'tournament' && activeTournamentActive) {
     const pendingMatch = activeTournamentM.find(m => !m.winner && !m.isBye && m.player1 && m.player2) ?? null;
     return (
       <div className={`queue-system game-view ${darkMode ? 'dark' : ''}`}>
+        {hostKeyBanner}
         <div className="topright-controls">
           <button className="dark-mode-toggle" onClick={() => setDarkMode(d => !d)}>{darkMode ? <Sun size={17} /> : <Moon size={17} />}</button>
-          <GearMenu
-            sessionId={session.sessionId}
-            isHost={session.isHost}
-            isLive={isLiveLocal}
-            canControl={canControl}
-            onToggleLive={handleGoLive}
-            onHardReset={handleHardReset}
-            onShowGuide={() => setShowGuide(true)}
-            hasMultipleCourts={courts.length >= 2}
-            onShowCoordinator={() => setShowCoordinator(true)}
-          />
+          <GearMenu {...gearMenuProps} />
         </div>
         <button className="back-home" onClick={() => router.push('/')}><ArrowLeft size={14} /> Back</button>
         <SessionBar sessionId={session.sessionId} isHost={session.isHost} isConnected={session.isConnected} isSaving={session.isSaving} />
@@ -1054,7 +842,7 @@ function QueueSystemContent() {
         {session.isReconnecting && !session.isExpired && (<div className="session-alert session-alert--reconnecting"><Wifi size={14} /> Reconnecting…</div>)}
         {modeSelector}{elimSelector}{uiControls}{tabBar}
         {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
-        {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} /> : (
+        {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} /> : (
           <div className="main-layout">
             <div className="queue-area">
               <h1 className="queue-title"><Trophy size={20} />{gameMode === 'singles' ? 'Singles' : 'Doubles'} Tournament</h1>
@@ -1102,19 +890,10 @@ function QueueSystemContent() {
   // ── RENDER C — Default / Play-all ─────────────────────────
   return (
     <div className={`queue-system game-view ${darkMode ? 'dark' : ''}`}>
+      {hostKeyBanner}
       <div className="topright-controls">
         <button className="dark-mode-toggle" onClick={() => setDarkMode(d => !d)}>{darkMode ? <Sun size={17} /> : <Moon size={17} />}</button>
-        <GearMenu
-          sessionId={session.sessionId}
-          isHost={session.isHost}
-          isLive={isLiveLocal}
-          canControl={canControl}
-          onToggleLive={handleGoLive}
-          onHardReset={handleHardReset}
-          onShowGuide={() => setShowGuide(true)}
-          hasMultipleCourts={courts.length >= 2}
-          onShowCoordinator={() => setShowCoordinator(true)}
-        />
+        <GearMenu {...gearMenuProps} />
       </div>
 
       <button className="back-home" onClick={() => router.push('/')}><ArrowLeft size={14} /> Back</button>
@@ -1126,7 +905,7 @@ function QueueSystemContent() {
       {modeSelector}{uiControls}{tabBar}
       {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
 
-      {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} /> : (
+      {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} /> : (
         <div className="main-layout">
           <div className="queue-area">
             <h1 className="queue-title">{gameMode === 'singles' ? <Swords size={19} /> : <Users size={19} />}{gameMode === 'singles' ? 'Singles' : 'Doubles'} Queue</h1>
@@ -1153,6 +932,14 @@ function QueueSystemContent() {
                   onRemove={i => { const nq = queue.filter((_, j) => j !== i); setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
                 />
               </div>
+            )}
+
+            {session.isHost && (
+              <SitOutPanel
+                players={players}
+                sittingOut={activeSittingOut}
+                onToggle={handleToggleSitOut}
+              />
             )}
 
             {activeQueueMode === 'default' && gameMode === 'doubles' && (
