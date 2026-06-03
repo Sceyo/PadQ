@@ -22,7 +22,7 @@ import {
   loadSession,
   updateSession,
   updateQueueSafely,
-  addHistoryEntry,
+  batchMatchResult,
   clearHistory,
   deleteLatestHistoryEntry,
   touchSession,
@@ -41,7 +41,7 @@ import {
 
 // ── Types ──────────────────────────────────────────────────
 
-type QueueMode       = 'default' | 'tournament' | 'playall';
+type QueueMode       = 'default' | 'tournament' | 'playall' | 'skilled';
 type EliminationType = 'single' | 'double';
 
 export interface SessionState {
@@ -343,8 +343,7 @@ export function useSession(): SessionState & SessionActions {
 
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      await updateQueueSafely(sessionId, hostToken, () => patch);
-      await addHistoryEntry(sessionId, hostToken, entry);
+      await batchMatchResult(sessionId, hostToken, patch, entry);
     } catch (err) {
       console.error('[useSession] commitMatchResult error:', err);
     } finally {
@@ -402,16 +401,15 @@ export function useSession(): SessionState & SessionActions {
    */
   const clearMatchHistory = useCallback(async () => {
     const sessionId = sessionIdRef.current;
+    const hostToken = hostTokenRef.current;
     if (!sessionId) {
-      // No Firebase session — just clear local state
       setState(prev => ({ ...prev, matchHistory: [] }));
       return;
     }
-    // Clear local immediately so UI updates without waiting for Firestore
+    if (!hostToken) return;
     setState(prev => ({ ...prev, matchHistory: [] }));
     try {
-      await clearHistory(sessionId);
-      // onSnapshot will fire with empty array, confirming the clear
+      await clearHistory(sessionId, hostToken);
     } catch (err) {
       console.error('[useSession] clearMatchHistory error:', err);
     }

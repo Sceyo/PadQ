@@ -74,7 +74,7 @@ export interface LiveScoreState {
 export interface SessionDoc {
   hostToken: string;
   gameMode: 'singles' | 'doubles';
-  queueMode: 'default' | 'tournament' | 'playall';
+  queueMode: 'default' | 'tournament' | 'playall' | 'skilled';
   elimType: 'single' | 'double';
   players: string[];
   queue: string[];
@@ -148,7 +148,10 @@ const sessionRef = (id: string) => doc(db, 'sessions', id);
 export async function createSession(
   data: Omit<SessionDoc, 'hostToken' | 'createdAt' | 'updatedAt' | 'lastActiveAt'>,
 ): Promise<{ sessionId: string; hostToken: string }> {
-  const sessionId  = generateRoomCode();
+  let sessionId = generateRoomCode();
+  while ((await getDoc(sessionRef(sessionId))).exists()) {
+    sessionId = generateRoomCode();
+  }
   const hostToken  = generateId();
 
   await setDoc(sessionRef(sessionId), {
@@ -274,6 +277,45 @@ export async function addHistoryEntry(
 }
 
 /**
+ * batchMatchResult  ← atomic queue update + history write
+ *
+ * Combines the queue patch and history entry into a single Firestore
+ * writeBatch so viewers never see the new queue without the matching
+ * history entry. Replaces the two-step updateQueueSafely + addHistoryEntry
+ * pattern used in commitMatchResult.
+ */
+export async function batchMatchResult(
+  sessionId: string,
+  hostToken: string,
+  patch: Partial<Omit<SessionDoc, 'hostToken' | 'createdAt'>>,
+  entry: Omit<MatchHistoryEntry, 'hostToken'>,
+): Promise<void> {
+  const batch  = writeBatch(db);
+  const sRef   = sessionRef(sessionId);
+  const hRef   = doc(collection(db, 'sessions', sessionId, 'history'));
+
+  batch.update(sRef, {
+    ...patch,
+    hostToken,
+    updatedAt:    serverTimestamp(),
+    lastActiveAt: serverTimestamp(),
+  });
+
+  const clean: Record<string, unknown> = {
+    id:        entry.id,
+    mode:      entry.mode,
+    players:   entry.players,
+    winner:    entry.winner,
+    timestamp: entry.timestamp,
+    hostToken,
+  };
+  if (entry.score !== undefined) clean.score = entry.score;
+  batch.set(hRef, clean);
+
+  await batch.commit();
+}
+
+/**
  * touchSession
  * Lightweight heartbeat — only updates lastActiveAt.
  * Call this when the host resumes a session without making a data write
@@ -323,7 +365,12 @@ export async function deleteSession(
  */
 export async function clearHistory(
   sessionId: string,
+  hostToken: string,
 ): Promise<void> {
+  const sessionSnap = await getDoc(sessionRef(sessionId));
+  if (sessionSnap.exists() && (sessionSnap.data() as SessionDoc).hostToken !== hostToken) {
+    throw new Error('Not the host');
+  }
   const histRef = collection(db, 'sessions', sessionId, 'history');
   const snap = await getDocs(histRef);
   if (snap.empty) return;
@@ -387,6 +434,7 @@ export function subscribeToHistory(
   const q = query(
     collection(db, 'sessions', sessionId, 'history'),
     orderBy('id', 'desc'),
+    limit(100),
   );
   return onSnapshot(q, (snap) => {
     const entries = snap.docs.map(d => d.data() as MatchHistoryEntry);
@@ -477,30 +525,53 @@ export function clearCourtGroup() {
 }
 
 // ── Club Roster localStorage helpers ─────────────────────
-// Persistent list of player names the host builds once and
-// pulls from when setting up each court — no re-typing needed.
+// Persistent list of player names (with optional skill bracket)
+// the host builds once and pulls from when setting up each court.
+
+export type SkillBracket = 'beginner' | 'intermediate' | 'advanced';
+
+export interface RosterEntry {
+  name:   string;
+  skill?: SkillBracket;
+}
 
 const LS_ROSTER = 'padq_roster';
 
-export function loadRoster(): string[] {
-  try { return JSON.parse(localStorage.getItem(LS_ROSTER) ?? '[]'); }
-  catch { return []; }
+export function loadRoster(): RosterEntry[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_ROSTER) ?? '[]');
+    // Migrate from legacy string[] format
+    if (Array.isArray(raw) && raw.length > 0 && typeof raw[0] === 'string') {
+      return (raw as string[]).map(name => ({ name }));
+    }
+    return raw as RosterEntry[];
+  } catch {
+    return [];
+  }
 }
 
-export function saveRoster(names: string[]): void {
-  localStorage.setItem(LS_ROSTER, JSON.stringify(names));
+export function saveRoster(entries: RosterEntry[]): void {
+  localStorage.setItem(LS_ROSTER, JSON.stringify(entries));
 }
 
-/** Merge new names into the roster (deduplicates, preserves order). */
+/** Merge new names into the roster (deduplicates case-insensitively, preserves order). */
 export function mergeIntoRoster(names: string[]): void {
   const current = loadRoster();
-  const seen = new Set(current);
-  const added = names.filter(n => !seen.has(n));
+  const seen    = new Set(current.map(e => e.name.toLowerCase()));
+  const added   = names.filter(n => !seen.has(n.toLowerCase())).map(n => ({ name: n }));
   if (added.length > 0) saveRoster([...current, ...added]);
 }
 
 export function removeFromRoster(name: string): void {
-  saveRoster(loadRoster().filter(n => n !== name));
+  saveRoster(loadRoster().filter(e => e.name !== name));
+}
+
+/** Set or clear the skill bracket for one roster entry. */
+export function setRosterEntrySkill(name: string, skill: SkillBracket | undefined): void {
+  const updated = loadRoster().map(e =>
+    e.name === name ? (skill ? { ...e, skill } : { name: e.name }) : e
+  );
+  saveRoster(updated);
 }
 
 // ── Career Stats localStorage helpers ─────────────────────
@@ -545,4 +616,32 @@ export function recordCareerResult(players: string, winner: string): void {
     else                             stats[name].losses++;
   }
   saveCareerStats(stats);
+}
+
+// ── Skilled Brackets localStorage helpers ─────────────────
+// Persists per-session skill-bracket assignments across page refreshes.
+// Shape mirrors SkilledBrackets in SkilledView.tsx.
+
+export interface SkilledBracketsStore {
+  beginner:     string[];
+  intermediate: string[];
+  advanced:     string[];
+}
+
+const LS_SKILLED_BRACKETS = 'padq_skilled_brackets';
+
+export function loadSkilledBrackets(): SkilledBracketsStore {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_SKILLED_BRACKETS) ?? 'null');
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw as SkilledBracketsStore;
+  } catch { /* ignore */ }
+  return { beginner: [], intermediate: [], advanced: [] };
+}
+
+export function saveSkilledBrackets(b: SkilledBracketsStore): void {
+  localStorage.setItem(LS_SKILLED_BRACKETS, JSON.stringify(b));
+}
+
+export function clearSkilledBrackets(): void {
+  localStorage.removeItem(LS_SKILLED_BRACKETS);
 }

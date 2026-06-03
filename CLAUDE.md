@@ -49,7 +49,7 @@ app/
       AnalyticsDashboard/     # Win rates, streaks, stats view
       Bracket/                # Tournament bracket (single + double elimination)
       CourtTabs/              # Multi-court tab switcher (host only)
-      CourtView.tsx           # Viewer-mode live session display
+      CourtCard/              # Single-court card used in the coordinator overlay grid
       DoublesMatch/           # Doubles team assignment + match control
       LiveManagement/         # AddPlayerPanel + ManualQueuePanel (host live tools)
       PaddleStatusPanel/      # Doubles pool visualizer (W1/L1 pools)
@@ -171,7 +171,7 @@ After `LOSERS`, cycle restarts at `WINNERS`. The `playedThisCycle` set ensures e
 
 `formTeams` — exhaustively evaluates all 3 splits of 4 players via `allPairings`, picks lowest penalty score. No shuffling needed.
 
-INIT scaling: `Math.ceil(allPlayers.length / 4)` matches, not a hardcoded 2.
+INIT scaling: `Math.max(1, Math.floor(allPlayers.length / 4))` matches — floor so only complete groups of 4 are scheduled; remainder players flow into `waitingQueue`.
 
 ---
 
@@ -203,6 +203,10 @@ sessions/{sessionId}           ← TTL field: lastActiveAt (30-min policy)
   isLive: boolean              ← host must explicitly set true to allow viewers
   accessPin: string|null       ← null = open, string = PIN required
   courtName: string            ← display name for CourtTabs
+  doublesEngineState: object   ← serialized PaddleState (w1, l1, waitingQueue, phase, playedThisCycle as string[])
+  singlesEngineState: object   ← serialized SinglesState (king, queue, waitingQueue, streak)
+  courtSlots: CourtSlot[]      ← multi-court current matchups (doubles multi-court mode)
+  sittingOut: string[]         ← players temporarily excluded from queue and engine pools
   createdAt, updatedAt, lastActiveAt: Timestamp
 
 sessions/{sessionId}/history/{auto-id}

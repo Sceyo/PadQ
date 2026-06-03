@@ -19,7 +19,7 @@ export const ScoreBoard: React.FC<{
   const [scoreA,      setScoreA]      = useState(0);
   const [scoreB,      setScoreB]      = useState(0);
   const [baseLimit,   setBaseLimit]   = useState(11);
-  const [limit,       setLimit]       = useState(21);
+  const [limit,       setLimit]       = useState(11);
   const [customLimit, setCustomLimit] = useState('');
   const [showCustom,  setShowCustom]  = useState(false);
   const [finished,    setFinished]    = useState(false);

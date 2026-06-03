@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Swords, Sparkles, Trophy, Play } from 'lucide-react';
+import { Swords, Sparkles, Trophy, Play, UserX } from 'lucide-react';
 import type { PlayerStat } from '../../lib/types';
 import type { LiveScoreState } from '@/lib/sessionService';
 import { PlayerLabel } from '../atoms/PlayerLabel';
@@ -17,7 +17,8 @@ export const DoublesMatch: React.FC<{
   onMatch:          (a: string[], b: string[], w: 'A' | 'B', score?: string) => void;
   onScoreChange?:   (score: LiveScoreState | null) => void;
   viewerScore?:     LiveScoreState | null;
-}> = ({ firstFour, suggestedTeamA, suggestedTeamB, playAllScore, statsMap, isHost, onMatch, onScoreChange, viewerScore }) => {
+  onMarkAbsent?:    (player: string) => void;
+}> = ({ firstFour, suggestedTeamA, suggestedTeamB, playAllScore, statsMap, isHost, onMatch, onScoreChange, viewerScore, onMarkAbsent }) => {
   const [teamA, setTeamA] = useState<string[]>([]);
   const [teamB, setTeamB] = useState<string[]>([]);
   const [winner, setWinner] = useState<'A' | 'B' | null>(null);
@@ -66,7 +67,21 @@ export const DoublesMatch: React.FC<{
       <div className="player-buttons">
         {firstFour.map((p, i) => {
           const cls = teamA.includes(p) ? 'player-btn-team-a' : teamB.includes(p) ? 'player-btn-team-b' : 'player-btn-unassigned';
-          return <button key={`${i}-${p}`} onClick={() => toggle(p)} className={cls} disabled={!isHost}><PlayerLabel name={p} statsMap={statsMap} /></button>;
+          return (
+            <div key={`${i}-${p}`} className="player-btn-cell">
+              <button onClick={() => toggle(p)} className={cls} disabled={!isHost}><PlayerLabel name={p} statsMap={statsMap} /></button>
+              {isHost && onMarkAbsent && (
+                <button
+                  className="absent-mini-btn"
+                  onClick={(e) => { e.stopPropagation(); onMarkAbsent(p); }}
+                  title="Mark absent — replace with waiting player"
+                  type="button"
+                >
+                  <UserX size={10} />
+                </button>
+              )}
+            </div>
+          );
         })}
       </div>
       <ScoreBoard

@@ -133,12 +133,8 @@ function smartSelectPool(
               scoreCandidate(p.teamA, p.teamB, recentPairs, recentMatches, lastMatchPlayers, skillMap),
             ),
           );
-          let comboScore = minPairingScore;
-          for (const p of [a, b, c, d]) {
-            if (lastMatchPlayers.has(p)) comboScore += PENALTY_FATIGUE;
-          }
-          if (comboScore < bestScore) {
-            bestScore = comboScore;
+          if (minPairingScore < bestScore) {
+            bestScore = minPairingScore;
             bestCombo = [a, b, c, d];
           }
         }

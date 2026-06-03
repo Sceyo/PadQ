@@ -1,4 +1,12 @@
 import type { RankTier, PlayerStat, SmartSuggestion, MatchHistoryEntry } from './types';
+import type { SkillBracket } from '@/lib/sessionService';
+
+const BRACKET_SKILL: Record<SkillBracket, number> = { beginner: 25, intermediate: 50, advanced: 75 };
+
+/** Map a roster skill bracket to a numeric skill value used in skillMap. */
+export function bracketSkillValue(skill: SkillBracket | undefined): number {
+  return skill !== undefined ? BRACKET_SKILL[skill] : 50;
+}
 
 export function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];

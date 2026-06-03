@@ -1,10 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Sun, Moon, ArrowLeft, Users, Swords, UserPlus,
   Trash2, Star, BookOpen, Play, Wifi,
 } from 'lucide-react';
+import type { RosterEntry, SkillBracket } from '@/lib/sessionService';
 
 export interface SetupViewProps {
   gameMode:            'singles' | 'doubles' | null;
@@ -14,7 +15,7 @@ export interface SetupViewProps {
   onCourtCountChange:  (n: number) => void;
   setupPin:            string;
   onPinChange:         (s: string) => void;
-  roster:              string[];
+  roster:              RosterEntry[];
   showRoster:          boolean;
   onToggleRoster:      () => void;
   rosterSelected:      Set<string>;
@@ -23,6 +24,7 @@ export interface SetupViewProps {
   onAddFromRoster:     () => void;
   onSaveToRoster:      () => void;
   onRemoveFromRoster:  (name: string) => void;
+  onSetRosterSkill:    (name: string, skill: SkillBracket | undefined) => void;
   tempPlayers:         string[];
   currentName:         string;
   onCurrentNameChange: (s: string) => void;
@@ -34,6 +36,7 @@ export interface SetupViewProps {
   onStartQueue:        () => void;
   isSaving:            boolean;
   onBack:              () => void;
+  errorMsg?:           string;
 }
 
 export function SetupView({
@@ -45,9 +48,15 @@ export function SetupView({
   tempPlayers, currentName, onCurrentNameChange,
   pasteInput, onPasteInputChange,
   onAddPlayer, onRemoveTempPlayer, onAddFromPaste,
-  onStartQueue, isSaving, onBack,
+  onStartQueue, isSaving, onBack, errorMsg,
+  onSetRosterSkill,
 }: SetupViewProps) {
   const minPlayers = gameMode === 'doubles' && courtCount > 1 ? courtCount * 4 : 5;
+  const [skillPickerFor, setSkillPickerFor] = useState<string | null>(null);
+
+  const SKILL_BRACKETS: SkillBracket[] = ['beginner', 'intermediate', 'advanced'];
+  const SKILL_LABEL: Record<SkillBracket, string> = { beginner: 'B', intermediate: 'I', advanced: 'A' };
+  const SKILL_TITLE: Record<SkillBracket, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
 
   return (
     <div className={`queue-system setup-page ${darkMode ? 'dark' : ''}`}>
@@ -133,25 +142,58 @@ export function SetupView({
           ) : (
             <div className="roster-panel">
               <div className="roster-list">
-                {roster.map((name, i) => (
-                  <label key={`roster-${i}-${name}`} className="roster-item">
-                    <input
-                      type="checkbox"
-                      checked={rosterSelected.has(name)}
-                      disabled={tempPlayers.includes(name)}
-                      onChange={() => onRosterToggle(name)}
-                    />
-                    <span className={`roster-name${tempPlayers.includes(name) ? ' roster-name--added' : ''}`}>
-                      {name}
-                    </span>
-                    <button
-                      type="button"
-                      className="roster-remove-btn"
-                      onClick={e => { e.preventDefault(); onRemoveFromRoster(name); }}
-                      title="Remove from roster"
-                    >×</button>
-                  </label>
-                ))}
+                {roster.map((entry, i) => {
+                  const isAdded = tempPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase());
+                  const pickerOpen = skillPickerFor === entry.name;
+                  return (
+                    <div key={`roster-${i}-${entry.name}`} className="roster-item roster-item--col">
+                      <div className="roster-item-row">
+                        <input
+                          type="checkbox"
+                          checked={rosterSelected.has(entry.name)}
+                          disabled={isAdded}
+                          onChange={() => onRosterToggle(entry.name)}
+                        />
+                        <span
+                          className={`roster-name roster-name--clickable${isAdded ? ' roster-name--added' : ''}`}
+                          onClick={() => setSkillPickerFor(pickerOpen ? null : entry.name)}
+                          title="Tap to set skill bracket"
+                        >
+                          {entry.name}
+                          {entry.skill && (
+                            <span className={`skill-badge skill-badge--${entry.skill}`}>
+                              {SKILL_LABEL[entry.skill]}
+                            </span>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className="roster-remove-btn"
+                          onClick={e => { e.preventDefault(); onRemoveFromRoster(entry.name); }}
+                          title="Remove from roster"
+                        >×</button>
+                      </div>
+                      {pickerOpen && (
+                        <div className="skill-picker">
+                          {SKILL_BRACKETS.map(bracket => (
+                            <button
+                              key={bracket}
+                              type="button"
+                              className={`skill-pick-btn skill-pick-btn--${bracket}${entry.skill === bracket ? ' skill-pick-btn--active' : ''}`}
+                              title={SKILL_TITLE[bracket]}
+                              onClick={() => {
+                                onSetRosterSkill(entry.name, entry.skill === bracket ? undefined : bracket);
+                                setSkillPickerFor(null);
+                              }}
+                            >
+                              {SKILL_TITLE[bracket]}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <div className="roster-actions">
                 <button
@@ -178,12 +220,13 @@ export function SetupView({
           <input
             type="text"
             value={currentName}
-            onChange={e => onCurrentNameChange(e.target.value)}
+            onChange={e => { onCurrentNameChange(e.target.value); }}
             placeholder="Enter player name"
             onKeyDown={e => e.key === 'Enter' && onAddPlayer()}
           />
           <button onClick={onAddPlayer} className="add-btn"><UserPlus size={15} /></button>
         </div>
+        {errorMsg && <p className="setup-error-msg">{errorMsg}</p>}
         <div className="input-group">
           <input
             type="text"

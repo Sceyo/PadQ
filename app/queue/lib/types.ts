@@ -8,7 +8,7 @@ export interface PlayerStat {
 }
 export type RankTier        = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
 export type EliminationType = 'single' | 'double';
-export type QueueMode       = 'default' | 'tournament' | 'playall';
+export type QueueMode       = 'default' | 'tournament' | 'playall' | 'skilled';
 export type GameTab         = 'queue' | 'analytics';
 
 export interface TournamentMatch {

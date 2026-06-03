@@ -7,9 +7,9 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import {
   Swords, Users, Trophy, Shuffle, History,
   Sun, Moon, ArrowLeft,
-  Star, Sparkles, RefreshCw,
+  Star, Sparkles, RefreshCw, Layers,
   BarChart2, Wifi, WifiOff,
-  Check, Copy,
+  Check, Copy, UserX, ArrowUp,
 } from 'lucide-react';
 import useQueue, {
   suggestNextDoublesMatch,
@@ -20,10 +20,12 @@ import { useSession } from '@/hooks/useSession';
 import type { LiveScoreState } from '@/lib/sessionService';
 import {
   loadCourtGroup, addCourtToGroup,
-  removeCourtFromGroup, loadHostFromStorage, saveHostToStorage,
-  loadRoster, mergeIntoRoster, removeFromRoster,
+  removeCourtFromGroup, clearCourtGroup, loadHostFromStorage, saveHostToStorage, clearHostFromStorage,
+  loadRoster, mergeIntoRoster, removeFromRoster, setRosterEntrySkill,
   loadSession, loadCareerStats, recordCareerResult,
+  loadSkilledBrackets, saveSkilledBrackets, clearSkilledBrackets,
   type CourtEntry, type CourtSlot, type SessionDoc, type CareerStatsMap,
+  type RosterEntry, type SkillBracket,
 } from '@/lib/sessionService';
 import './QueueSystem.css';
 
@@ -32,11 +34,18 @@ import type {
   MatchHistoryEntry, PlayerStat, EliminationType,
   QueueMode, GameTab, TournamentMatch,
 } from './lib/types';
-import { buildPlayerStats, generateSuggestions, shuffleArray } from './lib/playerUtils';
+import { buildPlayerStats, generateSuggestions, shuffleArray, bracketSkillValue } from './lib/playerUtils';
+import {
+  initSkilledState, rotatePlayers as rotatePlayersEngine, reassignCourt as reassignCourtEngine,
+  addPlayerToSkilledState as addPlayerToSkilledStateEngine, retagPlayerInQueue,
+  getPlayerBracketLevel, fillIdleCourts as fillIdleCourtsEngine,
+  recalculateRest as recalculateRestEngine,
+  type SkilledState, type SkilledCourt, type SkillLevel, type CourtDef,
+} from './lib/skilledMatchmakingEngine';
 import type { PaddleState, SerializablePaddleState, Team } from './lib/doublesEngine';
 import { freshPaddleState, advancePaddleState, addPlayerToWaiting, serializePaddleState, deserializePaddleState } from './lib/doublesEngine';
 import type { SinglesState, SerializableSinglesState } from './lib/singleEngine';
-import { freshSinglesState, advanceSinglesState, serializeSinglesState, deserializeSinglesState } from './lib/singleEngine';
+import { freshSinglesState, advanceSinglesState, addPlayerToSinglesWaiting, serializeSinglesState, deserializeSinglesState } from './lib/singleEngine';
 
 // ── Components ───────────────────────────────────────────────
 import { PlayerLabel } from './components/atoms/PlayerLabel';
@@ -58,12 +67,14 @@ import { GearMenu } from './components/GearMenu/GearMenu';
 import { CoordinatorOverlay } from './components/CoordinatorOverlay/CoordinatorOverlay';
 import { SetupView } from './components/SetupView/SetupView';
 import { SitOutPanel } from './components/SitOutPanel/SitOutPanel';
+import { SkilledView, type SkilledBrackets } from './components/SkilledView/SkilledView';
 
 // ── Undo snapshot type ────────────────────────────────────────
 interface UndoSnapshot {
   queue:        string[];
   paddleState:  PaddleState;
   singlesState: SinglesState;
+  courtSlots?:  CourtSlot[];
 }
 
 // Deep-copy helpers so undo doesn't share references with live state
@@ -160,7 +171,7 @@ function QueueSystemContent() {
   }, [session.isHost, session.sessionId]);
 
   // ── Roster (setup screen) ──────────────────────────────────
-  const [roster,         setRoster]         = useState<string[]>([]);
+  const [roster,         setRoster]         = useState<RosterEntry[]>([]);
   const [showRoster,     setShowRoster]     = useState(false);
   const [rosterSelected, setRosterSelected] = useState<Set<string>>(new Set());
 
@@ -217,6 +228,14 @@ function QueueSystemContent() {
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
   const [hasUndo, setHasUndo] = useState(false);
 
+  // ── Substitute / absent player ─────────────────────────────
+  const [substituteFor, setSubstituteFor] = useState<string | null>(null);
+
+  // ── Skilled brackets — persisted in localStorage ──────────
+  const [skilledBrackets,   setSkilledBrackets]   = useState<SkilledBrackets>(() => loadSkilledBrackets());
+  const [skilledState,      setSkilledState]       = useState<SkilledState | null>(null);
+  const [showSkillBrackets, setShowSkillBrackets]  = useState(false);
+
   // ── Sit-out state ──────────────────────────────────────────
   const [localSittingOut, setLocalSittingOut] = useState<string[]>([]);
 
@@ -225,9 +244,41 @@ function QueueSystemContent() {
     setLocalSittingOut(session.sittingOut ?? []);
   }, [session.sittingOut, session.isConnected]);
 
+  // Keep bracket assignments in sync when players are removed from the session
+  useEffect(() => {
+    const playerSet = new Set(players);
+    setSkilledBrackets(prev => ({
+      beginner:     prev.beginner.filter(n => playerSet.has(n)),
+      intermediate: prev.intermediate.filter(n => playerSet.has(n)),
+      advanced:     prev.advanced.filter(n => playerSet.has(n)),
+    }));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players]);
+
   const activeSittingOut = session.isConnected ? (session.sittingOut ?? []) : localSittingOut;
 
-  const getPartneredQueue = useCallback((pList: string[]) => [...pList], []);
+  // ── Toast notification (replaces alert()) ─────────────────
+  const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((msg: string) => {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToastMsg(msg);
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
+  }, []);
+
+  // ── Inline confirm dialog (replaces native confirm()) ──────
+  type ConfirmAction =
+    | { type: 'clear-history' }
+    | { type: 'hard-reset' }
+    | { type: 'back-home' }
+    | { type: 'remove-court'; sessionId: string };
+  const [pendingConfirm, setPendingConfirm] = useState<ConfirmAction | null>(null);
+
+  // ── Setup-phase validation error (replaces alert() in setup)
+  const [setupErrorMsg, setSetupErrorMsg] = useState<string | null>(null);
+
+  // ── Double-click guard for match result handlers ───────────
+  const isProcessingMatchRef = useRef(false);
 
   // Sync session.isLive → local
   useEffect(() => { setIsLiveLocal(session.isLive ?? false); }, [session.isLive]);
@@ -303,14 +354,50 @@ function QueueSystemContent() {
   const activeHistory          = session.isConnected ? (session.matchHistory as unknown as MatchHistoryEntry[]) : localHistory;
 
   // Derived
-  const statsList = useMemo(() => buildPlayerStats(players, activeHistory), [players, activeHistory]);
-  const statsMap  = useMemo(() => Object.fromEntries(statsList.map(s => [s.name, s])), [statsList]);
+  const statsList      = useMemo(() => buildPlayerStats(players, activeHistory), [players, activeHistory]);
+  const statsMap       = useMemo(() => Object.fromEntries(statsList.map(s => [s.name, s])), [statsList]);
+  // Persist bracket assignments to localStorage whenever they change
+  useEffect(() => { saveSkilledBrackets(skilledBrackets); }, [skilledBrackets]);
+
+  // Auto-initialize skilled state when reconnecting to a session that already had Skilled mode active.
+  // handleModeChange is the normal init path, but it's never called on page reload — this fills that gap.
+  useEffect(() => {
+    if (activeQueueMode !== 'skilled' || skilledState !== null || players.length === 0) return;
+    const defs: CourtDef[] = courtSlots.length > 0
+      ? courtSlots.map(c => ({ id: c.id, name: c.name }))
+      : [{ id: 'court-0', name: 'Court 1' }];
+    setSkilledState(initSkilledState(players, skilledBrackets, defs, activeSittingOut));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeQueueMode, players, courtSlots]);
+
+  // Set of players that have no skill tag assigned (for the untagged notice)
+  const untaggedInSkilled = useMemo(() => {
+    const tagged = new Set([
+      ...skilledBrackets.beginner,
+      ...skilledBrackets.intermediate,
+      ...skilledBrackets.advanced,
+    ]);
+    return new Set(players.filter(n => !tagged.has(n)));
+  }, [players, skilledBrackets]);
+
+  // Build a name→bracket map: skilled-tab assignments take priority over roster skill
+  const rosterSkillMap = useMemo<Record<string, SkillBracket | undefined>>(() => {
+    const base: Record<string, SkillBracket | undefined> = Object.fromEntries(roster.map(e => [e.name, e.skill]));
+    (['beginner', 'intermediate', 'advanced'] as SkillBracket[]).forEach(bracket => {
+      skilledBrackets[bracket].forEach(name => { base[name] = bracket; });
+    });
+    return base;
+  }, [roster, skilledBrackets]);
   const suggestions = useMemo(() => activeTab === 'queue' ? generateSuggestions(statsList, queue) : [], [statsList, queue, activeTab]);
   const playAllSuggestion = useMemo<PlayAllSuggestion | null>(() => {
     if (activeQueueMode !== 'playall' || gameMode !== 'doubles') return null;
     return suggestNextDoublesMatch(queue, playAllRel);
   }, [activeQueueMode, gameMode, queue, playAllRel]);
   const firstFour = useMemo(() => queue.slice(0, 4), [queue]);
+  const waitingForNext = useMemo(() => {
+    const onCourtCount = gameMode === 'doubles' ? 4 : 2;
+    return queue.slice(onCourtCount).filter(p => !activeSittingOut.includes(p));
+  }, [queue, gameMode, activeSittingOut]);
 
   // Load club roster from localStorage on mount
   useEffect(() => { setRoster(loadRoster()); }, []);
@@ -338,7 +425,8 @@ function QueueSystemContent() {
   const addTempPlayer = () => {
     const t = currentName.trim();
     if (!t) return;
-    if (tempPlayers.includes(t)) { alert('Player already added'); return; }
+    if (tempPlayers.includes(t)) { setSetupErrorMsg(`"${t}" is already in the list`); return; }
+    setSetupErrorMsg(null);
     setTempPlayers(prev => [...prev, t]); setCurrentName('');
   };
   const removeTempPlayer = (i: number) => setTempPlayers(prev => prev.filter((_, j) => j !== i));
@@ -353,11 +441,8 @@ function QueueSystemContent() {
 
   const handleStartQueue = async () => {
     const minPlayers = gameMode === 'doubles' && courtCount > 1 ? courtCount * 4 : 5;
-    if (tempPlayers.length < minPlayers) {
-      alert(`Need at least ${minPlayers} players for ${courtCount} court${courtCount > 1 ? 's' : ''}. Currently: ${tempPlayers.length}`);
-      return;
-    }
-    const orderedPlayers = getPartneredQueue(tempPlayers);
+    if (tempPlayers.length < minPlayers) return;
+    const orderedPlayers = [...tempPlayers];
     resetPaddleState();
     resetSinglesState(tempPlayers);
     setPlayers(tempPlayers); setTempPlayers([]); setLocalHistory([]);
@@ -445,6 +530,15 @@ function QueueSystemContent() {
     else if (newMode !== 'tournament') { setTournamentActive(false); setTournamentWinner(null); setTournamentMatches([]); }
     if (newMode === 'playall') resetPlayAllRelationships();
     if (newMode === 'default') { resetPaddleState(); resetSinglesState(players); }
+    if (newMode === 'skilled') {
+      // Build court definitions from existing court config (or default single court)
+      const defs: CourtDef[] = courtSlots.length > 0
+        ? courtSlots.map(c => ({ id: c.id, name: c.name }))
+        : [{ id: 'court-0', name: 'Court 1' }];
+      const state = initSkilledState(players, skilledBrackets, defs, activeSittingOut);
+      setSkilledState(state);
+      setShowSkillBrackets(false);
+    }
   };
 
   // ── Sit-out handler ────────────────────────────────────────
@@ -457,7 +551,46 @@ function QueueSystemContent() {
     const newQueue = isSittingOut ? [...queue, name] : queue.filter(n => n !== name);
     setLocalSittingOut(newSittingOut);
     setQueue(newQueue);
+
+    if (gameMode === 'singles') {
+      if (isSittingOut) {
+        const ns = addPlayerToSinglesWaiting(singlesStateRef.current, name);
+        singlesStateRef.current = ns;
+        setSinglesStateUI(ns);
+      } else {
+        const ns: SinglesState = {
+          ...singlesStateRef.current,
+          king: singlesStateRef.current.king === name ? null : singlesStateRef.current.king,
+          queue: singlesStateRef.current.queue.filter(p => p !== name),
+          waitingQueue: singlesStateRef.current.waitingQueue.filter(p => p !== name),
+        };
+        singlesStateRef.current = ns;
+        setSinglesStateUI(ns);
+      }
+    } else if (gameMode === 'doubles') {
+      if (isSittingOut) {
+        const ns = addPlayerToWaiting(paddleStateRef.current, name);
+        paddleStateRef.current = ns;
+        setPaddleStateUI(ns);
+      } else {
+        const ns: PaddleState = {
+          ...paddleStateRef.current,
+          w1: paddleStateRef.current.w1.filter(p => p !== name),
+          l1: paddleStateRef.current.l1.filter(p => p !== name),
+          waitingQueue: paddleStateRef.current.waitingQueue.filter(p => p !== name),
+        };
+        paddleStateRef.current = ns;
+        setPaddleStateUI(ns);
+      }
+    }
+
     if (session.sessionId) session.syncField({ sittingOut: newSittingOut, queue: newQueue });
+
+    // Recalculate rest thresholds when active player count changes in skilled mode
+    if (activeQueueMode === 'skilled' && skilledState) {
+      const activeCount = players.filter(p => !newSittingOut.includes(p)).length;
+      setSkilledState(prev => prev ? recalculateRestEngine(prev, activeCount) : prev);
+    }
   };
 
   // ── Undo handler ───────────────────────────────────────────
@@ -469,10 +602,12 @@ function QueueSystemContent() {
     setPaddleStateUI(snap.paddleState);
     singlesStateRef.current = snap.singlesState;
     setSinglesStateUI(snap.singlesState);
+    if (snap.courtSlots) setLocalCourtSlots(snap.courtSlots);
     setLocalHistory(prev => prev.slice(1));
     if (session.sessionId) {
       session.undoLastMatch({
         queue: snap.queue,
+        ...(snap.courtSlots ? { courtSlots: snap.courtSlots } : {}),
         doublesEngineState: serializePaddleState(snap.paddleState) as unknown as Record<string, unknown>,
         singlesEngineState: serializeSinglesState(snap.singlesState) as unknown as Record<string, unknown>,
       });
@@ -481,7 +616,90 @@ function QueueSystemContent() {
     setHasUndo(false);
   };
 
+  // ── Absent player → substitute ─────────────────────────────
+  const handleMarkAbsent = (player: string) => { setSubstituteFor(player); };
+
+  const handleConfirmSub = (replacement: string) => {
+    if (!substituteFor) return;
+    const absent    = substituteFor;
+    const absentIdx = queue.indexOf(absent);
+    const repIdx    = queue.indexOf(replacement);
+    if (absentIdx === -1 || repIdx === -1) return;
+    const newQueue = [...queue];
+    newQueue[absentIdx] = replacement;
+    newQueue.splice(repIdx, 1);
+    const newSittingOut = [...activeSittingOut, absent];
+    setQueue(newQueue);
+    setLocalSittingOut(newSittingOut);
+
+    if (gameMode === 'singles') {
+      const wasKing = singlesStateRef.current.king === absent;
+      const ns: SinglesState = {
+        ...singlesStateRef.current,
+        king: wasKing ? replacement : singlesStateRef.current.king,
+        // If absent was in engine queue (challenger), replace them; remove replacement from wherever they sat
+        queue: singlesStateRef.current.queue
+          .filter(p => p !== replacement)
+          .map(p => p === absent ? replacement : p),
+        waitingQueue: singlesStateRef.current.waitingQueue.filter(p => p !== absent && p !== replacement),
+      };
+      singlesStateRef.current = ns;
+      setSinglesStateUI(ns);
+    } else if (gameMode === 'doubles') {
+      const ns: PaddleState = {
+        ...paddleStateRef.current,
+        w1: paddleStateRef.current.w1.filter(p => p !== absent),
+        l1: paddleStateRef.current.l1.filter(p => p !== absent),
+        waitingQueue: paddleStateRef.current.waitingQueue.filter(p => p !== absent),
+      };
+      paddleStateRef.current = ns;
+      setPaddleStateUI(ns);
+    }
+
+    if (session.sessionId) session.syncField({ queue: newQueue, sittingOut: newSittingOut });
+    setSubstituteFor(null);
+  };
+
+  // ── Sit Next — promote a waiting player to the front of the waiting pool ──
+  const handleSitNext = (player: string) => {
+    const onCourtCount = gameMode === 'doubles' ? 4 : 2;
+    const playerIdx = queue.indexOf(player);
+    if (playerIdx === -1 || playerIdx <= onCourtCount) return;
+    const newQueue = [...queue];
+    newQueue.splice(playerIdx, 1);
+    newQueue.splice(onCourtCount, 0, player);
+    setQueue(newQueue);
+
+    if (gameMode === 'singles') {
+      const { queue: eq, waitingQueue: wq } = singlesStateRef.current;
+      const inMain = eq.includes(player);
+      const ns: SinglesState = {
+        ...singlesStateRef.current,
+        queue: inMain ? [player, ...eq.filter(p => p !== player)] : eq,
+        waitingQueue: inMain ? wq : [player, ...wq.filter(p => p !== player)],
+      };
+      singlesStateRef.current = ns;
+      setSinglesStateUI(ns);
+    } else if (gameMode === 'doubles') {
+      const { w1, l1, waitingQueue: wq } = paddleStateRef.current;
+      const inW1 = w1.includes(player);
+      const inL1 = !inW1 && l1.includes(player);
+      const ns: PaddleState = {
+        ...paddleStateRef.current,
+        w1: inW1 ? [player, ...w1.filter(p => p !== player)] : w1,
+        l1: inL1 ? [player, ...l1.filter(p => p !== player)] : l1,
+        waitingQueue: !inW1 && !inL1 ? [player, ...wq.filter(p => p !== player)] : wq,
+      };
+      paddleStateRef.current = ns;
+      setPaddleStateUI(ns);
+    }
+
+    if (session.sessionId) session.syncField({ queue: newQueue });
+  };
+
   const handleSinglesMatch = (winner: string, score?: string) => {
+    if (isProcessingMatchRef.current) return;
+    isProcessingMatchRef.current = true;
     const [p1, p2] = [queue[0], queue[1]];
     // Save undo snapshot before mutating state
     undoSnapshotRef.current = {
@@ -507,9 +725,12 @@ function QueueSystemContent() {
     setQueue(newQueue);
     addHistory({ id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`, winner, score, timestamp: new Date().toLocaleTimeString() }, newQueue);
     setModalWinner(`${winner} wins!`); setModalScore(score); setModalOpen(true);
+    isProcessingMatchRef.current = false;
   };
 
   const handleDoublesMatch = (a: string[], b: string[], w: 'A' | 'B', score?: string) => {
+    if (isProcessingMatchRef.current) return;
+    isProcessingMatchRef.current = true;
     // Save undo snapshot before mutating state
     undoSnapshotRef.current = {
       queue: [...queue],
@@ -525,7 +746,12 @@ function QueueSystemContent() {
     let newQueue: string[];
     if (gameMode === 'doubles') {
       const skillMap = Object.fromEntries(
-        Object.entries(statsMap).map(([name, stat]) => [name, (stat as { winRate: number }).winRate])
+        Object.entries(statsMap).map(([name, stat]) => [
+          name,
+          (stat as PlayerStat).gamesPlayed >= 3
+            ? (stat as PlayerStat).winRate
+            : bracketSkillValue(rosterSkillMap[name]),
+        ])
       );
       const activePlayers = players.filter(p => !activeSittingOut.includes(p));
       const { nextState, newQueue: paddleQueue } = advancePaddleState(paddleStateRef.current, winnerTeam, loserTeam, activePlayers, skillMap);
@@ -539,12 +765,24 @@ function QueueSystemContent() {
     setQueue(newQueue);
     addHistory({ id: Date.now(), mode: 'Doubles', players: `${a.join(' & ')} vs ${b.join(' & ')}`, winner: winnerNames, score, timestamp: new Date().toLocaleTimeString() }, newQueue);
     setModalWinner(`${winnerNames} win!`); setModalScore(score); setModalOpen(true);
+    isProcessingMatchRef.current = false;
   };
 
   const handleCourtMatch = (courtId: string, side: 'A' | 'B') => {
+    if (isProcessingMatchRef.current) return;
+    isProcessingMatchRef.current = true;
     const currentSlots = courtSlots;
     const slot = currentSlots.find(c => c.id === courtId);
-    if (!slot || slot.onCourt.length < 4) return;
+    if (!slot || slot.onCourt.length < 4) { isProcessingMatchRef.current = false; return; }
+
+    // Save undo snapshot (includes courtSlots so multi-court undo works correctly)
+    undoSnapshotRef.current = {
+      queue:        [...queue],
+      paddleState:  clonePaddleState(paddleStateRef.current),
+      singlesState: cloneSinglesState(singlesStateRef.current),
+      courtSlots:   currentSlots.map(c => ({ ...c, onCourt: [...c.onCourt] })),
+    };
+    setHasUndo(true);
 
     const teamA = slot.onCourt.slice(0, 2) as [string, string];
     const teamB = slot.onCourt.slice(2, 4) as [string, string];
@@ -557,17 +795,26 @@ function QueueSystemContent() {
     );
     const activePlayers = players.filter(p => !lockedSet.has(p) && !activeSittingOut.includes(p));
 
-    const skillMap = Object.fromEntries(
-      Object.entries(statsMap).map(([name, s]) => [name, (s as PlayerStat).winRate])
-    );
-    const { nextState, newQueue: engineQueue } = advancePaddleState(
-      paddleStateRef.current, winnerTeam, loserTeam, activePlayers, skillMap
-    );
-    paddleStateRef.current = nextState;
-    setPaddleStateUI(nextState);
+    let nextOnCourt: string[];
+    let nextWaiting: string[];
 
-    const nextOnCourt  = engineQueue.slice(0, 4);
-    const nextWaiting  = engineQueue.slice(4);
+    {
+      const skillMap = Object.fromEntries(
+        Object.entries(statsMap).map(([name, s]) => [
+          name,
+          (s as PlayerStat).gamesPlayed >= 3
+            ? (s as PlayerStat).winRate
+            : bracketSkillValue(rosterSkillMap[name]),
+        ])
+      );
+      const { nextState, newQueue: engineQueue } = advancePaddleState(
+        paddleStateRef.current, winnerTeam, loserTeam, activePlayers, skillMap
+      );
+      paddleStateRef.current = nextState;
+      setPaddleStateUI(nextState);
+      nextOnCourt = engineQueue.slice(0, 4);
+      nextWaiting = engineQueue.slice(4);
+    }
 
     const updatedSlots = currentSlots.map(c =>
       c.id === courtId ? { ...c, onCourt: nextOnCourt } : c
@@ -588,6 +835,8 @@ function QueueSystemContent() {
     setLocalCourtSlots(updatedSlots);
     setQueue(newQueue);
     setLocalHistory(prev => [entry, ...prev]);
+    recordCareerResult(entry.players, entry.winner);
+    setCareerStats(loadCareerStats());
 
     if (session.sessionId) {
       session.commitMatchResult(
@@ -599,31 +848,69 @@ function QueueSystemContent() {
     setModalWinner(`${winnerNames} win!`);
     setModalScore(undefined);
     setModalOpen(true);
+    isProcessingMatchRef.current = false;
+  };
+
+  // ── Skilled mode result handler ────────────────────────────
+  const handleSkilledResult = (courtId: string, side: 'A' | 'B') => {
+    if (isProcessingMatchRef.current || !skilledState) return;
+    isProcessingMatchRef.current = true;
+
+    const court = skilledState.courts.find(c => c.id === courtId);
+    if (!court || court.players.length < 4) { isProcessingMatchRef.current = false; return; }
+
+    undoSnapshotRef.current = { queue: [...queue], paddleState: clonePaddleState(paddleStateRef.current), singlesState: cloneSinglesState(singlesStateRef.current) };
+    setHasUndo(true);
+
+    const teamA      = court.players.slice(0, 2) as [string, string];
+    const teamB      = court.players.slice(2, 4) as [string, string];
+    const winnerTeam = side === 'A' ? teamA : teamB;
+    const winnerNames = winnerTeam.join(' & ');
+
+    const afterRotate   = rotatePlayersEngine(court.players, skilledState, skilledBrackets);
+    const afterReassign = reassignCourtEngine(courtId, afterRotate, skilledBrackets);
+    setSkilledState(fillIdleCourtsEngine(afterReassign));
+
+    const entry: MatchHistoryEntry = {
+      id: Date.now(), mode: `Skilled (${court.name})`,
+      players: `${teamA.join(' & ')} vs ${teamB.join(' & ')}`,
+      winner: winnerNames, timestamp: new Date().toLocaleTimeString(),
+    };
+    setLocalHistory(prev => [entry, ...prev]);
+    recordCareerResult(entry.players, entry.winner);
+    setCareerStats(loadCareerStats());
+    if (session.sessionId) session.commitMatchResult({ queue }, entry);
+
+    setModalWinner(`${winnerNames} win!`); setModalScore(undefined); setModalOpen(true);
+    isProcessingMatchRef.current = false;
   };
 
   const handleAddPlayerLive = (name: string) => {
-    if (players.includes(name)) { alert('Player already exists'); return; }
+    if (players.includes(name)) { showToast(`"${name}" is already in the session`); return; }
     const np = [...players, name], nq = [...queue, name];
     setPlayers(np); setQueue(nq);
     if (activeQueueMode === 'default' && gameMode === 'doubles') {
       const newPaddleState = addPlayerToWaiting(paddleStateRef.current, name);
       paddleStateRef.current = newPaddleState;
       setPaddleStateUI(newPaddleState);
+    } else if (activeQueueMode === 'default' && gameMode === 'singles') {
+      const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, name);
+      singlesStateRef.current = newSinglesState;
+      setSinglesStateUI(newSinglesState);
+    } else if (activeQueueMode === 'skilled' && skilledState) {
+      const activeCount = np.filter(p => !activeSittingOut.includes(p)).length;
+      setSkilledState(prev => {
+        if (!prev) return prev;
+        const afterAdd = addPlayerToSkilledStateEngine(name, prev, skilledBrackets);
+        return recalculateRestEngine(afterAdd, activeCount);
+      });
     }
     if (session.sessionId) session.syncField({ players: np, queue: nq });
   };
 
-  const handleFullReset = async () => {
-    if (!confirm('Clear all match history? The queue and players will stay.')) return;
-    setLocalHistory([]);
-    await session.clearMatchHistory();
-  };
+  const handleFullReset = () => { setPendingConfirm({ type: 'clear-history' }); };
 
-  const handleHardReset = () => {
-    if (!confirm('Hard Reset will clear ALL cached data including your session. Continue?')) return;
-    try { localStorage.clear(); sessionStorage.clear(); } catch { /* ignore */ }
-    window.location.href = '/';
-  };
+  const handleHardReset = () => { setPendingConfirm({ type: 'hard-reset' }); };
 
   const handleRecoverHost = useCallback(async (token: string): Promise<boolean> => {
     if (!session.sessionId) return false;
@@ -659,12 +946,36 @@ function QueueSystemContent() {
   };
 
   const handleRemoveCourt = (targetSessionId: string) => {
-    if (!confirm('Remove this court from your session group?')) return;
-    removeCourtFromGroup(targetSessionId);
-    setCourts(loadCourtGroup());
+    setPendingConfirm({ type: 'remove-court', sessionId: targetSessionId });
   };
 
   const handleAddCourt = () => { router.push('/'); };
+
+  const handleBackHome = () => {
+    if (session.isHost && session.sessionId && !session.isExpired) {
+      setPendingConfirm({ type: 'back-home' });
+    } else {
+      router.push('/');
+    }
+  };
+
+  const doConfirmedAction = () => {
+    const action = pendingConfirm;
+    if (!action) return;
+    setPendingConfirm(null);
+    if (action.type === 'clear-history') {
+      setLocalHistory([]);
+      session.clearMatchHistory();
+    } else if (action.type === 'hard-reset') {
+      try { clearHostFromStorage(); clearCourtGroup(); sessionStorage.clear(); } catch { /* ignore */ }
+      window.location.href = '/';
+    } else if (action.type === 'back-home') {
+      router.push('/');
+    } else if (action.type === 'remove-court') {
+      removeCourtFromGroup(action.sessionId);
+      setCourts(loadCourtGroup());
+    }
+  };
 
   // ── Roster handlers ──────────────────────────────────────
 
@@ -683,7 +994,11 @@ function QueueSystemContent() {
   };
 
   const handleSelectAllRoster = () => {
-    setRosterSelected(new Set(roster.filter(n => !tempPlayers.includes(n))));
+    setRosterSelected(new Set(
+      roster
+        .filter(e => !tempPlayers.some(p => p.toLowerCase() === e.name.toLowerCase()))
+        .map(e => e.name)
+    ));
   };
 
   const handleAddFromRoster = () => {
@@ -699,17 +1014,80 @@ function QueueSystemContent() {
     setRosterSelected(prev => { const next = new Set(prev); next.delete(name); return next; });
   };
 
+  const handleSetRosterSkill = (name: string, skill: SkillBracket | undefined) => {
+    setRosterEntrySkill(name, skill);
+    setRoster(loadRoster());
+  };
+
+  // Assign a player to a bracket, moving them out of any other bracket they're in
+  const handleAssignToBracket = (bracket: SkillBracket, name: string) => {
+    setSkilledBrackets(prev => {
+      const cleared = {
+        beginner:     prev.beginner.filter(n => n !== name),
+        intermediate: prev.intermediate.filter(n => n !== name),
+        advanced:     prev.advanced.filter(n => n !== name),
+      };
+      return { ...cleared, [bracket]: [...cleared[bracket], name] };
+    });
+    if (skilledState) setSkilledState(prev => prev ? retagPlayerInQueue(name, bracket as SkillLevel, prev) : prev);
+  };
+
+  // Remove skill tag only — player stays in session and queue (defaults to intermediate)
+  const handleUnassignFromBracket = (bracket: SkillBracket, name: string) => {
+    setSkilledBrackets(prev => ({ ...prev, [bracket]: prev[bracket].filter(n => n !== name) }));
+    if (skilledState) setSkilledState(prev => prev ? retagPlayerInQueue(name, 'intermediate', prev) : prev);
+  };
+
+  // Add one or more players to the session AND assign to a bracket in one atomic update
+  const handleAddNewToSkilled = (bracket: SkillBracket, names: string[]) => {
+    if (!names.length) return;
+    const genuinelyNew = names.filter(n => n.trim() && !players.includes(n));
+    if (genuinelyNew.length > 0) {
+      const np = [...players, ...genuinelyNew], nq = [...queue, ...genuinelyNew];
+      setPlayers(np); setQueue(nq);
+      if (session.sessionId) session.syncField({ players: np, queue: nq });
+    }
+    setSkilledBrackets(prev => {
+      const cleared = {
+        beginner:     prev.beginner.filter(n => !names.includes(n)),
+        intermediate: prev.intermediate.filter(n => !names.includes(n)),
+        advanced:     prev.advanced.filter(n => !names.includes(n)),
+      };
+      const existing = cleared[bracket];
+      return { ...cleared, [bracket]: [...existing, ...names.filter(n => !existing.includes(n))] };
+    });
+    if (skilledState) {
+      setSkilledState(prev => {
+        if (!prev) return prev;
+        const updatedBrackets = {
+          beginner:     skilledBrackets.beginner.filter(n => !names.includes(n)),
+          intermediate: skilledBrackets.intermediate.filter(n => !names.includes(n)),
+          advanced:     skilledBrackets.advanced.filter(n => !names.includes(n)),
+        };
+        const existing = updatedBrackets[bracket];
+        updatedBrackets[bracket] = [...existing, ...names.filter(n => !existing.includes(n))];
+        let s = prev;
+        for (const name of names) {
+          s = addPlayerToSkilledStateEngine(name, s, updatedBrackets);
+          s = retagPlayerInQueue(name, bracket as SkillLevel, s);
+        }
+        return s;
+      });
+    }
+  };
+
   // ── Shared fragments ──────────────────────────────────────
   const canControl = !session.sessionId || session.isHost;
   const canUndo    = session.isHost && hasUndo;
 
   const modeSelector = (
     <div className="mode-selector">
-      {(['default', 'tournament', 'playall'] as const).map(m => (
+      {(['default', 'tournament', 'playall', 'skilled'] as const).map(m => (
         <button key={m} className={`mode-btn ${activeQueueMode === m ? 'active' : ''}`} onClick={() => canControl && handleModeChange(m)} disabled={!canControl}>
           {m === 'default'    && <><Swords size={12} /> Default</>}
           {m === 'tournament' && <><Trophy size={12} /> Tournament</>}
           {m === 'playall'    && <><Star   size={12} /> Play‑all</>}
+          {m === 'skilled'    && <><Layers size={12} /> Skilled</>}
         </button>
       ))}
     </div>
@@ -776,6 +1154,7 @@ function QueueSystemContent() {
         onAddFromRoster={handleAddFromRoster}
         onSaveToRoster={handleSaveToRoster}
         onRemoveFromRoster={handleRemoveFromRosterUI}
+        onSetRosterSkill={handleSetRosterSkill}
         tempPlayers={tempPlayers}
         currentName={currentName}
         onCurrentNameChange={setCurrentName}
@@ -787,6 +1166,7 @@ function QueueSystemContent() {
         onStartQueue={handleStartQueue}
         isSaving={session.isSaving}
         onBack={() => router.push('/')}
+        errorMsg={setupErrorMsg ?? undefined}
       />
     );
   }
@@ -836,7 +1216,7 @@ function QueueSystemContent() {
           <button className="dark-mode-toggle" onClick={() => setDarkMode(d => !d)}>{darkMode ? <Sun size={17} /> : <Moon size={17} />}</button>
           <GearMenu {...gearMenuProps} />
         </div>
-        <button className="back-home" onClick={() => router.push('/')}><ArrowLeft size={14} /> Back</button>
+        <button className="back-home" onClick={handleBackHome}><ArrowLeft size={14} /> Back</button>
         <SessionBar sessionId={session.sessionId} isHost={session.isHost} isConnected={session.isConnected} isSaving={session.isSaving} />
         {session.isExpired && (<div className="session-alert session-alert--expired"><WifiOff size={14} /> Session expired. <button onClick={() => router.push('/')}>Go Home</button></div>)}
         {session.isReconnecting && !session.isExpired && (<div className="session-alert session-alert--reconnecting"><Wifi size={14} /> Reconnecting…</div>)}
@@ -883,11 +1263,36 @@ function QueueSystemContent() {
         <WinnerModal isOpen={modalOpen} winner={modalWinner} score={modalScore} onClose={() => setModalOpen(false)} autoClose={autoClose} setAutoClose={setAutoClose} />
         <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
         {showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
+        {toastMsg && (
+          <div className="toast-notification" role="alert">
+            <span>{toastMsg}</span>
+            <button className="toast-dismiss" onClick={() => setToastMsg(null)}>✕</button>
+          </div>
+        )}
+        {pendingConfirm && (
+          <div className="confirm-overlay" role="dialog" aria-modal="true">
+            <div className="confirm-dialog">
+              <p className="confirm-message">
+                {pendingConfirm.type === 'clear-history' && 'Clear all match history? The queue and players will stay.'}
+                {pendingConfirm.type === 'hard-reset' && 'Hard Reset will clear your session data. Roster and career stats will be kept.'}
+                {pendingConfirm.type === 'back-home' && 'Leave this session? The session stays active — rejoin anytime with the room code.'}
+                {pendingConfirm.type === 'remove-court' && 'Remove this court from your session group?'}
+              </p>
+              <div className="confirm-actions">
+                <button className="confirm-btn confirm-btn--cancel" onClick={() => setPendingConfirm(null)}>Cancel</button>
+                <button className={`confirm-btn ${pendingConfirm.type === 'back-home' ? 'confirm-btn--warn' : 'confirm-btn--danger'}`} onClick={doConfirmedAction}>
+                  {pendingConfirm.type === 'back-home' ? 'Leave' : 'Confirm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  // ── RENDER C — Default / Play-all ─────────────────────────
+  // ── RENDER C — Default / Play-all / Skilled ──────────────
+  const isSkilled = activeQueueMode === 'skilled';
   return (
     <div className={`queue-system game-view ${darkMode ? 'dark' : ''}`}>
       {hostKeyBanner}
@@ -896,7 +1301,7 @@ function QueueSystemContent() {
         <GearMenu {...gearMenuProps} />
       </div>
 
-      <button className="back-home" onClick={() => router.push('/')}><ArrowLeft size={14} /> Back</button>
+      <button className="back-home" onClick={handleBackHome}><ArrowLeft size={14} /> Back</button>
       <SessionBar sessionId={session.sessionId} isHost={session.isHost} isConnected={session.isConnected} isSaving={session.isSaving} />
 
       {session.isExpired && (<div className="session-alert session-alert--expired"><WifiOff size={14} /> Session expired. Your data has been cleared.{' '}<button onClick={() => router.push('/')}>Go Home</button></div>)}
@@ -908,15 +1313,26 @@ function QueueSystemContent() {
       {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} /> : (
         <div className="main-layout">
           <div className="queue-area">
-            <h1 className="queue-title">{gameMode === 'singles' ? <Swords size={19} /> : <Users size={19} />}{gameMode === 'singles' ? 'Singles' : 'Doubles'} Queue</h1>
+            <h1 className="queue-title">
+              {gameMode === 'singles' ? <Swords size={19} /> : <Users size={19} />}
+              {gameMode === 'singles' ? 'Singles' : 'Doubles'}{isSkilled ? ' Skilled' : ''} Queue
+            </h1>
 
-            {activeQueueMode === 'default' && (
-              <p className="mode-description">
-                <Trophy size={11} className="mode-desc-icon" />
-                Advanced Paddle Queue · Winners &amp; Losers cycles · Partners always swap
-              </p>
+            {activeQueueMode === 'default' && <p className="mode-description"><Trophy size={11} className="mode-desc-icon" /> Advanced Paddle Queue · Winners &amp; Losers cycles · Partners always swap</p>}
+            {activeQueueMode === 'playall' && <p className="mode-description"><Sparkles size={11} className="mode-desc-icon" /> Every player faces everyone before repeating</p>}
+            {isSkilled && <p className="mode-description"><Layers size={11} className="mode-desc-icon" /> Skill-based matchmaking · Same-level courts first, adjacent fill when needed</p>}
+
+            {/* ── Skill Brackets toggle panel (Skilled mode only) ── */}
+            {isSkilled && session.isHost && (
+              <div className="skilled-panel-wrap">
+                <button className={`skilled-panel-toggle${showSkillBrackets ? ' skilled-panel-toggle--open' : ''}`} onClick={() => setShowSkillBrackets(s => !s)}>
+                  <Layers size={12} /> Skill Brackets {showSkillBrackets ? '▴' : '▾'}
+                </button>
+                {showSkillBrackets && (
+                  <SkilledView brackets={skilledBrackets} players={players} roster={roster.map(e => e.name)} isHost={true} onAssign={handleAssignToBracket} onUnassign={handleUnassignFromBracket} onAddNew={handleAddNewToSkilled} />
+                )}
+              </div>
             )}
-            {activeQueueMode === 'playall' && (<p className="mode-description"><Sparkles size={11} className="mode-desc-icon" /> Every player faces everyone before repeating</p>)}
 
             <div className="queue-header-row">
               {session.isHost && activeQueueMode === 'playall' && (
@@ -927,33 +1343,180 @@ function QueueSystemContent() {
             {session.isHost && (
               <div className="live-tools-row">
                 <AddPlayerPanel onAdd={handleAddPlayerLive} />
-                <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
-                  onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
-                  onRemove={i => { const nq = queue.filter((_, j) => j !== i); setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
-                />
+                {!isSkilled && (
+                  <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
+                    onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
+                    onRemove={i => { const nq = queue.filter((_, j) => j !== i); setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
+                  />
+                )}
               </div>
             )}
 
-            {session.isHost && (
-              <SitOutPanel
-                players={players}
-                sittingOut={activeSittingOut}
-                onToggle={handleToggleSitOut}
-              />
+            {session.isHost && !isSkilled && (
+              <SitOutPanel players={players} sittingOut={activeSittingOut} onToggle={handleToggleSitOut} />
             )}
 
-            {activeQueueMode === 'default' && gameMode === 'doubles' && (
-              <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />
-            )}
+            {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />}
+            {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />}
 
-            {activeQueueMode === 'default' && gameMode === 'singles' && (
-              <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
-            )}
+            {/* ═══════════════════════════════════════════════════
+                SKILLED MODE LAYOUT
+                ═══════════════════════════════════════════════════ */}
+            {isSkilled && skilledState ? (
+              <>
+                {!showSkillBrackets && untaggedInSkilled.size > 0 && (
+                  <div className="skilled-untagged-notice">
+                    <span className="skilled-untagged-dot">?</span>
+                    {[...untaggedInSkilled].join(', ')} {untaggedInSkilled.size === 1 ? 'has' : 'have'} no skill tag — treated as Intermediate.
+                  </div>
+                )}
+
+                {/* Courts */}
+                <div className="skilled-courts-grid">
+                  {skilledState.courts.map(court => {
+                    const teamA = court.players.slice(0, 2);
+                    const teamB = court.players.slice(2, 4);
+                    const levelLabel = court.matchLevel === 'mixed' ? 'MIXED'
+                      : court.matchLevel === 'beginner' ? 'BEGINNER COURT'
+                      : court.matchLevel === 'intermediate' ? 'INTERMEDIATE COURT'
+                      : 'ADVANCED COURT';
+                    const levelClass = court.matchLevel === 'mixed' ? 'mixed'
+                      : court.matchLevel === 'beginner' ? 'beginner'
+                      : court.matchLevel === 'intermediate' ? 'intermediate'
+                      : 'advanced';
+                    const hasMatch = court.players.length === 4;
+                    const qWaiting = skilledState.skillQueue.beginner.length
+                      + skilledState.skillQueue.intermediate.length
+                      + skilledState.skillQueue.advanced.length;
+                    const resting  = skilledState.restEnabled ? skilledState.restPool.length : 0;
+                    const needed   = Math.max(0, 4 - (qWaiting + resting));
+                    const idleMsg  = needed === 0
+                      ? 'Filling court…'
+                      : needed === 1
+                        ? 'Waiting for 1 more player…'
+                        : resting > 0
+                          ? `Waiting for ${needed} more… (${resting} resting)`
+                          : `Waiting for ${needed} more players…`;
+                    return (
+                      <div key={court.id} className="skilled-court-card">
+                        <div className="skilled-court-header">
+                          <span className="skilled-court-name">{court.name}</span>
+                          {hasMatch && <span className={`skilled-level-tag skilled-level-tag--${levelClass}`}>{levelLabel}</span>}
+                        </div>
+                        {hasMatch ? (
+                          <>
+                            <div className="skilled-court-teams">
+                              {[teamA, teamB].map((team, ti) => (
+                                <div key={ti} className={`skilled-court-team skilled-court-team--${ti === 0 ? 'a' : 'b'}`}>
+                                  <span className="skilled-team-label">Team {ti === 0 ? 'A' : 'B'}</span>
+                                  {team.map(name => {
+                                    const lvl = getPlayerBracketLevel(name, skilledBrackets);
+                                    return (
+                                      <div key={name} className="skilled-court-player">
+                                        <span className={`skill-badge skill-badge--${lvl}`}>{lvl[0].toUpperCase()}</span>
+                                        {name}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                            {session.isHost && (
+                              <div className="skilled-court-actions">
+                                <button className="skilled-win-btn skilled-win-btn--a" onClick={() => handleSkilledResult(court.id, 'A')}>
+                                  <Trophy size={12} /> Team A wins
+                                </button>
+                                <button className="skilled-win-btn skilled-win-btn--b" onClick={() => handleSkilledResult(court.id, 'B')}>
+                                  <Trophy size={12} /> Team B wins
+                                </button>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <p className="skilled-court-idle">{idleMsg}</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Skill-grouped waiting queue */}
+                <div className="skilled-waiting-section">
+                  <h3 className="pairings-label">
+                    Waiting Queue ({skilledState.waitingQueue.length})
+                  </h3>
+                  {skilledState.waitingQueue.length === 0 ? (
+                    <p className="muted-hint">All players are on a court.</p>
+                  ) : (
+                    <div className="skilled-queue-groups">
+                      {(['beginner', 'intermediate', 'advanced'] as const).map((level, li) => {
+                        const group = skilledState.skillQueue[level];
+                        if (group.length === 0) return null;
+                        return (
+                          <div key={level} className="skilled-queue-group">
+                            {li > 0 && <div className="skilled-queue-divider" />}
+                            <div className={`skilled-queue-group-label skilled-queue-group-label--${level}`}>
+                              <span className={`skill-badge skill-badge--${level}`}>{level[0].toUpperCase()}</span>
+                              {level.charAt(0).toUpperCase() + level.slice(1)}
+                            </div>
+                            {group.map((name, i) => (
+                              <div key={name} className="skilled-queue-player">
+                                <span className="skilled-queue-pos">#{i + 1}</span>
+                                <span className={`skill-badge skill-badge--${level}`}>{level[0].toUpperCase()}</span>
+                                <span className="skilled-queue-name">{name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Rest pool — only shown when rest is enabled and someone is resting */}
+                {skilledState.restEnabled && skilledState.restPool.length > 0 && (
+                  <div className="skilled-rest-section">
+                    <h3 className="skilled-rest-header">
+                      Resting ({skilledState.restPool.length})
+                    </h3>
+                    <div className="skilled-rest-list">
+                      {skilledState.restPool.map(entry => (
+                        <div key={entry.name} className="skilled-rest-player">
+                          <span className={`skill-badge skill-badge--${entry.skillLevel}`}>
+                            {entry.skillLevel[0].toUpperCase()}
+                          </span>
+                          <span className="skilled-rest-name">{entry.name}</span>
+                          <span className="skilled-rest-cycles">
+                            {entry.cyclesRemaining === 1 ? '1 game left' : `${entry.cyclesRemaining} games left`}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : isSkilled ? (
+              <p className="muted-hint">Initialising skilled courts… switch to another mode and back if courts don't appear.</p>
+            ) : (
+              /* ══════════════════════════════════════════════════
+                 DEFAULT / PLAY-ALL LAYOUT (unchanged)
+                 ══════════════════════════════════════════════════ */
+              <>
 
             {gameMode === 'singles' && queue.length >= 2 && (
               <div className="match-section">
                 <h3 className="match-section-title"><Swords size={14} /> Current Match</h3>
-                <div className="current-match-players"><PlayerLabel name={queue[0]} statsMap={statsMap} /><span className="vs-sep">vs</span><PlayerLabel name={queue[1]} statsMap={statsMap} /></div>
+                <div className="current-match-players">
+                  <div className="player-with-absent">
+                    <PlayerLabel name={queue[0]} statsMap={statsMap} />
+                    {session.isHost && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[0])} title="Mark absent" type="button"><UserX size={11} /></button>}
+                  </div>
+                  <span className="vs-sep">vs</span>
+                  <div className="player-with-absent">
+                    <PlayerLabel name={queue[1]} statsMap={statsMap} />
+                    {session.isHost && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[1])} title="Mark absent" type="button"><UserX size={11} /></button>}
+                  </div>
+                </div>
                 <ScoreBoard labelA={queue[0]} labelB={queue[1]} disabled={!session.isHost}
                   onScoreChange={session.isHost ? handleScoreChange : undefined}
                   viewerScore={!session.isHost ? (session.liveScore ?? null) : null}
@@ -1005,19 +1568,61 @@ function QueueSystemContent() {
                     onMatch={handleDoublesMatch}
                     onScoreChange={session.isHost ? handleScoreChange : undefined}
                     viewerScore={!session.isHost ? (session.liveScore ?? null) : null}
+                    onMarkAbsent={session.isHost ? handleMarkAbsent : undefined}
                   />
                 )}
                 {gameMode === 'doubles' && queue.length < 4 && <p className="muted-hint">Not enough players for a match.</p>}
+
+                {/* Substitute picker — appears when host marks a player absent */}
+                {session.isHost && substituteFor !== null && (
+                  <div className="sub-picker-panel">
+                    <div className="sub-picker-header">
+                      <span className="sub-picker-label">Replace <strong>{substituteFor}</strong> with:</span>
+                      <button className="sub-cancel-btn" onClick={() => setSubstituteFor(null)} type="button">✕ Cancel</button>
+                    </div>
+                    <div className="sub-picker-options">
+                      {waitingForNext.map(p => (
+                        <button key={p} className="sub-pick-btn" onClick={() => handleConfirmSub(p)} type="button">
+                          <PlayerLabel name={p} statsMap={statsMap} />
+                        </button>
+                      ))}
+                      {waitingForNext.length === 0 && (
+                        <span className="muted-hint">No waiting players available.</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="pairings-container">
                   <h3 className="pairings-label">Upcoming Matches</h3>
                   {gameMode === 'singles' && <SinglesTable queue={queue} statsMap={statsMap} />}
                   {gameMode === 'doubles' && <DoublesTable queue={queue} statsMap={statsMap} />}
+
+                  {/* Sit Next — host can bump a waiting player to the front */}
+                  {session.isHost && waitingForNext.length >= 2 && (
+                    <div className="sit-next-section">
+                      <span className="sit-next-title">Waiting — tap ▲ to move a player up next</span>
+                      {waitingForNext.map((p, i) => (
+                        <div key={p} className="sit-next-row">
+                          <span className="sit-next-pos">#{i + 1}</span>
+                          <PlayerLabel name={p} statsMap={statsMap} />
+                          {i > 0 && (
+                            <button className="sit-next-btn" onClick={() => handleSitNext(p)} title="Move to front of waiting pool" type="button">
+                              <ArrowUp size={11} /> Next
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </>
             )}
             {gameMode === 'singles' && queue.length < 2 && <p className="muted-hint">Not enough players for a match.</p>}
+            </>
+            )}
 
-            <SmartSuggestions suggestions={suggestions} />
+            <SmartSuggestions suggestions={!isSkilled ? suggestions : []} />
           </div>
           {historyPanel}
         </div>
@@ -1025,6 +1630,30 @@ function QueueSystemContent() {
       <WinnerModal isOpen={modalOpen} winner={modalWinner} score={modalScore} onClose={() => setModalOpen(false)} autoClose={autoClose} setAutoClose={setAutoClose} />
       <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
       {showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
+      {toastMsg && (
+        <div className="toast-notification" role="alert">
+          <span>{toastMsg}</span>
+          <button className="toast-dismiss" onClick={() => setToastMsg(null)}>✕</button>
+        </div>
+      )}
+      {pendingConfirm && (
+        <div className="confirm-overlay" role="dialog" aria-modal="true">
+          <div className="confirm-dialog">
+            <p className="confirm-message">
+              {pendingConfirm.type === 'clear-history' && 'Clear all match history? The queue and players will stay.'}
+              {pendingConfirm.type === 'hard-reset' && 'Hard Reset will clear your session data. Roster and career stats will be kept.'}
+              {pendingConfirm.type === 'back-home' && 'Leave this session? The session stays active — rejoin anytime with the room code.'}
+              {pendingConfirm.type === 'remove-court' && 'Remove this court from your session group?'}
+            </p>
+            <div className="confirm-actions">
+              <button className="confirm-btn confirm-btn--cancel" onClick={() => setPendingConfirm(null)}>Cancel</button>
+              <button className={`confirm-btn ${pendingConfirm.type === 'back-home' ? 'confirm-btn--warn' : 'confirm-btn--danger'}`} onClick={doConfirmedAction}>
+                {pendingConfirm.type === 'back-home' ? 'Leave' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

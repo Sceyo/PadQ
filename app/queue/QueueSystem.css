@@ -2793,6 +2793,493 @@ body.dark-mode .roster-item:hover { background: rgba(255,255,255,.05); }
 body.dark-mode .roster-name { color: #e2e8f0; }
 body.dark-mode .roster-name--added { color: #4b5563; }
 
+/* ── Roster: skill column layout ─────────────────────────── */
+.roster-item--col { flex-direction: column; align-items: stretch; gap: 0; }
+.roster-item-row  { display: flex; align-items: center; gap: 8px; }
+.roster-name--clickable { cursor: pointer; }
+.roster-name--clickable:hover { color: var(--accent); }
+
+/* ── Skill badge (inline next to player name) ────────────── */
+.skill-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 3px;
+  font-size: 10px; font-weight: 700; margin-left: 5px;
+  vertical-align: middle; flex-shrink: 0;
+}
+.skill-badge--beginner     { background: rgba(34,197,94,.15);  color: #22c55e; border: 1px solid rgba(34,197,94,.35); }
+.skill-badge--intermediate { background: rgba(245,158,11,.15); color: #f59e0b; border: 1px solid rgba(245,158,11,.35); }
+.skill-badge--advanced     { background: rgba(239,68,68,.15);  color: #ef4444; border: 1px solid rgba(239,68,68,.35); }
+
+/* ── Skill picker (expands below the player row) ─────────── */
+.skill-picker {
+  display: flex; gap: 6px; padding: 5px 0 2px 24px;
+}
+.skill-pick-btn {
+  flex: 1; padding: 4px 0; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--btn);
+  color: var(--txt-2); font-size: .72rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all .12s;
+}
+.skill-pick-btn:hover { background: var(--btn-hover); color: var(--txt-1); }
+.skill-pick-btn--beginner.skill-pick-btn--active     { background: rgba(34,197,94,.15);  color: #22c55e; border-color: #22c55e; }
+.skill-pick-btn--intermediate.skill-pick-btn--active { background: rgba(245,158,11,.15); color: #f59e0b; border-color: #f59e0b; }
+.skill-pick-btn--advanced.skill-pick-btn--active     { background: rgba(239,68,68,.15);  color: #ef4444; border-color: #ef4444; }
+body.dark-mode .skill-pick-btn { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.1); }
+
+/* ═══════════════════════════════════════════════════════════
+   SKILLED MODE — queue-view elements
+   ═══════════════════════════════════════════════════════════ */
+
+/* Mixed-skill badge on the mode description line */
+.skilled-mix-badge {
+  display: inline-flex; align-items: center; gap: 3px;
+  margin-left: 8px; padding: 2px 8px; border-radius: 99px;
+  font-size: .7rem; font-weight: 700;
+}
+.skilled-mix-badge--adjacent { background: rgba(245,158,11,.12); color: #f59e0b; border: 1px solid rgba(245,158,11,.3); }
+.skilled-mix-badge--any      { background: rgba(239,68,68,.12);  color: #ef4444; border: 1px solid rgba(239,68,68,.3); }
+
+/* Untagged player notice */
+.skilled-untagged-notice {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 8px 12px; border-radius: var(--r-sm);
+  background: rgba(245,158,11,.07); border: 1px solid rgba(245,158,11,.25);
+  font-size: .78rem; color: #f59e0b; margin-bottom: 10px; line-height: 1.5;
+}
+.skilled-untagged-dot {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(245,158,11,.2); border: 1px solid rgba(245,158,11,.4);
+  font-size: .7rem; font-weight: 800; margin-top: 1px;
+}
+
+/* Skill brackets collapsible panel toggle */
+.skilled-panel-wrap { margin-bottom: 12px; }
+.skilled-panel-toggle {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--border); background: var(--btn);
+  color: var(--txt-2); font-size: .78rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all .15s;
+  margin-bottom: 8px;
+}
+.skilled-panel-toggle:hover { background: var(--btn-hover); color: var(--txt-1); border-color: var(--accent); }
+.skilled-panel-toggle--open { background: rgba(124,107,255,.1); border-color: var(--accent); color: var(--accent); }
+
+/* ═══════════════════════════════════════════════════════════
+   SKILLED MODE — court cards
+   ═══════════════════════════════════════════════════════════ */
+
+.skilled-courts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px; margin-bottom: 20px;
+}
+
+.skilled-court-card {
+  background: var(--card-alt); border: 1.5px solid var(--border);
+  border-radius: var(--r-md); overflow: hidden;
+}
+
+.skilled-court-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,.02);
+}
+.skilled-court-name {
+  font-size: .82rem; font-weight: 700; color: var(--txt-1);
+}
+
+/* Court-level tags */
+.skilled-level-tag {
+  font-size: .65rem; font-weight: 800; letter-spacing: .06em;
+  padding: 2px 8px; border-radius: 99px; border: 1px solid;
+}
+.skilled-level-tag--beginner     { color: #22c55e; background: rgba(34,197,94,.1);  border-color: rgba(34,197,94,.3); }
+.skilled-level-tag--intermediate { color: #f59e0b; background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.3); }
+.skilled-level-tag--advanced     { color: #ef4444; background: rgba(239,68,68,.1);  border-color: rgba(239,68,68,.3); }
+.skilled-level-tag--mixed        { color: #9ca3af; background: rgba(156,163,175,.1); border-color: rgba(156,163,175,.3); }
+
+.skilled-court-teams {
+  display: flex; gap: 0; padding: 10px 14px; flex-direction: column; gap: 8px;
+}
+.skilled-court-team { display: flex; flex-direction: column; gap: 4px; }
+.skilled-team-label {
+  font-size: .68rem; font-weight: 700; letter-spacing: .05em; color: var(--txt-3);
+  text-transform: uppercase; margin-bottom: 2px;
+}
+.skilled-court-team--a .skilled-team-label { color: #60a5fa; }
+.skilled-court-team--b .skilled-court-label { color: #f472b6; }
+
+.skilled-court-player {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .84rem; color: var(--txt-1);
+}
+
+.skilled-court-actions {
+  display: flex; gap: 8px; padding: 10px 14px;
+  border-top: 1px solid var(--border);
+}
+.skilled-win-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  padding: 7px 0; border-radius: var(--r-sm);
+  border: 1.5px solid var(--border); background: var(--btn);
+  color: var(--txt-2); font-size: .78rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all .12s;
+}
+.skilled-win-btn--a:hover { background: rgba(96,165,250,.12); border-color: #60a5fa; color: #60a5fa; }
+.skilled-win-btn--b:hover { background: rgba(244,114,182,.12); border-color: #f472b6; color: #f472b6; }
+
+.skilled-court-idle {
+  padding: 18px 14px; font-size: .78rem; color: var(--txt-3); text-align: center; margin: 0;
+}
+
+/* ── Skill-grouped waiting queue ── */
+.skilled-waiting-section { margin-top: 6px; }
+
+.skilled-queue-groups {
+  display: flex; flex-direction: column; gap: 0;
+  border: 1.5px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+}
+.skilled-queue-group { padding: 8px 12px; }
+.skilled-queue-divider {
+  height: 1px; background: var(--border); margin: 0 -12px;
+}
+.skilled-queue-group-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .72rem; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; margin-bottom: 6px;
+}
+.skilled-queue-group-label--beginner     { color: #22c55e; }
+.skilled-queue-group-label--intermediate { color: #f59e0b; }
+.skilled-queue-group-label--advanced     { color: #ef4444; }
+
+.skilled-queue-player {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 0; font-size: .84rem; color: var(--txt-1);
+}
+.skilled-queue-pos {
+  width: 28px; font-size: .72rem; color: var(--txt-3); text-align: right; flex-shrink: 0;
+}
+.skilled-queue-name { flex: 1; }
+
+/* ── Skilled mode — rest pool ─────────────────────────────── */
+.skilled-rest-section {
+  margin-top: 10px;
+  padding: 8px 10px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.02);
+}
+.skilled-rest-header {
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--txt-3);
+  margin: 0 0 6px;
+}
+.skilled-rest-list { display: flex; flex-direction: column; gap: 3px; }
+.skilled-rest-player {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  opacity: .5;
+}
+.skilled-rest-name { flex: 1; font-size: .84rem; color: var(--txt-2); }
+.skilled-rest-cycles {
+  font-size: .7rem;
+  color: var(--txt-3);
+  font-style: italic;
+  white-space: nowrap;
+}
+
+body.dark-mode .skilled-court-card { background: rgba(255,255,255,.03); }
+body.dark-mode .skilled-court-header { background: rgba(255,255,255,.02); }
+body.dark-mode .skilled-queue-groups { background: rgba(255,255,255,.02); }
+body.dark-mode .skilled-rest-section { border-color: rgba(255,255,255,.06); background: rgba(0,0,0,.15); }
+
+/* ═══════════════════════════════════════════════════════════
+   SKILLED VIEW — bracket management
+   ═══════════════════════════════════════════════════════════ */
+
+.skilled-view {
+  width: 100%; max-width: 680px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 6px 0 32px;
+}
+
+.skilled-desc {
+  font-size: .78rem; color: var(--txt-3); text-align: center;
+  margin: 0 0 4px; line-height: 1.5;
+}
+
+/* ── Section shell ── */
+.skilled-section {
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+/* ── Section header ── */
+.skilled-header {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  padding: 11px 14px; gap: 10px;
+  background: var(--card-alt); border: none; cursor: pointer;
+  font-family: inherit; transition: background .15s;
+  position: relative;
+}
+.skilled-header:hover { background: var(--btn-hover); }
+.skilled-header--open { background: var(--sk-bg, rgba(124,107,255,.08)); }
+
+.skilled-header-left {
+  display: flex; align-items: center; gap: 8px;
+}
+.skilled-arrow { color: var(--txt-3); display: flex; align-items: center; }
+.skilled-label {
+  font-size: .85rem; font-weight: 700; color: var(--txt-1); letter-spacing: .01em;
+}
+.skilled-count {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 99px; border: 1px solid;
+  font-size: .72rem; font-weight: 700;
+}
+.skilled-color-bar {
+  width: 3px; height: 20px; border-radius: 2px; flex-shrink: 0;
+}
+
+/* ── Body / table ── */
+.skilled-body {
+  background: var(--bg, #0f0f1a); border-top: 1px solid var(--border);
+  padding: 0 0 10px;
+}
+
+.skilled-table {
+  width: 100%; border-collapse: collapse;
+}
+.skilled-th {
+  padding: 8px 14px; text-align: left;
+  font-size: .72rem; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--txt-3);
+  border-bottom: 1px solid var(--border);
+}
+.skilled-th--rank    { width: 40px; text-align: center; }
+.skilled-th--actions { width: 56px; }
+
+.skilled-tr { transition: background .1s; }
+.skilled-tr:hover { background: var(--btn); }
+.skilled-tr--input { background: rgba(124,107,255,.05); }
+.skilled-tr--empty { pointer-events: none; }
+
+.skilled-td {
+  padding: 8px 14px; font-size: .84rem; color: var(--txt-1);
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.skilled-td--rank    { text-align: center; color: var(--txt-3); font-size: .78rem; }
+.skilled-td--actions { display: flex; gap: 4px; align-items: center; justify-content: flex-end; padding-right: 10px; }
+.skilled-td--empty   { text-align: center; color: var(--txt-3); font-size: .78rem; padding: 14px; }
+
+/* ── Inline input row ── */
+.skilled-inline-input {
+  width: 100%; background: var(--btn); border: 1.5px solid var(--accent);
+  border-radius: var(--r-sm); padding: 5px 10px;
+  color: var(--txt-1); font-size: .84rem; font-family: inherit;
+  outline: none;
+}
+.skilled-inline-input::placeholder { color: var(--txt-3); }
+
+/* ── Action buttons ── */
+.skilled-remove-btn,
+.skilled-confirm-btn,
+.skilled-cancel-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--btn);
+  cursor: pointer; transition: all .12s; color: var(--txt-3);
+}
+.skilled-remove-btn:hover  { color: #ef4444; border-color: #ef4444; background: rgba(239,68,68,.08); }
+.skilled-confirm-btn:hover { color: #22c55e; border-color: #22c55e; background: rgba(34,197,94,.08); }
+.skilled-cancel-btn:hover  { color: var(--txt-1); background: var(--btn-hover); }
+
+/* ── Roster picker panel ── */
+.skilled-picker {
+  margin: 0 14px 10px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--card-alt);
+  overflow: hidden;
+}
+.skilled-picker-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.skilled-picker-title {
+  font-size: .75rem; font-weight: 600; color: var(--txt-2);
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.skilled-picker-search {
+  display: flex; align-items: center; gap: 6px;
+  padding: 8px 12px; border-bottom: 1px solid var(--border);
+  color: var(--txt-3);
+}
+.skilled-filter-input {
+  flex: 1; background: none; border: none; outline: none;
+  color: var(--txt-1); font-size: .83rem; font-family: inherit;
+}
+.skilled-filter-input::placeholder { color: var(--txt-3); }
+.skilled-picker-grid {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 10px 12px 12px;
+}
+.skilled-picker-empty {
+  font-size: .78rem; color: var(--txt-3); padding: 12px;
+  text-align: center; margin: 0;
+}
+.skilled-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 99px;
+  border: 1.5px solid var(--border); background: var(--btn);
+  color: var(--txt-1); font-size: .8rem; font-weight: 500;
+  cursor: pointer; font-family: inherit; transition: all .12s;
+}
+.skilled-chip:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.skilled-chip:hover .skilled-chip-badge { display: none; }
+
+/* Already assigned to another bracket */
+.skilled-chip--assigned { color: var(--txt-3); border-style: dashed; }
+.skilled-chip--assigned:hover { color: #fff; border-style: solid; }
+
+.skilled-chip-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; border-radius: 3px;
+  font-size: 9px; font-weight: 800; flex-shrink: 0;
+}
+
+/* New player row at bottom of picker */
+.skilled-picker-new {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px 12px;
+  border-top: 1px solid var(--border);
+}
+.skilled-picker-new-label {
+  font-size: .72rem; font-weight: 600; color: var(--txt-3);
+  text-transform: uppercase; letter-spacing: .04em; white-space: nowrap;
+}
+.skilled-new-input {
+  flex: 1; background: var(--btn); border: 1.5px solid var(--border);
+  border-radius: var(--r-sm); padding: 5px 10px;
+  color: var(--txt-1); font-size: .83rem; font-family: inherit; outline: none;
+  transition: border-color .12s;
+}
+.skilled-new-input:focus { border-color: var(--accent); }
+.skilled-new-input::placeholder { color: var(--txt-3); }
+.skilled-new-add-btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 5px 12px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--accent); background: rgba(124,107,255,.1);
+  color: var(--accent); font-size: .78rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all .12s; white-space: nowrap;
+}
+.skilled-new-add-btn:hover:not(:disabled) { background: var(--accent); color: #fff; }
+.skilled-new-add-btn:disabled { opacity: .35; cursor: not-allowed; }
+
+body.dark-mode .skilled-picker { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1); }
+body.dark-mode .skilled-picker-header { border-color: rgba(255,255,255,.07); }
+body.dark-mode .skilled-picker-search { border-color: rgba(255,255,255,.07); }
+body.dark-mode .skilled-picker-new    { border-color: rgba(255,255,255,.07); }
+body.dark-mode .skilled-chip { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.12); }
+
+/* ── Add Player footer button ── */
+.skilled-add-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin: 8px 14px 0;
+  padding: 6px 14px; border-radius: var(--r-sm);
+  border: 1.5px dashed var(--border); background: none;
+  color: var(--txt-2); font-size: .78rem; font-weight: 600;
+  cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.skilled-add-btn:hover {
+  border-color: var(--accent); color: var(--accent);
+  background: rgba(124,107,255,.06);
+}
+
+/* ── Dark-mode adjustments ── */
+body.dark-mode .skilled-header   { background: rgba(255,255,255,.03); }
+body.dark-mode .skilled-header:hover { background: rgba(255,255,255,.06); }
+body.dark-mode .skilled-body     { background: rgba(0,0,0,.3); }
+
+/* ── Multi-select roster picker list ─────────────────────── */
+.skilled-picker-list {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 4px 0;
+}
+
+.skilled-picker-row {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 7px 12px;
+  background: none; border: none;
+  color: var(--txt-1); font-size: .85rem; font-family: inherit;
+  cursor: pointer; text-align: left;
+  transition: background .1s; border-radius: 4px;
+}
+.skilled-picker-row:hover:not(.skilled-picker-row--taken) { background: var(--btn-hover); }
+
+.skilled-picker-row--selected { background: rgba(255,255,255,.07); }
+.skilled-picker-row--selected .skilled-picker-row-name {
+  color: var(--sk-accent, var(--accent)); font-weight: 600;
+}
+.skilled-picker-row--selected .skilled-picker-row-check {
+  background: var(--sk-accent, var(--accent));
+  border-color: var(--sk-accent, var(--accent));
+  color: #fff;
+}
+
+.skilled-picker-row--taken { opacity: .4; cursor: default; }
+
+.skilled-picker-row-check {
+  flex-shrink: 0; width: 16px; height: 16px;
+  border-radius: 4px; border: 1.5px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  transition: all .1s;
+}
+.skilled-picker-row--taken .skilled-picker-row-check { border-color: transparent; }
+
+.skilled-picker-row-name { flex: 1; }
+
+.skilled-picker-taken-divider {
+  margin: 4px 12px;
+  border: none; border-top: 1px solid rgba(255,255,255,.06);
+}
+
+.skilled-picker-footer {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 0 0; margin-top: 4px;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+
+.skilled-picker-confirm-btn {
+  padding: 6px 16px; border-radius: var(--r-sm);
+  border: none;
+  background: var(--sk-accent, var(--accent));
+  color: #fff; font-size: .8rem; font-weight: 700;
+  cursor: pointer; font-family: inherit; transition: opacity .15s;
+}
+.skilled-picker-confirm-btn:disabled { opacity: .35; cursor: not-allowed; }
+.skilled-picker-confirm-btn:hover:not(:disabled) { opacity: .85; }
+
+.skilled-picker-cancel-btn {
+  padding: 6px 14px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--border);
+  background: none; color: var(--txt-2);
+  font-size: .8rem; cursor: pointer; font-family: inherit; transition: all .15s;
+}
+.skilled-picker-cancel-btn:hover { background: var(--btn-hover); color: var(--txt-1); }
+
 /* ═══════════════════════════════════════════════════════════
    COORDINATOR OVERLAY — read-only all-courts overview
    ═══════════════════════════════════════════════════════════ */
@@ -3039,3 +3526,195 @@ body.dark-mode .sitout-panel { background: rgba(0,0,0,.3); }
   cursor: pointer; font-family: inherit; transition: background .15s;
 }
 .gear-recovery-cancel:hover { background: var(--btn-hover); }
+
+/* ═══════════════════════════════════════════════════════════
+   ABSENT / SUBSTITUTE PANEL (Suggestion B)
+   ═══════════════════════════════════════════════════════════ */
+
+.player-btn-cell {
+  display: inline-flex; align-items: center; gap: 3px;
+}
+
+.absent-mini-btn {
+  padding: 3px 5px; border-radius: 5px; border: none;
+  background: rgba(239,68,68,.14); color: #f87171;
+  cursor: pointer; display: inline-flex; align-items: center;
+  transition: background .12s; flex-shrink: 0;
+}
+.absent-mini-btn:hover { background: rgba(239,68,68,.28); }
+
+.player-with-absent { display: inline-flex; align-items: center; gap: 4px; }
+
+.sub-picker-panel {
+  margin: 8px 0;
+  background: rgba(0,0,0,.22);
+  border: 1px solid rgba(239,68,68,.22);
+  border-radius: 10px; padding: 10px 12px;
+}
+
+.sub-picker-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 8px; gap: 8px;
+}
+
+.sub-picker-label { font-size: .78rem; color: #f0f4ff; }
+.sub-picker-label strong { color: #f87171; }
+
+.sub-cancel-btn {
+  padding: 3px 9px; border-radius: 6px; cursor: pointer; border: none;
+  font-size: .7rem; font-weight: 600;
+  background: rgba(255,255,255,.1); color: var(--txt-2);
+  white-space: nowrap;
+}
+.sub-cancel-btn:hover { background: rgba(255,255,255,.2); }
+
+.sub-picker-options { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.sub-pick-btn {
+  padding: 5px 12px; border-radius: 8px; cursor: pointer; border: none;
+  font-size: .78rem;
+  background: rgba(34,197,94,.14); color: #4ade80;
+  border: 1px solid rgba(34,197,94,.22);
+  transition: background .12s; font-family: inherit;
+}
+.sub-pick-btn:hover { background: rgba(34,197,94,.28); }
+
+body.dark-mode .sub-picker-panel { background: rgba(0,0,0,.35); }
+
+/* ═══════════════════════════════════════════════════════════
+   SIT NEXT (Suggestion B — waiting queue priority)
+   ═══════════════════════════════════════════════════════════ */
+
+.sit-next-section {
+  margin: 6px 0;
+  padding: 8px 10px;
+  background: rgba(0,0,0,.12);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.sit-next-title {
+  font-size: .7rem; font-weight: 600; color: var(--txt-3);
+  display: block; margin-bottom: 5px;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+
+.sit-next-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 3px 0;
+}
+
+.sit-next-pos {
+  font-size: .68rem; color: var(--txt-3); min-width: 18px; flex-shrink: 0;
+}
+
+.sit-next-btn {
+  margin-left: auto; flex-shrink: 0;
+  padding: 2px 7px; border-radius: 5px; cursor: pointer; border: none;
+  font-size: .68rem; font-weight: 600; font-family: inherit;
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(99,102,241,.18); color: #a78bfa;
+  transition: background .12s;
+}
+.sit-next-btn:hover { background: rgba(99,102,241,.32); }
+
+body.dark-mode .sit-next-section { background: rgba(0,0,0,.22); }
+
+/* ── Toast notification ──────────────────────────────────── */
+.toast-notification {
+  position: fixed;
+  bottom: 1.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  color: var(--txt-1);
+  padding: 0.6rem 1rem 0.6rem 0.85rem;
+  border-radius: var(--r-sm);
+  font-size: 0.82rem;
+  font-weight: 500;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  box-shadow: var(--sh-md);
+  white-space: nowrap;
+  animation: toast-in 0.15s ease;
+}
+.toast-dismiss {
+  background: none; border: none; cursor: pointer;
+  color: var(--txt-3); font-size: 0.9rem; padding: 0; line-height: 1;
+}
+.toast-dismiss:hover { color: var(--txt-1); }
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(6px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ── Inline confirm dialog ───────────────────────────────── */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 9100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fade-in .12s ease;
+}
+.confirm-dialog {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 1.5rem 1.25rem 1.25rem;
+  max-width: 360px;
+  width: calc(100% - 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-shadow: var(--sh-lg);
+}
+.confirm-message {
+  color: var(--txt-1);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  margin: 0;
+}
+.confirm-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+.confirm-btn {
+  padding: 0.5rem 1.1rem;
+  border-radius: var(--r-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity .15s;
+}
+.confirm-btn:hover { opacity: .85; }
+.confirm-btn--danger { background: var(--danger); color: #fff; }
+.confirm-btn--warn   { background: var(--warning); color: #fff; }
+.confirm-btn--cancel {
+  background: transparent;
+  color: var(--txt-2);
+  border: 1px solid var(--border);
+}
+.confirm-btn--cancel:hover { background: var(--btn-hover); opacity: 1; }
+
+@keyframes fade-in {
+  from { opacity: 0; } to { opacity: 1; }
+}
+
+/* ── Setup phase inline error ────────────────────────────── */
+.setup-error-msg {
+  margin: -10px 0 10px;
+  font-size: 0.78rem;
+  color: var(--danger);
+  font-weight: 500;
+  text-align: left;
+}

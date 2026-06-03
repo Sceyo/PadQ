@@ -10,10 +10,10 @@ const RANK_CFG: Record<RankTier, { color: string; icon: React.ReactNode }> = {
   Diamond:  { color: '#93c5fd', icon: <Zap    size={10} /> },
 };
 
-export const RankBadge: React.FC<{ rank: RankTier }> = ({ rank }) => {
+export const RankBadge: React.FC<{ rank: RankTier; className?: string }> = ({ rank, className = 'rank-badge' }) => {
   const { color, icon } = RANK_CFG[rank];
   return (
-    <span className="rank-badge" style={{ '--rc': color } as React.CSSProperties}>
+    <span className={className} style={{ '--rc': color } as React.CSSProperties}>
       {icon}{rank}
     </span>
   );

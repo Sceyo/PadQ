@@ -23,7 +23,7 @@ import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
-  Wifi, WifiOff, Star, Award, Shield, Zap, Check,
+  Wifi, WifiOff, Check,
   BarChart2, TrendingUp, Activity, Clock, AlertCircle,
   Loader2,
 } from 'lucide-react';
@@ -37,81 +37,15 @@ import {
 } from '@/lib/sessionService';
 import { useSessionAccess } from '@/hooks/useSessionAccess';
 import AccessCodeModal from '@/app/queue/components/atoms/AccessCodeModal';
+import { RankBadge } from '@/app/queue/components/atoms/RankBadge';
+import { StreakBadge } from '@/app/queue/components/atoms/StreakBadge';
+import type { RankTier, PlayerStat } from '@/app/queue/lib/types';
+import { buildPlayerStats } from '@/app/queue/lib/playerUtils';
 import './watch.css';
-
-// ═══════════════════════════════════════════════════════════
-// TYPES (mirrored from queue/page.tsx — kept local so this
-// page is fully independent)
-// ═══════════════════════════════════════════════════════════
-
-type RankTier = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
-
-interface PlayerStat {
-  name: string;
-  wins: number;
-  losses: number;
-  gamesPlayed: number;
-  winRate: number;
-  streak: number;
-  rank: RankTier;
-}
-
-const RANK_CFG: Record<RankTier, { color: string; icon: React.ReactNode }> = {
-  Bronze:   { color: '#cd7f32', icon: <Shield size={10} /> },
-  Silver:   { color: '#a8a9ad', icon: <Shield size={10} /> },
-  Gold:     { color: '#ffd700', icon: <Award  size={10} /> },
-  Platinum: { color: '#00c8c8', icon: <Star   size={10} /> },
-  Diamond:  { color: '#93c5fd', icon: <Zap    size={10} /> },
-};
-
-// ═══════════════════════════════════════════════════════════
-// PURE HELPERS
-// ═══════════════════════════════════════════════════════════
-
-function calcRank(wr: number, gp: number): RankTier {
-  if (gp < 3)    return 'Bronze';
-  if (wr >= 80)  return 'Diamond';
-  if (wr >= 65)  return 'Platinum';
-  if (wr >= 50)  return 'Gold';
-  if (wr >= 35)  return 'Silver';
-  return 'Bronze';
-}
-
-function buildStats(players: string[], history: MatchHistoryEntry[]): PlayerStat[] {
-  const wins:   Record<string, number> = {};
-  const losses: Record<string, number> = {};
-  const streak: Record<string, number> = {};
-  for (const p of players) { wins[p] = 0; losses[p] = 0; streak[p] = 0; }
-
-  for (const entry of [...history].reverse()) {
-    const winnerNames = entry.winner.split(' & ');
-    const allNames    = entry.players
-      .split(' vs ').flatMap(s => s.split(' & ')).map(s => s.trim())
-      .filter(n => players.includes(n));
-    for (const name of allNames) {
-      if (winnerNames.includes(name)) { wins[name] = (wins[name] ?? 0) + 1; streak[name] = (streak[name] ?? 0) + 1; }
-      else { losses[name] = (losses[name] ?? 0) + 1; streak[name] = 0; }
-    }
-  }
-
-  return players.map(name => {
-    const w = wins[name] ?? 0, l = losses[name] ?? 0, gp = w + l;
-    const wr = gp === 0 ? 0 : Math.round((w / gp) * 100);
-    return { name, wins: w, losses: l, gamesPlayed: gp, winRate: wr, streak: streak[name] ?? 0, rank: calcRank(wr, gp) };
-  });
-}
 
 // ═══════════════════════════════════════════════════════════
 // SMALL UI ATOMS
 // ═══════════════════════════════════════════════════════════
-
-const RankBadge: React.FC<{ rank: RankTier }> = ({ rank }) => {
-  const { color, icon } = RANK_CFG[rank];
-  return <span className="w-rank-badge" style={{ '--rc': color } as React.CSSProperties}>{icon}{rank}</span>;
-};
-
-const StreakBadge: React.FC<{ streak: number }> = ({ streak }) =>
-  streak < 2 ? null : <span className="w-streak-badge"><Flame size={11} />{streak}</span>;
 
 const StatBar: React.FC<{ value: number; max: number; color: string }> = ({ value, max, color }) => (
   <div className="w-bar-track"><div className="w-bar-fill" style={{ width: `${max === 0 ? 0 : Math.round((value / max) * 100)}%`, background: color }} /></div>
@@ -195,6 +129,7 @@ function WatchPageContent() {
   const [status,          setStatus]          = useState<'loading' | 'live' | 'reconnecting' | 'error' | 'ended' | 'expired'>('loading');
   const [errorMsg,        setErrorMsg]        = useState('');
   const [showHistory,     setShowHistory]     = useState(true);
+  const [showAllHistory,  setShowAllHistory]  = useState(false);
 
   // ── Match announcement (Task 12) ────────────────────────
   const [announcement,   setAnnouncement]    = useState<string | null>(null);
@@ -285,7 +220,7 @@ function WatchPageContent() {
   // ── Derived ─────────────────────────────────────────────
 
   const stats = useMemo(
-    () => session ? buildStats(session.players, history) : [],
+    () => session ? buildPlayerStats(session.players, history) : [],
     [session, history],
   );
   const statsMap = useMemo(
@@ -566,12 +501,12 @@ function WatchPageContent() {
                 <div className="w-vs-row">
                   <span className="w-player-chip">
                     {pendingTournamentMatch.player1}
-                    <StreakBadge streak={statsMap[pendingTournamentMatch.player1 ?? '']?.streak ?? 0} />
+                    <StreakBadge streak={statsMap[pendingTournamentMatch.player1 ?? '']?.streak ?? 0} className="w-streak-badge" />
                   </span>
                   <span className="w-vs">VS</span>
                   <span className="w-player-chip">
                     {pendingTournamentMatch.player2}
-                    <StreakBadge streak={statsMap[pendingTournamentMatch.player2 ?? '']?.streak ?? 0} />
+                    <StreakBadge streak={statsMap[pendingTournamentMatch.player2 ?? '']?.streak ?? 0} className="w-streak-badge" />
                   </span>
                 </div>
               </div>
@@ -591,12 +526,12 @@ function WatchPageContent() {
                 <div className="w-vs-row">
                   <span className="w-player-chip">
                     {currentSinglesMatch.p1}
-                    <StreakBadge streak={statsMap[currentSinglesMatch.p1]?.streak ?? 0} />
+                    <StreakBadge streak={statsMap[currentSinglesMatch.p1]?.streak ?? 0} className="w-streak-badge" />
                   </span>
                   <span className="w-vs">VS</span>
                   <span className="w-player-chip">
                     {currentSinglesMatch.p2}
-                    <StreakBadge streak={statsMap[currentSinglesMatch.p2]?.streak ?? 0} />
+                    <StreakBadge streak={statsMap[currentSinglesMatch.p2]?.streak ?? 0} className="w-streak-badge" />
                   </span>
                 </div>
               </div>
@@ -667,7 +602,7 @@ function WatchPageContent() {
                     <tr key={s.name}>
                       <td className="w-col-num">{i + 1}</td>
                       <td><strong>{s.name}</strong></td>
-                      <td><RankBadge rank={s.rank} /></td>
+                      <td><RankBadge rank={s.rank} className="w-rank-badge" /></td>
                       <td className="w-col-win">{s.wins}</td>
                       <td className="w-col-loss">{s.losses}</td>
                       <td>{s.gamesPlayed}</td>
@@ -702,16 +637,23 @@ function WatchPageContent() {
             history.length === 0
               ? <p className="w-muted">No matches played yet.</p>
               : (
-                <ul className="w-history-list">
-                  {history.map(e => (
-                    <li key={e.id} className="w-history-item">
-                      <span className="w-h-time">{e.timestamp}</span>
-                      <span className="w-h-match">{e.players}</span>
-                      <span className="w-h-winner"><Trophy size={11} /> {e.winner}</span>
-                      {e.score && <span className="w-h-score">{e.score}</span>}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  <ul className="w-history-list">
+                    {(showAllHistory ? history : history.slice(0, 5)).map(e => (
+                      <li key={e.id} className="w-history-item">
+                        <span className="w-h-time">{e.timestamp}</span>
+                        <span className="w-h-match">{e.players}</span>
+                        <span className="w-h-winner"><Trophy size={11} /> {e.winner}</span>
+                        {e.score && <span className="w-h-score">{e.score}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                  {history.length > 5 && (
+                    <button className="w-show-all-btn" onClick={() => setShowAllHistory(a => !a)}>
+                      {showAllHistory ? 'Show less' : `Show all ${history.length} results`}
+                    </button>
+                  )}
+                </>
               )
           )}
         </div>

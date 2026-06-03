@@ -664,3 +664,14 @@ body.dark-mode .share-end-row { border-top-color:rgba(255,255,255,.07); }
 .w-not-live-code { font-family:'Bebas Neue',monospace; font-size:2.2rem; letter-spacing:.18em; color:#f0f4ff; user-select:all; }
 
 .w-not-live-waiting { display:flex; align-items:center; gap:7px; font-size:.75rem; color:#6b7280; margin:4px 0 12px; }
+/* -- Score history: show-all toggle (Suggestion C) ----------- */
+.w-show-all-btn {
+  display: inline-flex; align-items: center; gap: 5px;
+  margin-top: 10px; padding: 5px 14px;
+  border-radius: 99px;
+  border: 1px solid rgba(255,255,255,.1);
+  background: transparent; color: #6b7280;
+  font-size: .72rem; font-family: inherit;
+  cursor: pointer; transition: all .15s;
+}
+.w-show-all-btn:hover { background: rgba(255,255,255,.06); color: #9ca3af; }
