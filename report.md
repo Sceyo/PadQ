@@ -1,6 +1,6 @@
 # PadQ System Report
 
-**Last updated**: 2026-06-03
+**Last updated**: 2026-06-05
 **Branch**: main
 **Scope**: Full codebase audit — queue algorithms, architecture, security, UX, data layer; club-scale use case assessment (5 courts, 50+ players)
 
@@ -551,6 +551,10 @@ All club-scale blockers are resolved. The system is now manageable at 5-court / 
 
 ✅ **Mid-session re-tag safety** — `retagPlayerInQueue` checks `isOnCourt` and exits early for on-court players; only waiting-queue players are moved to the new bracket immediately.
 
+✅ **Skilled stats tab in AnalyticsDashboard** — "Skilled" tab (default when in Skilled mode) shows per-bracket leaderboards (Beginner / Intermediate / Advanced) with W/L/GP/Win% and colour-matched bars. Session stats are grouped by `skilledBrackets` assignments; players with no games show "No matches played yet."
+
+✅ **Visual polish** — Team B label typo fixed (colour now applies); Team A / B divider line added to court cards; win buttons default-tinted blue/pink; active court cards get a coloured left-border accent driven by `matchLevel` (green / amber / red / grey).
+
 ---
 
 ### ~~🐛 Critical Bug — Courts not rendering in Skilled mode~~ — RESOLVED (2026-06-03)
@@ -578,12 +582,27 @@ All club-scale blockers are resolved. The system is now manageable at 5-court / 
 
 ---
 
+### ~~Stats tab for Skilled mode~~ — RESOLVED (2026-06-05)
+
+`AnalyticsDashboard` now accepts a `skilledBrackets` prop. When in Skilled mode, a **Skilled** tab appears as the default (left-most) tab in the analytics panel. It renders three bracket sections (Beginner / Intermediate / Advanced), each with a mini-leaderboard: rank, player name, wins, losses, games played, and win% with a color-matched bar. Players with no match history yet show "No matches played yet" rather than an empty table. `page.tsx` passes `skilledBrackets` only when `isSkilled` is true so the tab doesn't appear in other modes.
+
+---
+
+### ~~Visual polish — court cards, queue, badge styling~~ — RESOLVED (2026-06-05)
+
+Four targeted fixes:
+
+- **Team B label typo fixed** — `.skilled-court-team--b .skilled-court-label` corrected to `.skilled-team-label`; the pink `#f472b6` colour now actually applies to Team B player rows.
+- **Team A / Team B divider** — a `1px` border separates the two teams inside each court card; teams are no longer visually merged.
+- **Win buttons default-tinted** — Team A win button is default-blue (`rgba(96,165,250,.06)` background), Team B is default-pink (`rgba(244,114,182,.06)`), not just on hover. Teams are visually distinct at a glance before any interaction.
+- **Court card level accent** — active courts receive a coloured left border driven by `matchLevel`: green for Beginner, amber for Intermediate, red for Advanced, grey for Mixed. Idle courts have no accent (no `matchLevel` class applied).
+
+---
+
 ### Remaining Tasks
 
 #### 🟢 Lower Priority
 
-- [ ] Stats tab for Skilled mode — wins/losses per player per skill level
-- [ ] Visual polish — court cards, queue, badge styling fully aligned with dark theme
 - [ ] Undo support for Skilled mode result (currently saves a snapshot of paddle/singles state which is irrelevant in Skilled mode; no Skilled-specific undo yet)
 
 ---

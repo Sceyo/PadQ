@@ -2900,16 +2900,22 @@ body.dark-mode .skill-pick-btn { background: rgba(255,255,255,.05); border-color
 .skilled-level-tag--advanced     { color: #ef4444; background: rgba(239,68,68,.1);  border-color: rgba(239,68,68,.3); }
 .skilled-level-tag--mixed        { color: #9ca3af; background: rgba(156,163,175,.1); border-color: rgba(156,163,175,.3); }
 
+.skilled-court-card--beginner     { border-left: 3px solid #22c55e; }
+.skilled-court-card--intermediate { border-left: 3px solid #f59e0b; }
+.skilled-court-card--advanced     { border-left: 3px solid #ef4444; }
+.skilled-court-card--mixed        { border-left: 3px solid #9ca3af; }
+
 .skilled-court-teams {
-  display: flex; gap: 0; padding: 10px 14px; flex-direction: column; gap: 8px;
+  display: flex; padding: 10px 14px; flex-direction: column; gap: 0;
 }
-.skilled-court-team { display: flex; flex-direction: column; gap: 4px; }
+.skilled-court-team { display: flex; flex-direction: column; gap: 4px; padding: 8px 0; }
+.skilled-court-team--b { border-top: 1px solid var(--border); }
 .skilled-team-label {
   font-size: .68rem; font-weight: 700; letter-spacing: .05em; color: var(--txt-3);
   text-transform: uppercase; margin-bottom: 2px;
 }
 .skilled-court-team--a .skilled-team-label { color: #60a5fa; }
-.skilled-court-team--b .skilled-court-label { color: #f472b6; }
+.skilled-court-team--b .skilled-team-label { color: #f472b6; }
 
 .skilled-court-player {
   display: flex; align-items: center; gap: 6px;
@@ -2927,8 +2933,10 @@ body.dark-mode .skill-pick-btn { background: rgba(255,255,255,.05); border-color
   color: var(--txt-2); font-size: .78rem; font-weight: 600;
   cursor: pointer; font-family: inherit; transition: all .12s;
 }
-.skilled-win-btn--a:hover { background: rgba(96,165,250,.12); border-color: #60a5fa; color: #60a5fa; }
-.skilled-win-btn--b:hover { background: rgba(244,114,182,.12); border-color: #f472b6; color: #f472b6; }
+.skilled-win-btn--a { background: rgba(96,165,250,.06); border-color: rgba(96,165,250,.3); color: #60a5fa; }
+.skilled-win-btn--b { background: rgba(244,114,182,.06); border-color: rgba(244,114,182,.3); color: #f472b6; }
+.skilled-win-btn--a:hover { background: rgba(96,165,250,.18); border-color: #60a5fa; }
+.skilled-win-btn--b:hover { background: rgba(244,114,182,.18); border-color: #f472b6; }
 
 .skilled-court-idle {
   padding: 18px 14px; font-size: .78rem; color: var(--txt-3); text-align: center; margin: 0;
@@ -3486,6 +3494,29 @@ body.dark-mode .sitout-panel { background: rgba(0,0,0,.3); }
 }
 .analytics-tab-btn:hover { color: var(--txt-1); }
 .analytics-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* ── Analytics — Skilled bracket standings ─────────────────── */
+.analytics-skilled-brackets {
+  display: flex; flex-direction: column; gap: 16px;
+}
+.analytics-skilled-bracket {
+  border: 1.5px solid var(--border); border-radius: var(--r-md); overflow: hidden;
+}
+.analytics-skilled-bracket-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 14px;
+  font-size: .8rem; font-weight: 700; letter-spacing: .02em;
+  background: rgba(255,255,255,.02);
+  border-bottom: 2px solid transparent;
+}
+.analytics-skilled-bracket-header--beginner     { color: #22c55e; border-bottom-color: rgba(34,197,94,.35); }
+.analytics-skilled-bracket-header--intermediate { color: #f59e0b; border-bottom-color: rgba(245,158,11,.35); }
+.analytics-skilled-bracket-header--advanced     { color: #ef4444; border-bottom-color: rgba(239,68,68,.35); }
+.analytics-skilled-bracket-count {
+  font-size: .72rem; font-weight: 500; color: var(--txt-3); margin-left: 2px;
+}
+body.dark-mode .analytics-skilled-bracket { border-color: rgba(255,255,255,.08); }
+body.dark-mode .analytics-skilled-bracket-header { background: rgba(255,255,255,.02); }
 
 /* ── GearMenu host recovery form (Task 11) ──────────────────── */
 .gear-recovery-form {

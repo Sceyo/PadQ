@@ -1310,7 +1310,7 @@ function QueueSystemContent() {
       {modeSelector}{uiControls}{tabBar}
       {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
 
-      {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} /> : (
+      {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} skilledBrackets={isSkilled ? skilledBrackets : undefined} /> : (
         <div className="main-layout">
           <div className="queue-area">
             <h1 className="queue-title">
@@ -1398,7 +1398,7 @@ function QueueSystemContent() {
                           ? `Waiting for ${needed} more… (${resting} resting)`
                           : `Waiting for ${needed} more players…`;
                     return (
-                      <div key={court.id} className="skilled-court-card">
+                      <div key={court.id} className={`skilled-court-card${hasMatch ? ` skilled-court-card--${levelClass}` : ''}`}>
                         <div className="skilled-court-header">
                           <span className="skilled-court-name">{court.name}</span>
                           {hasMatch && <span className={`skilled-level-tag skilled-level-tag--${levelClass}`}>{levelLabel}</span>}
