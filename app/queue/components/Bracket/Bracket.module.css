@@ -29,7 +29,34 @@
   box-shadow: var(--shadow-sm);
 }
 .bracketMatchDone { border-color: #bbf7d0; }
-.bracketMatchBye { opacity: 0.45; }
+.bracketMatchBye {
+  border-style: dashed;
+  border-color: var(--border);
+  opacity: 0.85;
+}
+.bracketByeLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  min-height: 33px;
+}
+.bracketByeTag {
+  font-size: .65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--warning, #f59e0b);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+.bracketByeHint {
+  font-size: .68rem;
+  font-style: italic;
+  color: var(--txt-3);
+}
 .bracketMatchLosers { border-color: #fca5a5; }
 .bracketMatchGF { border: 2px solid var(--warning); box-shadow: 0 0 16px rgba(245,158,11,.22); }
 
@@ -63,3 +90,9 @@ body.dark-mode .bracketDivider { background: #2d3348; }
 body.dark-mode .bracketMatchLosers { border-color: #7f1d1d; }
 body.dark-mode .bracketMatchLosers .bracketPlayerWinner { background: #450a0a; color: #fca5a5; }
 body.dark-mode .bracketMatchGF .bracketPlayerWinner { background: #451a03; color: #fcd34d; }
+body.dark-mode .bracketMatchBye { border-color: #2d3348; }
+body.dark-mode .bracketByeTag {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.25);
+}

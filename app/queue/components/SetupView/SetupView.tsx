@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import {
   Sun, Moon, ArrowLeft, Users, Swords, UserPlus,
-  Trash2, Star, BookOpen, Play, Wifi,
+  Trash2, Star, BookOpen, Play, Wifi, Link, X,
 } from 'lucide-react';
 import type { RosterEntry, SkillBracket } from '@/lib/sessionService';
 
@@ -37,6 +37,10 @@ export interface SetupViewProps {
   isSaving:            boolean;
   onBack:              () => void;
   errorMsg?:           string;
+  /** Pre-session locked partner pairs — only relevant for doubles multi-court */
+  lockedPartners:      [string, string][];
+  onAddLockedPair:     (a: string, b: string) => void;
+  onRemoveLockedPair:  (i: number) => void;
 }
 
 export function SetupView({
@@ -50,9 +54,16 @@ export function SetupView({
   onAddPlayer, onRemoveTempPlayer, onAddFromPaste,
   onStartQueue, isSaving, onBack, errorMsg,
   onSetRosterSkill,
+  lockedPartners, onAddLockedPair, onRemoveLockedPair,
 }: SetupViewProps) {
-  const minPlayers = gameMode === 'doubles' && courtCount > 1 ? courtCount * 4 : 5;
+  const minPlayers = gameMode === 'doubles' && courtCount > 1
+    ? courtCount * 4
+    : gameMode === 'singles' && courtCount > 1
+      ? Math.max(5, courtCount * 2 + 1)
+      : 5;
   const [skillPickerFor, setSkillPickerFor] = useState<string | null>(null);
+  // Partner picker state — first selected player waiting for a second
+  const [partnerPickFirst, setPartnerPickFirst] = useState<string | null>(null);
 
   const SKILL_BRACKETS: SkillBracket[] = ['beginner', 'intermediate', 'advanced'];
   const SKILL_LABEL: Record<SkillBracket, string> = { beginner: 'B', intermediate: 'I', advanced: 'A' };
@@ -76,8 +87,8 @@ export function SetupView({
       </div>
 
       <div className="player-input-container">
-        {/* Court count — doubles only */}
-        {gameMode === 'doubles' && (
+        {/* Court count — singles and doubles */}
+        {(gameMode === 'doubles' || gameMode === 'singles') && (
           <div className="setup-field-row">
             <label className="setup-field-label">Number of courts</label>
             <div className="court-count-selector">
@@ -95,9 +106,14 @@ export function SetupView({
                 disabled={courtCount >= 6}
               >+</button>
             </div>
-            {courtCount > 1 && (
+            {courtCount > 1 && gameMode === 'doubles' && (
               <span className="setup-field-hint">
                 Needs {courtCount * 4}+ players · shared waiting queue
+              </span>
+            )}
+            {courtCount > 1 && gameMode === 'singles' && (
+              <span className="setup-field-hint">
+                {courtCount} courts · shared queue · 2 player per court
               </span>
             )}
           </div>
@@ -258,6 +274,68 @@ export function SetupView({
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {/* ── Lock Partners (doubles multi-court only) ── */}
+        {gameMode === 'doubles' && courtCount > 1 && tempPlayers.length >= 2 && (
+          <div className="partner-lock-section">
+            <div className="partner-lock-header">
+              <Link size={13} />
+              <span>Lock Partners <span className="setup-field-hint">(optional)</span></span>
+            </div>
+            <p className="partner-lock-hint">
+              Tap two players to pair them as permanent partners. Locked pairs always play on the same team.
+            </p>
+
+            {/* Player grid — tap to select first, then second */}
+            <div className="partner-player-grid">
+              {tempPlayers
+                .filter(p => !lockedPartners.some(pair => pair.includes(p)))
+                .map(p => {
+                  const isFirst = partnerPickFirst === p;
+                  return (
+                    <button
+                      key={p}
+                      type="button"
+                      className={`partner-pick-btn${isFirst ? ' partner-pick-btn--selected' : ''}`}
+                      onClick={() => {
+                        if (!partnerPickFirst) {
+                          setPartnerPickFirst(p);
+                        } else if (partnerPickFirst === p) {
+                          setPartnerPickFirst(null);
+                        } else {
+                          onAddLockedPair(partnerPickFirst, p);
+                          setPartnerPickFirst(null);
+                        }
+                      }}
+                    >
+                      {p}
+                      {isFirst && <span className="partner-pick-hint"> ← pick partner</span>}
+                    </button>
+                  );
+                })}
+            </div>
+
+            {/* Locked pairs list */}
+            {lockedPartners.length > 0 && (
+              <div className="locked-pairs-list">
+                {lockedPartners.map((pair, i) => (
+                  <div key={i} className="locked-pair-row">
+                    <Link size={11} className="locked-pair-icon" />
+                    <span className="locked-pair-names">{pair[0]} &amp; {pair[1]}</span>
+                    <button
+                      type="button"
+                      className="locked-pair-remove"
+                      onClick={() => onRemoveLockedPair(i)}
+                      title="Remove pairing"
+                    >
+                      <X size={11} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

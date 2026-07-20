@@ -41,6 +41,23 @@ export interface SkilledState {
   restCycleLength: 1 | 2;              // game cycles before re-entering queue
   totalPlayers:    number;              // active players (not sitting out)
   gamesCycleCount: number;             // increments every time any court finishes a game
+  bracketWaitCycles: Record<SkillLevel, number>;
+  // Consecutive pickBestGroup calls since a bracket last had ≥1 player
+  // selected onto a court, despite having players waiting. Resets to 0
+  // whenever the bracket is empty (nothing to starve) or gets picked.
+  // Used to force a starvation override (see STARVATION_THRESHOLD below)
+  // so a small bracket (e.g. 2 advanced players against a 30+ beginner
+  // pool) can't be skipped indefinitely by P1/P2 always succeeding first.
+  starvationThreshold: number;
+  // Court-count-aware starvation threshold: max(2, courtCount).
+  // A bracket that has been skipped this many consecutive picks despite
+  // having waiting players gets force-included in the next pick.
+  // Using courtCount as the base means "one full rotation" is the
+  // natural fairness unit — at N courts, a bracket can be skipped at
+  // most N times (one per court's pick) before the override fires,
+  // regardless of how many players are in other brackets.
+  // Floor of 2 prevents the override from firing on literally every
+  // other pick at single-court sessions.
 }
 
 export interface CourtDef {
@@ -65,6 +82,62 @@ function flattenQueue(sq: SkillQueue): string[] {
 
 function totalWaiting(sq: SkillQueue): number {
   return sq.beginner.length + sq.intermediate.length + sq.advanced.length;
+}
+
+// ── Starvation prevention ─────────────────────────────────────
+// The starvation threshold is now court-count-aware and stored per
+// session in SkilledState.starvationThreshold (computed at init as
+// max(2, courtCount)). A bracket that has been skipped for this many
+// consecutive picks — despite having waiting players — gets
+// force-included in the next pick, bypassing the normal P1→P2→P3
+// cascade. Using courtCount as the base means one full rotation worth
+// of skips is the fairness unit: at N courts, no bracket waits more
+// than N consecutive picks before the override fires.
+// The floor of 2 prevents over-aggressive overriding at 1-court setups.
+
+/**
+ * After a pick (successful or not), update each bracket's wait-cycle
+ * counter: reset to 0 if the bracket is now empty or had a player picked,
+ * otherwise increment.
+ */
+function updateWaitCycles(
+  prev:         Record<SkillLevel, number>,
+  sqBeforePick: SkillQueue,
+  pickedPlayers: string[],
+): Record<SkillLevel, number> {
+  const pickedSet = new Set(pickedPlayers);
+  const next: Record<SkillLevel, number> = { ...prev };
+  (['beginner', 'intermediate', 'advanced'] as SkillLevel[]).forEach(level => {
+    const pool = sqBeforePick[level];
+    const wasPicked = pool.some(p => pickedSet.has(p));
+    if (pool.length === 0 || wasPicked) {
+      next[level] = 0;
+    } else {
+      next[level] = (prev[level] ?? 0) + 1;
+    }
+  });
+  return next;
+}
+
+/**
+ * Force-build a group that includes at least one player from `starvedLevel`,
+ * filling the remaining slots from whichever other brackets have players,
+ * in B→I→A order. Used only when STARVATION_THRESHOLD is exceeded.
+ */
+function forceIncludeGroup(sq: SkillQueue, starvedLevel: SkillLevel): PickResult | null {
+  const starvedPool = sq[starvedLevel];
+  if (starvedPool.length === 0) return null;
+
+  const starvedPlayer = starvedPool[0];
+  const others = flattenQueue(sq).filter(p => p !== starvedPlayer);
+  if (others.length < 3) return null;
+
+  const selected = [starvedPlayer, ...others.slice(0, 3)];
+  return {
+    players:    snakeOrder(selected, sq),
+    skillMatch: 'mixed',
+    matchLevel: 'mixed',
+  };
 }
 
 // ── Rest threshold ────────────────────────────────────────────
@@ -117,10 +190,27 @@ interface PickResult {
  * P3B — Cross-bracket fill: B+A allowed when P1–P3 all fail and ≥4 total exist.
  *       Teams are snake-ordered so no team gets both Advanced players.
  */
-function pickBestGroup(sq: SkillQueue): PickResult | null {
+function pickBestGroup(
+  sq: SkillQueue,
+  waitCycles: Record<SkillLevel, number> = { beginner: 0, intermediate: 0, advanced: 0 },
+  threshold: number = 3,
+): PickResult | null {
   if (totalWaiting(sq) < 4) return null;
 
   const { beginner: B, intermediate: I, advanced: A } = sq;
+
+  // ── P0: Starvation override ─────────────────────────────────
+  // If any bracket has been waiting too long (despite having players),
+  // force-include one of them before running the normal cascade. Checked
+  // in B→I→A order; only the first starved bracket found is forced per
+  // pick (forcing all of them at once isn't possible within a 4-player
+  // group anyway when more than one bracket is starved).
+  for (const level of ['beginner', 'intermediate', 'advanced'] as SkillLevel[]) {
+    if (sq[level].length > 0 && (waitCycles[level] ?? 0) >= threshold) {
+      const forced = forceIncludeGroup(sq, level);
+      if (forced) return forced;
+    }
+  }
 
   // ── P1: Pure match ─────────────────────────────────────────
   if (B.length >= 4) return { players: B.slice(0, 4), skillMatch: 'pure', matchLevel: 'beginner' };
@@ -234,21 +324,26 @@ export function buildSkillQueue(
 export function assignCourts(
   skillQueue: SkillQueue,
   courtDefs:  CourtDef[],
-): { courts: SkilledCourt[]; remainingQueue: SkillQueue } {
+  waitCycles: Record<SkillLevel, number> = { beginner: 0, intermediate: 0, advanced: 0 },
+  threshold:  number = 3,
+): { courts: SkilledCourt[]; remainingQueue: SkillQueue; waitCycles: Record<SkillLevel, number> } {
   let sq = { ...skillQueue, beginner: [...skillQueue.beginner], intermediate: [...skillQueue.intermediate], advanced: [...skillQueue.advanced] };
+  let wc = { ...waitCycles };
   const courts: SkilledCourt[] = [];
 
   for (const def of courtDefs) {
-    const group = pickBestGroup(sq);
+    const sqBefore = sq;
+    const group = pickBestGroup(sq, wc, threshold);
     if (!group) {
       courts.push({ id: def.id, name: def.name, players: [], skillMatch: 'pure', matchLevel: 'mixed', idleCycles: 0, earlyReturns: [] });
     } else {
       sq = removeFromQueue(sq, group.players);
+      wc = updateWaitCycles(wc, sqBefore, group.players);
       courts.push({ id: def.id, name: def.name, players: group.players, skillMatch: group.skillMatch, matchLevel: group.matchLevel, idleCycles: 0, earlyReturns: [] });
     }
   }
 
-  return { courts, remainingQueue: sq };
+  return { courts, remainingQueue: sq, waitCycles: wc };
 }
 
 /**
@@ -322,8 +417,12 @@ export function reassignCourt(
   skillBrackets: { beginner: string[]; intermediate: string[]; advanced: string[] },
 ): SkilledState {
   const prevIdle = state.courts.find(c => c.id === courtId)?.idleCycles ?? 0;
-  const group    = pickBestGroup(state.skillQueue);
+  const sqBefore = state.skillQueue;
+  const group    = pickBestGroup(state.skillQueue, state.bracketWaitCycles, state.starvationThreshold);
   const newQueue = group ? removeFromQueue(state.skillQueue, group.players) : state.skillQueue;
+  const newWaitCycles = group
+    ? updateWaitCycles(state.bracketWaitCycles, sqBefore, group.players)
+    : state.bracketWaitCycles;
   const courts   = state.courts.map(c =>
     c.id === courtId
       ? {
@@ -336,7 +435,7 @@ export function reassignCourt(
         }
       : c
   );
-  return { ...state, skillQueue: newQueue, courts, waitingQueue: flattenQueue(newQueue) };
+  return { ...state, skillQueue: newQueue, courts, waitingQueue: flattenQueue(newQueue), bracketWaitCycles: newWaitCycles };
 }
 
 /**
@@ -348,20 +447,23 @@ export function initSkilledState(
   courtDefs:     CourtDef[],
   sitOut:        string[] = [],
 ): SkilledState {
-  const active = players.filter(p => !sitOut.includes(p));
-  const sq     = buildSkillQueue(active, skillBrackets);
-  const { courts, remainingQueue } = assignCourts(sq, courtDefs);
+  const active    = players.filter(p => !sitOut.includes(p));
+  const sq        = buildSkillQueue(active, skillBrackets);
+  const threshold = Math.max(2, courtDefs.length);
+  const { courts, remainingQueue, waitCycles } = assignCourts(sq, courtDefs, undefined, threshold);
   const { restEnabled, restCycleLength } = computeRestThreshold(active.length, courtDefs.length);
   return {
-    skillQueue:      remainingQueue,
+    skillQueue:          remainingQueue,
     courts,
-    waitingQueue:    flattenQueue(remainingQueue),
+    waitingQueue:        flattenQueue(remainingQueue),
     sitOut,
-    restPool:        [],
+    restPool:            [],
     restEnabled,
     restCycleLength,
-    totalPlayers:    active.length,
-    gamesCycleCount: 0,
+    totalPlayers:        active.length,
+    gamesCycleCount:     0,
+    bracketWaitCycles:   waitCycles,
+    starvationThreshold: threshold,
   };
 }
 
@@ -484,6 +586,7 @@ export function fillIdleCourts(
       const sel     = all.slice(0, 4);
       const ordered = snakeOrder(sel, s.skillQueue);
       const newSq   = removeFromQueue(s.skillQueue, sel);
+      const newWaitCycles = updateWaitCycles(s.bracketWaitCycles, s.skillQueue, sel);
 
       console.warn(`[SkilledEngine] Immediate idle fill court ${court.id} (queue=${waiting})`);
 
@@ -491,6 +594,7 @@ export function fillIdleCourts(
         ...s,
         skillQueue:   newSq,
         waitingQueue: flattenQueue(newSq),
+        bracketWaitCycles: newWaitCycles,
         courts: s.courts.map(c =>
           c.id === court.id
             ? { ...c, players: ordered, skillMatch: 'mixed' as SkillMatch, matchLevel: 'mixed' as SkillLevel | 'mixed', idleCycles: 0, earlyReturns: [] }
@@ -521,6 +625,7 @@ export function fillIdleCourts(
       const sel     = all.slice(0, 4);
       const ordered = snakeOrder(sel, tempSq);
       const finalSq = removeFromQueue(tempSq, sel);
+      const newWaitCycles = updateWaitCycles(s.bracketWaitCycles, tempSq, sel);
 
       console.warn(`[SkilledEngine] Emergency idle fill court ${court.id}: early rest return [${earlyNames.join(', ')}]`);
 
@@ -529,6 +634,7 @@ export function fillIdleCourts(
         skillQueue:   finalSq,
         waitingQueue: flattenQueue(finalSq),
         restPool:     newRest,
+        bracketWaitCycles: newWaitCycles,
         courts: s.courts.map(c =>
           c.id === court.id
             ? { ...c, players: ordered, skillMatch: 'mixed' as SkillMatch, matchLevel: 'mixed' as SkillLevel | 'mixed', idleCycles: 0, earlyReturns: earlyNames }

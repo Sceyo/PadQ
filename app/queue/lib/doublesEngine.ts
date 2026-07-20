@@ -154,20 +154,75 @@ export function swapPartners(
   return history.includes(teamPairKey(primary.teamA, primary.teamB)) ? alternate : primary;
 }
 
-function balancePools(w1: string[], l1: string[]): { w1: string[]; l1: string[] } {
-  let nextW1 = w1;
-  let nextL1 = l1;
+function balancePools(
+  w1:      string[],
+  l1:      string[],
+  waiting: string[] = [],
+): { w1: string[]; l1: string[]; waiting: string[] } {
+  let nextW1      = w1;
+  let nextL1      = l1;
+  let nextWaiting = waiting;
+
+  // Loop (rather than a single corrective pass) because moving w1's
+  // overflow into l1 can itself push l1 over the cap, and that
+  // re-inflation needs to be re-checked — a single if/if pass left w1
+  // free to grow unbounded once both pools hit MAX_POOL_SIZE at the same
+  // time (see: long INIT phase with 30+ players, where every round adds
+  // 2 players to each pool in lockstep).
+  //
+  // Once a single bounce between just w1/l1 can no longer make progress
+  // (both still over cap, but trimming one would just re-inflate the
+  // other past it) the true excess is routed into `waiting` instead of
+  // being left to sit oversized in either pool — this is the same
+  // release valve the INIT->WINNERS transition already uses for players
+  // who haven't been seeded into a match yet, so it's consistent with
+  // how the rest of the engine treats "exists but not currently active."
+  let progressed = true;
+  while (progressed && (nextW1.length > MAX_POOL_SIZE || nextL1.length > MAX_POOL_SIZE)) {
+    progressed = false;
+
+    if (nextW1.length > MAX_POOL_SIZE) {
+      // Trim from the back — front entries have priority (most recently
+      // injected or most deserving of next play).
+      const overflow = nextW1.slice(MAX_POOL_SIZE);
+      const trimmed  = nextW1.slice(0, MAX_POOL_SIZE);
+      if (nextL1.length + overflow.length <= MAX_POOL_SIZE) {
+        nextW1 = trimmed;
+        nextL1 = [...nextL1, ...overflow];
+        progressed = true;
+      }
+    }
+    if (nextL1.length > MAX_POOL_SIZE) {
+      const overflow = nextL1.slice(MAX_POOL_SIZE);
+      const trimmed  = nextL1.slice(0, MAX_POOL_SIZE);
+      if (nextW1.length + overflow.length <= MAX_POOL_SIZE) {
+        nextL1 = trimmed;
+        nextW1 = [...nextW1, ...overflow];
+        progressed = true;
+      }
+    }
+  }
+
+  // Either both pools are now within cap, or bouncing further between
+  // just the two of them can't make progress (combined size > 2 *
+  // MAX_POOL_SIZE). In the latter case, drain genuine excess into
+  // `waiting` so both pools end up exactly at the cap.
+  // Trim from the BACK (oldest/most-established entries at the tail),
+  // not the front — callers prepend priority players to the front, so
+  // front-trimming would immediately re-evict the very players that were
+  // just injected to get priority treatment.
   if (nextW1.length > MAX_POOL_SIZE) {
-    const overflow = nextW1.slice(0, nextW1.length - MAX_POOL_SIZE);
-    nextW1 = nextW1.slice(nextW1.length - MAX_POOL_SIZE);
-    nextL1 = [...overflow, ...nextL1];
+    const overflow = nextW1.slice(MAX_POOL_SIZE);
+    nextW1 = nextW1.slice(0, MAX_POOL_SIZE);
+    nextWaiting = [...nextWaiting, ...overflow];
   }
   if (nextL1.length > MAX_POOL_SIZE) {
-    const overflow = nextL1.slice(0, nextL1.length - MAX_POOL_SIZE);
-    nextL1 = nextL1.slice(nextL1.length - MAX_POOL_SIZE);
-    nextW1 = [...nextW1, ...overflow];
+    const overflow = nextL1.slice(MAX_POOL_SIZE);
+    nextL1 = nextL1.slice(0, MAX_POOL_SIZE);
+    nextWaiting = [...nextWaiting, ...overflow];
   }
-  return { w1: nextW1, l1: nextL1 };
+
+  return { w1: nextW1, l1: nextL1, waiting: nextWaiting };
 }
 
 export function freshPaddleState(): PaddleState {
@@ -271,7 +326,7 @@ export function advancePaddleState(
   nextW1 = [...nextW1, ...winnerTeam];
   nextL1 = [...nextL1, ...loserTeam];
 
-  ({ w1: nextW1, l1: nextL1 } = balancePools(nextW1, nextL1));
+  ({ w1: nextW1, l1: nextL1, waiting: nextWaiting } = balancePools(nextW1, nextL1, nextWaiting));
 
   let nextPhase           = state.phase;
   let nextMatchIndex      = state.matchIndexInPhase + 1;
@@ -285,8 +340,11 @@ export function advancePaddleState(
       nextWaiting = [...nextWaiting, ...overflow];
 
       const unplayed = nextWaiting.filter(p => !nextPlayedThisCycle.has(p));
+      // Prepend unplayed players so they get priority; balancePools trims
+      // from the back, so newly-injected front-entries are preserved.
       nextW1      = [...unplayed, ...nextW1.filter(p => !unplayed.includes(p))];
       nextWaiting = nextWaiting.filter(p => nextPlayedThisCycle.has(p));
+      ({ w1: nextW1, l1: nextL1, waiting: nextWaiting } = balancePools(nextW1, nextL1, nextWaiting));
 
       nextPhase      = 'WINNERS';
       nextMatchIndex = 0;
@@ -295,15 +353,29 @@ export function advancePaddleState(
     nextPhase      = 'LOSERS';
     nextMatchIndex = 0;
   } else {
-    const allHavePlayed = allPlayers.every(p => nextPlayedThisCycle.has(p));
+    // Only consider players who are actively in rotation (w1 or l1) or
+    // have already played this cycle. Players still parked in waitingQueue
+    // haven't entered the rotation yet — requiring them to appear in
+    // playedThisCycle before the cycle resets creates a permanent deadlock
+    // for any player who was never seeded in INIT (e.g. the last 1-3
+    // players in a non-divisible-by-4 pool), since they'd block the cycle
+    // from ever resetting and therefore never get injected via `unplayed`.
+    const activePlayers = new Set([...nextW1, ...nextL1, ...nextPlayedThisCycle]);
+    const allHavePlayed = [...activePlayers].every(p => nextPlayedThisCycle.has(p));
     if (allHavePlayed) {
       nextPlayedThisCycle = new Set();
     }
 
     const unplayed = nextWaiting.filter(p => !nextPlayedThisCycle.has(p));
     if (unplayed.length > 0) {
+      // Prepend unplayed players to give them priority — they displace
+      // existing w1 occupants who'll flow to waiting via balancePools.
+      // balancePools now trims from the back (oldest/most-established
+      // entries) rather than the front, so the newly-injected unplayed
+      // players at the front are preserved, not immediately re-evicted.
       nextW1      = [...unplayed, ...nextW1.filter(p => !unplayed.includes(p))];
       nextWaiting = nextWaiting.filter(p => nextPlayedThisCycle.has(p));
+      ({ w1: nextW1, l1: nextL1, waiting: nextWaiting } = balancePools(nextW1, nextL1, nextWaiting));
     }
 
     nextPhase      = 'WINNERS';

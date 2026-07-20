@@ -63,6 +63,8 @@ import { SmartSuggestions } from './components/SmartSuggestions/SmartSuggestions
 import { SessionBar } from './components/SessionBar/SessionBar';
 import { CourtTabs } from './components/CourtTabs/CourtTabs';
 import { CourtCard } from './components/CourtCard/CourtCard';
+import { SinglesCourtCard } from './components/SinglesCourtCard/SinglesCourtCard';
+import { CourtSwapModal } from './components/CourtSwapModal/CourtSwapModal';
 import { GearMenu } from './components/GearMenu/GearMenu';
 import { CoordinatorOverlay } from './components/CoordinatorOverlay/CoordinatorOverlay';
 import { SetupView } from './components/SetupView/SetupView';
@@ -121,6 +123,7 @@ function QueueSystemContent() {
     recordPlayAllSingles, resetPlayAllRelationships,
   } = useQueue();
 
+
   const session = useSession();
 
   // Sync Firebase → local queue hook
@@ -135,14 +138,17 @@ function QueueSystemContent() {
     if (session.queue.join(',') !== queue.join(',')) setQueue(session.queue);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.queue, session.isConnected, session.isSaving]);
-
+  useEffect(() => { queueRef.current = queue; }, [queue]);
+  
   // UI-only state
+  
   const [tempPlayers,  setTempPlayers]  = useState<string[]>([]);
   const [currentName,  setCurrentName]  = useState('');
   const [pasteInput,   setPasteInput]   = useState('');
   const [modalOpen,    setModalOpen]    = useState(false);
   const [modalWinner,  setModalWinner]  = useState('');
   const [modalScore,   setModalScore]   = useState<string | undefined>(undefined);
+  const [swapCourtId,  setSwapCourtId]  = useState<string | null>(null);
   const [autoClose,    setAutoClose]    = useState(false);
   const [showHistory,  setShowHistory]  = useState(true);
   const [darkMode,     setDarkMode]     = useState(true);
@@ -159,6 +165,8 @@ function QueueSystemContent() {
   const [hostKeyToken,   setHostKeyToken]   = useState<string | null>(null);
   const [hostKeyCopied,  setHostKeyCopied]  = useState(false);
   const newSessionRef = useRef(false);
+  const queueRef = useRef<string[]>([]);
+  const courtSlotsRef = useRef<CourtSlot[]>([]);
 
   // Show banner once after a new session is created (not on resume)
   useEffect(() => {
@@ -178,6 +186,7 @@ function QueueSystemContent() {
   // ── Setup: PIN + court name ─────────────────────────────────
   const [setupPin,       setSetupPin]       = useState('');
   const [setupCourtName, setSetupCourtName] = useState('Court 1');
+  const [lockedPartners, setLockedPartners] = useState<[string, string][]>([]);
   const [courtCount,     setCourtCount]     = useState(1);
 
   // ── Multi-court shared-queue slots ──────────────────────────
@@ -291,6 +300,7 @@ function QueueSystemContent() {
 
   // Resolved court slots (Firestore when connected, local otherwise)
   const courtSlots = session.isConnected ? (session.courtSlots ?? []) : localCourtSlots;
+  useEffect(() => { courtSlotsRef.current = courtSlots; }, [courtSlots]);
 
   // Players not on any court (the shared waiting queue in multi-court mode)
   const waitingPlayers = useMemo(() => {
@@ -440,7 +450,11 @@ function QueueSystemContent() {
   };
 
   const handleStartQueue = async () => {
-    const minPlayers = gameMode === 'doubles' && courtCount > 1 ? courtCount * 4 : 5;
+    const minPlayers = gameMode === 'doubles' && courtCount > 1
+      ? courtCount * 4
+      : gameMode === 'singles' && courtCount > 1
+        ? Math.max(5, courtCount * 2 + 1)
+        : 5;
     if (tempPlayers.length < minPlayers) return;
     const orderedPlayers = [...tempPlayers];
     resetPaddleState();
@@ -452,12 +466,43 @@ function QueueSystemContent() {
     let initialCourtSlots: CourtSlot[] | undefined;
     let initialQueue: string[];
     if (gameMode === 'doubles' && courtCount > 1) {
+      // Respect locked partners: locked pairs always appear together on the
+      // same team. Build an ordered player list where locked pairs are
+      // adjacent, then slice into courts of 4 (pair0 + pair1 per court).
+      const lockedSet = new Set(lockedPartners.flat());
+      const unlockedPlayers = orderedPlayers.filter(p => !lockedSet.has(p));
+
+      // Build a seeding order: locked pairs first (each pair is 2 players),
+      // then remaining unpaired players.
+      const seededOrder: string[] = [];
+      const usedPairs = new Set<number>();
+      // For each court slot (4 players = 2 pairs), fill with locked pairs first
+      for (const [i, pair] of lockedPartners.entries()) {
+        if (pair.every(p => orderedPlayers.includes(p))) {
+          seededOrder.push(...pair);
+          usedPairs.add(i);
+        }
+      }
+      // Fill remaining slots with unpaired players
+      seededOrder.push(...unlockedPlayers);
+
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
         id: `court-${i}`,
         name: `Court ${i + 1}`,
-        onCourt: orderedPlayers.slice(i * 4, (i + 1) * 4),
+        onCourt: seededOrder.slice(i * 4, (i + 1) * 4),
       }));
-      initialQueue = orderedPlayers.slice(courtCount * 4);
+      initialQueue = seededOrder.slice(courtCount * 4);
+      setLocalCourtSlots(initialCourtSlots);
+      courtSlotsRef.current = initialCourtSlots;
+      setLockedPartners([]); // clear after session starts
+    } else if (gameMode === 'singles' && courtCount > 1) {
+      // Singles multi-court: seed 2 players per court, rest go to shared queue
+      initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
+        id: `court-${i}`,
+        name: `Court ${i + 1}`,
+        onCourt: orderedPlayers.slice(i * 2, (i + 1) * 2),
+      }));
+      initialQueue = orderedPlayers.slice(courtCount * 2);
       setLocalCourtSlots(initialCourtSlots);
     } else {
       initialCourtSlots = undefined;
@@ -697,20 +742,58 @@ function QueueSystemContent() {
     if (session.sessionId) session.syncField({ queue: newQueue });
   };
 
-  const handleSinglesMatch = (winner: string, score?: string) => {
+  const handleSinglesMatch = (winner: string, score?: string, courtId?: string) => {
     if (isProcessingMatchRef.current) return;
     isProcessingMatchRef.current = true;
     const [p1, p2] = [queue[0], queue[1]];
-    // Save undo snapshot before mutating state
     undoSnapshotRef.current = {
       queue: [...queue],
       paddleState: clonePaddleState(paddleStateRef.current),
       singlesState: cloneSinglesState(singlesStateRef.current),
     };
     setHasUndo(true);
-    playSingles(winner);
+    // Only call playSingles in single-court mode — it validates winner
+    // against queue[0]/queue[1] which is wrong for multi-court.
+    if (!(gameMode === 'singles' && courtId && courtSlots.length > 0)) {
+      playSingles(winner);
+    }
     if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
     let newQueue: string[];
+
+    if (gameMode === 'singles' && courtId && courtSlots.length > 0) {
+      const slot = courtSlots.find(c => c.id === courtId);
+      if (slot) {
+        const [cp1, cp2] = slot.onCourt;
+        const loser = winner === cp1 ? cp2 : cp1;
+        // Use queueRef.current instead of queue to always get the latest value
+        const currentQueue = queueRef.current;
+        const currentWaiting = queueRef.current.filter(
+          p => !courtSlots.flatMap(c => c.onCourt).includes(p)
+        );
+        const nextChallenger = currentWaiting[0] ?? null;
+        const newQueue_ = nextChallenger
+          ? queueRef.current.filter(p => p !== nextChallenger)
+          : [...queueRef.current];
+        const newOnCourt = nextChallenger ? [winner, nextChallenger] : [winner];
+        const updatedQueue = [...newQueue_, loser];
+        queueRef.current = updatedQueue;
+        // Update the ref immediately so the next court reads fresh data
+        queueRef.current = updatedQueue;
+        const updatedSlots = courtSlots.map(c =>
+          c.id === courtId ? { ...c, onCourt: newOnCourt } : c
+        );
+        setLocalCourtSlots(updatedSlots);
+        if (session.sessionId) session.syncField({ courtSlots: updatedSlots });
+        newQueue = updatedQueue;
+        addHistory({ id: Date.now(), mode: 'Singles', players: `[${slot.name}] ${cp1} vs ${cp2}`, winner, score, timestamp: new Date().toLocaleTimeString() }, newQueue);
+        setModalWinner(`${winner} wins!`); setModalScore(score); setModalOpen(true);
+        setQueue(newQueue);
+        if (session.sessionId) session.syncField({ queue: newQueue });
+        isProcessingMatchRef.current = false;
+        return;
+      }
+    }
+
     if (activeQueueMode === 'default' && gameMode === 'singles') {
       const activePlayers = players.filter(p => !activeSittingOut.includes(p));
       const { nextState, newQueue: singlesQueue } = advanceSinglesState(singlesStateRef.current, winner, activePlayers);
@@ -723,8 +806,7 @@ function QueueSystemContent() {
       newQueue = [loser, ...rest, winner];
     }
     setQueue(newQueue);
-    addHistory({ id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`, winner, score, timestamp: new Date().toLocaleTimeString() }, newQueue);
-    setModalWinner(`${winner} wins!`); setModalScore(score); setModalOpen(true);
+    addHistory({ id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`, winner, score, timestamp: new Date().toLocaleTimeString() }, newQueue); setModalWinner(`${winner} wins!`); setModalScore(score); setModalOpen(true);
     isProcessingMatchRef.current = false;
   };
 
@@ -771,7 +853,7 @@ function QueueSystemContent() {
   const handleCourtMatch = (courtId: string, side: 'A' | 'B') => {
     if (isProcessingMatchRef.current) return;
     isProcessingMatchRef.current = true;
-    const currentSlots = courtSlots;
+    const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
     const slot = currentSlots.find(c => c.id === courtId);
     if (!slot || slot.onCourt.length < 4) { isProcessingMatchRef.current = false; return; }
 
@@ -849,6 +931,20 @@ function QueueSystemContent() {
     setModalScore(undefined);
     setModalOpen(true);
     isProcessingMatchRef.current = false;
+  };
+
+  // ── Mid-session player position swap ──────────────────────
+  // Host can swap any two of the 4 players on a court — changes
+  // who is partnered with whom, or which teams face each other.
+  // onCourt[0..1] = Team A, onCourt[2..3] = Team B.
+  const handleSwapPlayers = (courtId: string, newOnCourt: string[]) => {
+    const updatedSlots = courtSlotsRef.current.map((s: CourtSlot) =>
+      s.id === courtId ? { ...s, onCourt: newOnCourt } : s
+    );
+    courtSlotsRef.current = updatedSlots;
+    setLocalCourtSlots(updatedSlots);
+    if (session.sessionId) session.syncField({ courtSlots: updatedSlots });
+    setSwapCourtId(null);
   };
 
   // ── Skilled mode result handler ────────────────────────────
@@ -1078,7 +1174,7 @@ function QueueSystemContent() {
 
   // ── Shared fragments ──────────────────────────────────────
   const canControl = !session.sessionId || session.isHost;
-  const canUndo    = session.isHost && hasUndo;
+  const canUndo = session.isHost && hasUndo && courtSlots.length === 0;
 
   const modeSelector = (
     <div className="mode-selector">
@@ -1124,7 +1220,12 @@ function QueueSystemContent() {
             {activeHistory.map(e => (
               <li key={e.id} className="history-item">
                 <div className="history-time">{e.timestamp}</div>
-                <div className="history-match">{e.players}</div>
+                <div className="history-match">
+                  {e.mode?.includes('(') && (
+                    <div className="history-court-tag">{e.mode.match(/\(([^)]+)\)/)?.[1]}</div>
+                  )}
+                  <div>{e.players}</div>
+                </div>
                 <div className="history-winner"><Trophy size={11} /> {e.winner}</div>
                 {e.score && <div className="history-score">{e.score}</div>}
               </li>
@@ -1167,6 +1268,14 @@ function QueueSystemContent() {
         isSaving={session.isSaving}
         onBack={() => router.push('/')}
         errorMsg={setupErrorMsg ?? undefined}
+        lockedPartners={lockedPartners}
+        onAddLockedPair={(a, b) => setLockedPartners(prev => {
+          // Prevent duplicate pairs and each player appearing in more than one pair
+          const alreadyPaired = new Set(prev.flat());
+          if (alreadyPaired.has(a) || alreadyPaired.has(b)) return prev;
+          return [...prev, [a, b]];
+        })}
+        onRemoveLockedPair={(i) => setLockedPartners(prev => prev.filter((_, j) => j !== i))}
       />
     );
   }
@@ -1261,6 +1370,18 @@ function QueueSystemContent() {
           </div>
         )}
         <WinnerModal isOpen={modalOpen} winner={modalWinner} score={modalScore} onClose={() => setModalOpen(false)} autoClose={autoClose} setAutoClose={setAutoClose} />
+        {swapCourtId && (() => {
+          const slot = courtSlotsRef.current.find(s => s.id === swapCourtId);
+          return slot ? (
+            <CourtSwapModal
+              courtName={slot.name}
+              onCourt={slot.onCourt}
+              statsMap={statsMap}
+              onConfirm={(newOnCourt) => handleSwapPlayers(swapCourtId, newOnCourt)}
+              onClose={() => setSwapCourtId(null)}
+            />
+          ) : null;
+        })()}
         <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
         {showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
         {toastMsg && (
@@ -1318,10 +1439,21 @@ function QueueSystemContent() {
               {gameMode === 'singles' ? 'Singles' : 'Doubles'}{isSkilled ? ' Skilled' : ''} Queue
             </h1>
 
-            {activeQueueMode === 'default' && <p className="mode-description"><Trophy size={11} className="mode-desc-icon" /> Advanced Paddle Queue · Winners &amp; Losers cycles · Partners always swap</p>}
-            {activeQueueMode === 'playall' && <p className="mode-description"><Sparkles size={11} className="mode-desc-icon" /> Every player faces everyone before repeating</p>}
-            {isSkilled && <p className="mode-description"><Layers size={11} className="mode-desc-icon" /> Skill-based matchmaking · Same-level courts first, adjacent fill when needed</p>}
-
+            {activeQueueMode === 'default' && gameMode === 'doubles' && (
+              <p className="mode-description">
+                <Trophy size={11} className="mode-desc-icon" /> Advanced Paddle Queue · Winners &amp; Losers cycles · Partners always swap
+              </p>
+            )}
+            {activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
+              <p className="mode-description">
+                <Trophy size={11} className="mode-desc-icon" /> King of the Court · Winner stays on · Challenger from queue
+              </p>
+            )}
+            {activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length > 0 && (
+              <p className="mode-description">
+                <Trophy size={11} className="mode-desc-icon" /> King of the Court · Winner stays on · {courtSlots.length} courts · shared queue
+              </p>
+            )}
             {/* ── Skill Brackets toggle panel (Skilled mode only) ── */}
             {isSkilled && session.isHost && (
               <div className="skilled-panel-wrap">
@@ -1357,8 +1489,7 @@ function QueueSystemContent() {
             )}
 
             {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />}
-            {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />}
-
+            {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />}
             {/* ═══════════════════════════════════════════════════
                 SKILLED MODE LAYOUT
                 ═══════════════════════════════════════════════════ */}
@@ -1503,7 +1634,45 @@ function QueueSystemContent() {
                  ══════════════════════════════════════════════════ */
               <>
 
-            {gameMode === 'singles' && queue.length >= 2 && (
+            {/* Multi-court singles: shared queue, one player per court */}
+            {gameMode === 'singles' && courtSlots.length > 0 && (
+              <div className="multicourt-section">
+                <div className="courts-grid">
+                  {courtSlots.map(slot => (
+                    <SinglesCourtCard
+                      key={slot.id}
+                      slot={{
+                        id:      slot.id,
+                        name:    slot.name,
+                        players: slot.onCourt,
+                        king:    slot.onCourt[0] ?? null,
+                      }}
+                      statsMap={statsMap}
+                      isHost={session.isHost}
+                      onWin={(courtId, winner) => handleSinglesMatch(winner, undefined, courtId)}
+                    />
+                  ))}
+                </div>
+                <div className="waiting-queue-panel">
+                  <h3 className="pairings-label">Waiting Queue ({queue.length})</h3>
+                  {queue.length === 0
+                    ? <p className="muted-hint">All players are on a court.</p>
+                    : (
+                      <div className="waiting-players-list">
+                        {queue.map((p, i) => (
+                          <div key={`wait-${i}-${p}`} className="waiting-player-row">
+                            <span className="waiting-num">#{i + 1}</span>
+                            <PlayerLabel name={p} statsMap={statsMap} />
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
+                </div>
+              </div>
+            )}
+
+            {gameMode === 'singles' && courtSlots.length === 0 && queue.length >= 2 && (
               <div className="match-section">
                 <h3 className="match-section-title"><Swords size={14} /> Current Match</h3>
                 <div className="current-match-players">
@@ -1535,6 +1704,7 @@ function QueueSystemContent() {
                       statsMap={statsMap}
                       isHost={session.isHost}
                       onWin={handleCourtMatch}
+                      onEdit={session.isHost ? (id) => setSwapCourtId(id) : undefined}
                     />
                   ))}
                 </div>
@@ -1628,6 +1798,18 @@ function QueueSystemContent() {
         </div>
       )}
       <WinnerModal isOpen={modalOpen} winner={modalWinner} score={modalScore} onClose={() => setModalOpen(false)} autoClose={autoClose} setAutoClose={setAutoClose} />
+      {swapCourtId && (() => {
+        const slot = courtSlotsRef.current.find(s => s.id === swapCourtId);
+        return slot ? (
+          <CourtSwapModal
+            courtName={slot.name}
+            onCourt={slot.onCourt}
+            statsMap={statsMap}
+            onConfirm={(newOnCourt) => handleSwapPlayers(swapCourtId, newOnCourt)}
+            onClose={() => setSwapCourtId(null)}
+          />
+        ) : null;
+      })()}
       <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
       {showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
       {toastMsg && (

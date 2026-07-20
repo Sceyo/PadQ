@@ -63,3 +63,91 @@
 .team-amp{color:var(--txt-3);font-size:.78rem;margin:0 1px;}  
 .streak-badge{display:inline-flex;align-items:center;gap:2px;background:linear-gradient(135deg,#f97316,#ef4444);color:#fff;font-size:.62rem;font-weight:700;padding:2px 6px;border-radius:99px;vertical-align:middle;flex-shrink:0;}  
 .rank-badge{display:inline-flex;align-items:center;gap:3px;font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:99px;vertical-align:middle;text-transform:uppercase;letter-spacing:.04em;color:var(--rc,#999);border:1.5px solid var(--rc,#999);background:color-mix(in srgb,var(--rc,#999) 10%,transparent);flex-shrink:0;}
+/* ── Lock Partners (pre-session) ─────────────────────────── */
+.partner-lock-section {
+  background: var(--surface-2, #1e2233);
+  border: 1.5px solid var(--border, #2d3348);
+  border-radius: var(--r-md, 12px);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.partner-lock-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--txt-1, #f0f4ff);
+}
+.partner-lock-hint {
+  font-size: 0.72rem;
+  color: var(--txt-3, #6b7280);
+  margin: 0;
+  line-height: 1.5;
+}
+.partner-player-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.partner-pick-btn {
+  background: var(--card, #1a1f2e);
+  border: 1.5px solid var(--border, #2d3348);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--txt-1, #f0f4ff);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.partner-pick-btn:hover { border-color: var(--primary, #6366f1); }
+.partner-pick-btn--selected {
+  border-color: var(--primary, #6366f1) !important;
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+}
+.partner-pick-hint {
+  font-size: 0.65rem;
+  color: #818cf8;
+  font-style: italic;
+}
+.locked-pairs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border, #2d3348);
+  padding-top: 10px;
+}
+.locked-pair-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 8px;
+  padding: 6px 10px;
+}
+.locked-pair-icon { color: #818cf8; flex-shrink: 0; }
+.locked-pair-names {
+  flex: 1;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--txt-1, #f0f4ff);
+}
+.locked-pair-remove {
+  background: none;
+  border: none;
+  color: var(--txt-3, #6b7280);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s;
+}
+.locked-pair-remove:hover { color: var(--error, #ef4444); }

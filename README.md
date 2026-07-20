@@ -1,110 +1,134 @@
-# 🎮 PadQ System – Match Manager
+# 🏓 PadQ — Real-Time Match Queue Manager
 
-A full-stack web application for organizing singles or doubles matches with a fair queue. Winners go to the back, losers to the front – or choose from four different match-making modes.
+PadQ is a real-time match queue manager for singles and doubles paddle/racket sports (pickleball, badminton, table tennis, padel). A host creates a session, adds players, and the app handles fair rotation across multiple queue modes. Viewers join via a 4-character room code to watch the session live, with no installation required on their end.
+
+**Live demo**: [pad-q.vercel.app](https://pad-q.vercel.app)
 
 ---
 
 ## 🎯 Features
 
-- **Singles / Doubles** – select your preferred game format  
-- **Player management** – add 5–24 players with a simple + button and list  
-- **Queue modes**:
-  - **Default** – winners to back, losers to front (classic)
-  - **Randomize** – shuffle the entire queue after every match
-  - **Tournament** – knockout bracket, winners advance, champions crowned
-  - **Play-all** – prevents the same pairing until all other combinations have been used
-- **Match history** – track results with timestamps (hide/show toggle)
-- **Dark mode** – sun/moon toggle in the top-right corner
-- **Responsive design** – works on mobile, tablet, and desktop
-- **Modern UI** – gradient background, pill-shaped buttons, smooth animations
+- **Singles or Doubles** — king-of-the-court singles, or doubles with an INIT → WINNERS → LOSERS rotation engine
+- **Four queue modes**:
+  - **Default** — winners stay on, losers rotate to the back
+  - **Tournament** — single/double-elimination bracket with auto-advancing winners
+  - **Play-All** — guarantees every possible pairing is played before any repeats
+  - **Skilled** — groups players into Beginner / Intermediate / Advanced brackets and auto-fills courts with skill-aware matchmaking
+- **Live viewer mode** — anyone with the room code (or a direct link) can watch the session update in real time, no account needed
+- **Multi-court support** — run several courts as linked sessions, with a read-only coordinator overlay showing all courts at once
+- **Club roster** — save regular players locally and bulk-add them to future sessions
+- **Match history & undo** — every result is logged with a timestamp; the most recent match can be undone
+- **Player sit-out & substitution** — temporarily bench a player or swap in a replacement for someone who's absent, without disrupting the queue
+- **Session recovery** — hosts get a one-time "session key" so they can reclaim host control if they lose their device session
+- **Dark mode** and a responsive layout for mobile, tablet, and desktop
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: React.js, Axios, React Router  
-- **Backend**: Python, Flask, Flask-CORS  
-- **Styling**: Custom CSS with CSS variables (light/dark themes)
+- **Framework**: Next.js 16.2.1 (App Router) + React 19
+- **Language**: TypeScript 5 (strict mode)
+- **Database**: Firebase Firestore — real-time sync, no backend server to run
+- **Styling**: Custom CSS with CSS variables (dark mode support) + Tailwind CSS 4 in a few places
+- **Other libraries**: `brackets-manager` (tournament bracket logic), `qrcode.react` (room-code QR codes), `lucide-react` (icons)
+
+There is no separate backend service — Firestore handles persistence and real-time sync directly from the client.
 
 ---
 
-## 🚀 Installation & Setup
+## 🚀 Getting Started
 
 ### 1. Clone the repository
 
-``bash
-git clone https://github.com/your-username/queue-system.git
-cd queue-system
+```bash
+git clone https://github.com/Sceyo/PadQ.git
+cd PadQ
+```
 
-### 2. Backend Setup
-- cd backend
-- python -m venv venv
-- source venv/bin/activate      # On Windows: venv\Scripts\activate
-- pip install flask flask-cors
-- python app.py
+### 2. Install dependencies
 
-The backend will run on:
-👉 http://localhost:5000
+```bash
+npm install
+```
 
-### 3. Frontend Setup
-- cd frontend
-- npm install
-- npm start
+### 3. Set up Firebase
 
-The frontend will open on:
-👉 http://localhost:3000
+PadQ uses Firestore only (no Firebase Auth or Storage). You'll need your own Firebase project:
+
+1. Create a project at [console.firebase.google.com](https://console.firebase.google.com)
+2. Enable **Firestore Database**
+3. Add a web app to the project and copy its config values
+4. Create a `.env.local` file in the project root with your Firebase web config (variable names depend on `lib/firebase.ts` — check that file for the exact keys it expects)
+5. Deploy the included security rules and indexes:
+
+```bash
+firebase deploy --only firestore:rules,firestore:indexes
+```
+
+> The repo includes `firestore.rules`, `firestore.indexes.json`, and `firebase.json`, pre-configured for the schema this app uses.
+
+### 4. Run the dev server
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+### Other scripts
+
+| Command | Description |
+|---|---|
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm run start` | Run the production build |
+| `npm run lint` | Run ESLint |
 
 ---
 
 ## 📖 Usage
-- Homepage – choose Singles or Doubles
-- Player Input – add names using the + button (min 5, max 24), then press Start
-- Queue Mode – select:
-  - Default
-  - Randomize
-  - Tournament
-  - Play-all
-- ▶️ Playing Matches
-  - Singles: Click the winner of the top two players
-  - Doubles:
-- Assign first four players into teams
-- Select the winning team
+
+1. **Host**: open the app, choose Singles or Doubles, add players (or pull them from your saved roster), and pick a queue mode
+2. **Start the session** — you'll get a 4-character room code and a one-time host recovery key (save this in case you need to reclaim host access later)
+3. **Share the room code or link** — viewers can follow along live from the `/watch/{sessionId}` page without needing to do anything else
+4. **Run matches** — record winners as games finish; the queue, brackets, or skill-based matchmaking update automatically
+5. **Manage live** — use sit-out, substitution, undo, and the coordinator overlay (for multi-court setups) as needed from the host menu
 
 ---
 
-## 📊 Other Features
-- Match History – shown on the right (toggle with Hide/Show History)
-- Dark Mode – toggle via sun/moon icon
-- Tournament Mode – auto-generated bracket, click winners to advance
-- Randomize – reshuffle queue or reseed tournament using 🎲 button
+## 📁 Project Structure
 
----
-
-## 📁 Folder Structure
-```bash
-queue-system/
-├── backend/
-│   ├── app.py               # Flask API endpoints
-│   └── requirements.txt
-└── frontend/
-    ├── public/
-    ├── src/
-    │   ├── App.js
-    │   ├── HomePage.js
-    │   ├── HomePage.css
-    │   ├── QueueSystem.js
-    │   ├── QueueSystem.css
-    │   └── index.js
-    └── package.json
 ```
+app/
+  page.tsx                  # Homepage — game mode selector, room code entry
+  queue/
+    page.tsx                # Main queue manager (host + viewer)
+    lib/                    # Queue engines (doubles, singles, skilled), types, utils
+    components/             # UI components (analytics, brackets, court cards, etc.)
+    context/                # Multi-court context provider
+  watch/[sessionId]/
+    page.tsx                # Read-only live viewer page
+hooks/
+  useSession.ts             # Firebase session lifecycle (create, join, sync)
+  useQueue.ts                # Local queue state + suggestions
+  useSessionAccess.ts        # Viewer PIN gate
+lib/
+  firebase.ts                # Firebase app + Firestore init
+  sessionService.ts          # All Firestore read/write operations
+```
+
+See `CLAUDE.md` in the repo root for a full architecture and data-flow breakdown.
+
 ---
 
-## 🔌 API Endpoints (Backend)
-| Method | Endpoint | Description |
-| --- | --- | --- |
-| POST	| /api/mode	| Set game mode | 
-| POST	| /api/players	| Upload player list |
-| GET	| /api/queue	| Get current queue |
-| POST	| /api/randomize	| Shuffle queue |
-| POST	| /api/match/singles	| Play singles match |
-| POST	| /api/match/doubles	| Play doubles match |
+## 🔒 Security Notes
+
+- Firestore security rules enforce a `hostToken` server-side for all writes — only the host who created a session can modify it
+- Sessions auto-expire after 30 minutes of inactivity (Firestore TTL on `lastActiveAt`)
+- An optional 4-character PIN can gate viewer access to a session
+
+---
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome. See `CLAUDE.md` for architecture details before making changes to the queue engines.

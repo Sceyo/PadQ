@@ -1,6 +1,6 @@
 'use client';
 
-import { Trophy } from 'lucide-react';
+import { Trophy, Pencil } from 'lucide-react';
 import type { CourtSlot } from '@/lib/sessionService';
 import type { PlayerStat } from '../../lib/types';
 import { PlayerLabel } from '../atoms/PlayerLabel';
@@ -11,9 +11,10 @@ interface Props {
   statsMap: Record<string, PlayerStat>;
   isHost: boolean;
   onWin: (courtId: string, side: 'A' | 'B') => void;
+  onEdit?: (courtId: string) => void;
 }
 
-export function CourtCard({ slot, statsMap, isHost, onWin }: Props) {
+export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
   const teamA = slot.onCourt.slice(0, 2);
   const teamB = slot.onCourt.slice(2, 4);
   const ready = slot.onCourt.length >= 4;
@@ -23,6 +24,15 @@ export function CourtCard({ slot, statsMap, isHost, onWin }: Props) {
       <div className={styles.header}>
         <span className={styles.courtName}>{slot.name}</span>
         {ready && <span className={styles.liveDot} />}
+        {isHost && ready && onEdit && (
+          <button
+            className={styles.editBtn}
+            onClick={() => onEdit(slot.id)}
+            title="Edit player positions"
+          >
+            <Pencil size={11} />
+          </button>
+        )}
       </div>
 
       {ready ? (

@@ -17,6 +17,24 @@
   gap: 8px;
 }
 
+.editBtn {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--txt-3);
+  padding: 3px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.editBtn:hover {
+  color: var(--txt-1);
+  border-color: var(--primary, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+}
+
 .courtName {
   font-size: 0.7rem;
   font-weight: 700;

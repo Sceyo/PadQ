@@ -140,15 +140,31 @@ const BracketSection: React.FC<{
                 const p1Won = m.winner === m.player1, p2Won = m.winner === m.player2;
                 return (
                   <div key={m.id} className={['bracket-match', m.winner ? 'bracket-match--done' : '', m.isBye ? 'bracket-match--bye' : '', bracketType === 'L' ? 'bracket-match--losers' : '', bracketType === 'GF' ? 'bracket-match--gf' : ''].filter(Boolean).join(' ')}>
-                    <div className={['bracket-player', p1Won ? 'bracket-player--winner' : m.winner ? 'bracket-player--loser' : ''].filter(Boolean).join(' ')}>
-                      <span>{m.player1 ?? <span className="bracket-tbd">TBD</span>}</span>
-                      {p1Won && <Check size={11} className="bracket-win-icon" />}
-                    </div>
-                    <div className="bracket-divider" />
-                    <div className={['bracket-player', p2Won ? 'bracket-player--winner' : m.winner ? 'bracket-player--loser' : ''].filter(Boolean).join(' ')}>
-                      <span>{m.isBye ? <span className="bracket-no-player">No Player</span> : m.player2 ?? <span className="bracket-tbd">TBD</span>}</span>
-                      {p2Won && <Check size={11} className="bracket-win-icon" />}
-                    </div>
+                    {m.isBye ? (
+                      <>
+                        <div className="bracket-player bracket-player--winner">
+                          <span>{m.player1 ?? <span className="bracket-tbd">TBD</span>}</span>
+                          <Check size={11} className="bracket-win-icon" />
+                        </div>
+                        <div className="bracket-divider" />
+                        <div className="bracket-bye-label">
+            
+                          <span className="bracket-bye-hint">advances</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className={['bracket-player', p1Won ? 'bracket-player--winner' : m.winner ? 'bracket-player--loser' : ''].filter(Boolean).join(' ')}>
+                          <span>{m.player1 ?? <span className="bracket-tbd">TBD</span>}</span>
+                          {p1Won && <Check size={11} className="bracket-win-icon" />}
+                        </div>
+                        <div className="bracket-divider" />
+                        <div className={['bracket-player', p2Won ? 'bracket-player--winner' : m.winner ? 'bracket-player--loser' : ''].filter(Boolean).join(' ')}>
+                          <span>{m.player2 ?? <span className="bracket-tbd">TBD</span>}</span>
+                          {p2Won && <Check size={11} className="bracket-win-icon" />}
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}

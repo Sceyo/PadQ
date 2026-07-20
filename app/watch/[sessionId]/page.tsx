@@ -336,12 +336,28 @@ function WatchPageContent() {
   }
 
   // ── What the viewer sees — mirrors the HOST's current view ─
-  // Guardrail: viewer cannot switch modes. They always see
-  // exactly what queueMode + tournamentActive dictates.
+  const isTournament  = session.queueMode === 'tournament' && session.tournamentActive;
+  const isSkilled     = session.queueMode === 'skilled';
+  const isMultiCourt  = (session.courtSlots ?? []).length > 0;
+  const queue         = session.queue ?? [];
+  const gameMode      = session.gameMode;
+  const courtSlots    = session.courtSlots ?? [];
 
-  const isTournament = session.queueMode === 'tournament' && session.tournamentActive;
-  const queue        = session.queue ?? [];
-  const gameMode     = session.gameMode;
+  // Deserialize doubles engine state for winners/losers cycle display (Issue #2)
+  let paddleStateForWatch: { phase: string; winnersPool: string[][]; losersPool: string[][]; playedThisCycle: Set<string> } | null = null;
+  if (session.doublesEngineState) {
+    try {
+      const raw = session.doublesEngineState as Record<string, unknown>;
+      paddleStateForWatch = {
+        phase:           (raw.phase as string) ?? 'INIT',
+        winnersPool:     ((raw.winnersPool as { a: string; b: string }[] | undefined) ?? []).map(p => [p.a, p.b]),
+        losersPool:      ((raw.losersPool  as { a: string; b: string }[] | undefined) ?? []).map(p => [p.a, p.b]),
+        playedThisCycle: new Set<string>((raw.playedThisCycle as string[] | undefined) ?? []),
+      };
+    } catch {
+      paddleStateForWatch = null;
+    }
+  }
 
   // Current match detection (same logic as host)
   const pendingTournamentMatch = isTournament
@@ -515,9 +531,138 @@ function WatchPageContent() {
         )}
 
         {/* ══════════════════════════════════════════════════
-            QUEUE VIEW (default / play-all)
+            SKILLED MODE VIEW
             ══════════════════════════════════════════════════ */}
-        {!isTournament && (
+        {!isTournament && isSkilled && (
+          <div className="w-section">
+            <h2 className="w-section-title"><Users size={16} /> Skilled Mode — Courts</h2>
+            {courtSlots.length > 0 ? (
+              <div className="w-courts-grid">
+                {courtSlots.map(slot => {
+                  const teamA = slot.onCourt.slice(0, 2);
+                  const teamB = slot.onCourt.slice(2, 4);
+                  const hasMatch = slot.onCourt.length >= 4;
+                  return (
+                    <div key={slot.id} className="w-court-card">
+                      <div className="w-court-name">{slot.name}</div>
+                      {hasMatch ? (
+                        <div className="w-vs-row">
+                          <span className="w-player-chip w-player-chip--team">{teamA.join(' & ')}</span>
+                          <span className="w-vs">VS</span>
+                          <span className="w-player-chip w-player-chip--team">{teamB.join(' & ')}</span>
+                        </div>
+                      ) : (
+                        <p className="w-muted">Waiting for players…</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="w-muted">Courts not yet assigned.</p>
+            )}
+            {queue.length > 0 && (
+              <div className="w-waiting-queue">
+                <h3 className="w-subsection-title">Waiting Queue</h3>
+                <div className="w-queue-chips">
+                  {queue.map((p, i) => (
+                    <span key={`wq-${i}-${p}`} className="w-queue-chip">
+                      <span className="w-queue-num">#{i + 1}</span> {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════
+            MULTI-COURT DOUBLES VIEW
+            ══════════════════════════════════════════════════ */}
+        {!isTournament && !isSkilled && isMultiCourt && gameMode === 'doubles' && (
+          <div className="w-section">
+            <h2 className="w-section-title"><Users size={16} /> Courts</h2>
+            <div className="w-courts-grid">
+              {courtSlots.map(slot => {
+                const teamA = slot.onCourt.slice(0, 2);
+                const teamB = slot.onCourt.slice(2, 4);
+                const hasMatch = slot.onCourt.length >= 4;
+                return (
+                  <div key={slot.id} className="w-court-card">
+                    <div className="w-court-name">{slot.name}</div>
+                    {hasMatch ? (
+                      <div className="w-vs-row">
+                        <span className="w-player-chip w-player-chip--team">{teamA.join(' & ')}</span>
+                        <span className="w-vs">VS</span>
+                        <span className="w-player-chip w-player-chip--team">{teamB.join(' & ')}</span>
+                      </div>
+                    ) : (
+                      <p className="w-muted">Waiting for players…</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {queue.length > 0 && (
+              <div className="w-waiting-queue">
+                <h3 className="w-subsection-title">Waiting Queue</h3>
+                <div className="w-queue-chips">
+                  {queue.map((p, i) => (
+                    <span key={`wq-${i}-${p}`} className="w-queue-chip">
+                      <span className="w-queue-num">#{i + 1}</span> {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════
+            WINNERS / LOSERS CYCLE (Issue #2)
+            Shows for any doubles non-tournament mode when
+            paddleState has been synced from the host.
+            ══════════════════════════════════════════════════ */}
+        {!isTournament && gameMode === 'doubles' && paddleStateForWatch && paddleStateForWatch.phase !== 'INIT' && (
+          <div className="w-section">
+            <h2 className="w-section-title">
+              {paddleStateForWatch.phase === 'WINNERS' ? '🏆 Winners Cycle' : '🔴 Losers Cycle'}
+            </h2>
+            <div className="w-cycle-pools">
+              {paddleStateForWatch.winnersPool.length > 0 && (
+                <div className="w-pool w-pool--winners">
+                  <span className="w-pool-tag">W</span>
+                  <div className="w-pool-pairs">
+                    {paddleStateForWatch.winnersPool.map((pair, i) => (
+                      <span key={`wp-${i}`} className={`w-pool-pair ${i === 0 ? 'w-pool-pair--active' : ''}`}>
+                        {pair.join(' & ')}
+                        {i === 0 && <span className="w-on-court-dot"> ▶</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {paddleStateForWatch.losersPool.length > 0 && (
+                <div className="w-pool w-pool--losers">
+                  <span className="w-pool-tag">L</span>
+                  <div className="w-pool-pairs">
+                    {paddleStateForWatch.losersPool.map((pair, i) => (
+                      <span key={`lp-${i}`} className={`w-pool-pair ${i === 0 ? 'w-pool-pair--active' : ''}`}>
+                        {pair.join(' & ')}
+                        {i === 0 && <span className="w-on-court-dot"> ▶</span>}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ══════════════════════════════════════════════════
+            QUEUE VIEW (default / play-all, single-court)
+            ══════════════════════════════════════════════════ */}
+        {!isTournament && !isSkilled && !isMultiCourt && (
           <>
             {/* Current match */}
             {currentSinglesMatch && (
@@ -642,7 +787,12 @@ function WatchPageContent() {
                     {(showAllHistory ? history : history.slice(0, 5)).map(e => (
                       <li key={e.id} className="w-history-item">
                         <span className="w-h-time">{e.timestamp}</span>
-                        <span className="w-h-match">{e.players}</span>
+                        <span className="w-h-match">
+                          {e.mode?.includes('(') && (
+                            <span className="w-h-court">{e.mode.match(/\(([^)]+)\)/)?.[1]}</span>
+                          )}
+                          {e.players}
+                        </span>
                         <span className="w-h-winner"><Trophy size={11} /> {e.winner}</span>
                         {e.score && <span className="w-h-score">{e.score}</span>}
                       </li>
