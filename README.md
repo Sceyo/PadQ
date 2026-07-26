@@ -62,7 +62,37 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 
 ## Product preview
 
-The repository currently contains the PAD-Q product logo shown above. Host, skilled-matchmaking, analytics, and spectator screenshots are planned for this section. The deployed application can be explored through the [live demo](https://pad-q.vercel.app).
+### Session entry
+
+![PAD-Q homepage with singles, doubles, and live-session options](public/screenshots/homepage.jpg)
+
+The homepage gives players and organizers direct access to singles, doubles, and spectator experiences.
+
+### Skilled matchmaking
+
+![PAD-Q skilled matchmaking court and waiting queue](public/screenshots/skilled.jpg)
+
+Skill-aware matchmaking groups players by ability while tracking the waiting queue and preventing smaller groups from being skipped indefinitely.
+
+### Host scoring
+
+![PAD-Q host scoreboard with configurable scoring](public/screenshots/scoreboard.jpg)
+
+The host can enable point-by-point scoring, select a target score, update either team, and record the winner from the same match view.
+
+### Live spectator view
+
+![PAD-Q spectator view showing a live score and waiting queue](public/screenshots/live.jpg)
+
+Spectators can follow the live score, current format, room status, active courts, and waiting queue without receiving host controls.
+
+### Multi-court management
+
+![PAD-Q three-court doubles session](public/screenshots/3courts.jpg)
+
+Multi-court sessions keep active matches visible together so a host can record results and continue player rotation across three courts.
+
+Explore the current build through the [live demo](https://pad-q.vercel.app).
 
 ## My role and ownership
 
@@ -260,7 +290,7 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 6. Improve offline behavior and visible connection recovery.
 7. Complete skilled-mode undo behavior and further separate page orchestration into focused controllers.
 8. Add CSV history export, roster import, and configurable singles streak limits.
-9. Add product screenshots and a short demonstration video.
+9. Add a short product demonstration video.
 
 ## Usage notice
 
@@ -272,4 +302,5 @@ This source-visible notice keeps ownership with the creator; it is not an open-s
 
 ## Contact
 
-LinkedIn and portfolio links will be added here when their final URLs are available.
+- [LinkedIn](https://www.linkedin.com/in/francis-aliser/)
+- [Portfolio](https://aliser-portfolio.vercel.app/)
