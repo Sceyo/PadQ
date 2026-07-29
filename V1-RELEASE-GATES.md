@@ -32,42 +32,45 @@ passing build alone is not a release approval.
       release window.
 - [ ] Smoke-test host and viewer access against the deployed rules.
 
-## Gate 1.5 — Selective three-court spectator synchronization
+## Gate 1.5 — Selective three-court spectator view
 
 **Status: Pending — V1 launch blocker**
 
-PADQ's central V1 promise is that players can see every court, choose the court
-they want to follow, see who plays next, see the upcoming court assignment, and
-review performance. The current single `liveScore` field does not provide three
-independent court scores.
+PADQ's central V1 promise is that players can see who is currently playing on
+every court, choose the court they want to focus on, see who plays next, see the
+upcoming court assignment, and review performance. Multi-court V1 intentionally
+does not synchronize point-by-point scores; the host records only the completed
+result so court operations remain practical and Firestore usage stays low.
 
-- [ ] Store Court 1, Court 2, and Court 3 live state independently under the
-      room, with one document per court.
-- [ ] Show a viewer court selector with lightweight summaries for all courts.
-- [ ] Subscribe each viewer to only the selected court's live-score document.
-- [ ] Unsubscribe from the previous court immediately when switching courts.
-- [ ] Keep the shared room listener for the queue, next-player order, and court
-      assignments.
+- [x] Keep Court 1, Court 2, and Court 3 assignments in the shared room state.
+- [x] Let the host see all three court cards and record a winner independently
+      for each completed court.
+- [ ] Show a viewer Court 1–3 selector with lightweight summaries for all courts.
+- [ ] Show the selected court's current players and match status without a
+      point-by-point scoreboard.
+- [ ] Keep one shared room listener for court assignments, the queue,
+      next-player order, and completed results.
 - [ ] Store compact performance summaries with the room and load detailed match
       history only when the viewer opens it.
-- [ ] Commit a finished score atomically to durable match history and the next
+- [ ] Commit a finished result atomically to durable match history and the next
       queue/court assignment.
-- [ ] Extend Firestore rules so only the host can update court scores while
-      authenticated viewers can read a known room's courts.
-- [ ] Add emulator tests for cross-room access, malformed scores, unauthorized
-      score updates, court switching, and atomic match completion.
+- [ ] Extend Firestore rules and tests for the final multi-court assignment and
+      performance-summary shape.
+- [ ] Add emulator tests for cross-room access, unauthorized assignment updates,
+      court switching, concurrent results, and atomic match completion.
 - [ ] Add UI tests for joining a room, choosing each court, switching courts,
       reconnecting, and viewing next-player and performance information.
 
 ### Gate 1.5 acceptance criteria
 
-- Three courts can show different matches and scores simultaneously.
-- A viewer choosing Court 3 receives Court 3 score changes without receiving
-  point-by-point changes from Courts 1 and 2.
+- Three courts can show different current matches simultaneously.
+- A viewer choosing Court 3 sees Court 3's current players and retains access to
+  the shared waiting queue and upcoming assignments.
 - Queue and court-assignment changes still reach every viewer.
 - A refresh or brief disconnection restores the correct selected-court state.
 - Completing two courts at nearly the same time does not lose a result or assign
   one player to two courts.
+- No point-by-point multi-court score writes are made to Firestore.
 
 ## Gate 2 — Free-tier capacity and real-life reliability
 
@@ -76,7 +79,7 @@ independent court scores.
 - [ ] Stress-test 30 players, 3 courts, and 30 viewer devices/tabs.
 - [ ] Verify partner requests keep both players together through waiting,
       assignment, completion, and requeueing.
-- [ ] Test simultaneous court completions, rapid score changes, duplicate taps,
+- [ ] Test simultaneous court completions, rapid result actions, duplicate taps,
       host refresh, viewer reconnect, court switching, late arrivals, sit-outs,
       substitutions, and one unavailable court.
 - [ ] Measure Firestore reads, writes, deletes, storage, and transfer rather than
@@ -100,7 +103,7 @@ independent court scores.
 - [x] Maximum 30 players and 3 courts.
 - [x] Room-code and QR spectator access.
 - [x] Partner queueing.
-- [ ] Selective Court 1–3 live scoring from Gate 1.5.
+- [ ] Selective Court 1–3 current-match viewing from Gate 1.5.
 - [ ] Shared next-player and court-assignment view.
 - [ ] Quota-efficient session performance summaries and match history.
 - [x] Host-only control and read-only viewers.
@@ -116,6 +119,8 @@ independent court scores.
 - [x] Firebase Storage uploads, Cloud Functions, Cloud Run, scheduled jobs,
       managed Firestore TTL, backups, and other billing-dependent services.
 - [x] Cross-room public leaderboards and deep live historical analytics.
+- [x] Point-by-point scoring for multi-court sessions.
+- [x] Delegated scorekeeper access from separate devices.
 
 ## Gate 4 — Release-candidate verification
 
@@ -140,9 +145,10 @@ independent court scores.
 - [ ] Deploy the approved Firestore rules and indexes.
 - [ ] Deploy the exact approved commit to Vercel production.
 - [ ] Run a host-to-viewer smoke test for all three courts.
-- [ ] Verify queue, partner, court assignment, scoring, history, and performance.
+- [ ] Verify queue, partner, current-court players, next assignment, completed
+      results, history, and performance.
 - [ ] Monitor Firebase and Vercel usage during the first live event.
-- [ ] Roll back immediately if ownership, score integrity, player assignment, or
+- [ ] Roll back immediately if ownership, result integrity, player assignment, or
       free-tier headroom fails.
 - [ ] Mark V1 released only after the first controlled event completes without a
       production-blocking incident.
