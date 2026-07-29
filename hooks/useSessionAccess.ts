@@ -34,14 +34,12 @@ export function useSessionAccess(sessionId: string): {
   access: AccessState;
   submitPin: (pin: string) => Promise<boolean>;
 } {
-  const [access,   setAccess]   = useState<AccessState>('checking');
+  const validSessionId = sessionId.length >= 4;
+  const [access,   setAccess]   = useState<AccessState>(validSessionId ? 'checking' : 'error');
   const [pinHash,  setPinHash]  = useState<string | null>(null);
 
   useEffect(() => {
-    if (!sessionId || sessionId.length < 4) {
-      setAccess('error');
-      return;
-    }
+    if (!validSessionId) return;
 
     loadSession(sessionId).then(data => {
       if (!data) {
@@ -64,7 +62,7 @@ export function useSessionAccess(sessionId: string): {
         setAccess('needs-pin');
       }
     }).catch(() => setAccess('error'));
-  }, [sessionId]);
+  }, [sessionId, validSessionId]);
 
   const submitPin = async (pin: string): Promise<boolean> => {
     if (!pinHash) return true;

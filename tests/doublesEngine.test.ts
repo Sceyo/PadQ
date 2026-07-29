@@ -121,7 +121,7 @@ describe('doublesEngine — advancePaddleState (INIT phase transition)', () => {
   });
 
   it('with exactly 4 players, transitions to WINNERS after just 1 match (floor(4/4)=1)', () => {
-    let state = freshPaddleState();
+    const state = freshPaddleState();
     const players = P(4);
     const m1 = buildNextMatch(state, players);
     const res = advancePaddleState(state, m1.teamA, m1.teamB, players);
@@ -142,7 +142,7 @@ describe('doublesEngine — advancePaddleState (INIT phase transition)', () => {
   });
 
   it('records all 4 played players into lastPlayedMap with the matchCount at time of play', () => {
-    let state = freshPaddleState();
+    const state = freshPaddleState();
     const players = P(4);
     const m1 = buildNextMatch(state, players);
     const res = advancePaddleState(state, m1.teamA, m1.teamB, players);
@@ -152,7 +152,7 @@ describe('doublesEngine — advancePaddleState (INIT phase transition)', () => {
   });
 
   it('winners go to w1 and losers go to l1 after a match', () => {
-    let state = freshPaddleState();
+    const state = freshPaddleState();
     const players = P(4);
     const m1 = buildNextMatch(state, players);
     const winnerTeam: Team = m1.teamA;
@@ -208,7 +208,7 @@ describe('doublesEngine — advancePaddleState (WINNERS -> LOSERS -> WINNERS cyc
 describe('doublesEngine — pool balancing (MAX_POOL_SIZE = 8)', () => {
   it('caps w1 at 8 and overflows the oldest entries into l1', () => {
     // Build a state where w1 already has 8 players, then advance with 2 more winners.
-    let state: PaddleState = {
+    const state: PaddleState = {
       ...freshPaddleState(),
       w1: P(8),
     };

@@ -241,9 +241,9 @@ function shuffleArray(arr: string[]): string[] {
 
 const EMPTY_RELATIONSHIPS: PlayAllRelationships = { teammates: {}, opponents: {} };
 
-export default function useQueue() {
+export default function useQueue(initialGameMode: 'singles' | 'doubles' | null = null) {
   const [state, setState] = useState<QueueState>({
-    gameMode: null,
+    gameMode: initialGameMode,
     players: [],
     queue: [],
   });
@@ -259,11 +259,18 @@ export default function useQueue() {
       try {
         const parsed = JSON.parse(stored);
         // Support old saves that don't have playAllRel yet
-        if (parsed.playAllRel) setPlayAllRel(parsed.playAllRel);
         // Strip playAllRel before setting queue state
-        const { playAllRel: _ignored, ...queueState } = parsed;
-        setState(queueState);
-      } catch (e) {
+        const { playAllRel: storedRelationships, ...queueState } = parsed;
+        queueMicrotask(() => {
+          if (storedRelationships) setPlayAllRel(storedRelationships);
+          setState(prev => ({
+            ...queueState,
+            // An explicit /queue?mode= route may have updated gameMode while
+            // storage was being restored. Never overwrite that newer choice.
+            gameMode: prev.gameMode ?? queueState.gameMode,
+          }));
+        });
+      } catch {
         console.error('Failed to parse stored queue state');
       }
     }

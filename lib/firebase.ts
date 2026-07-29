@@ -19,6 +19,7 @@
 // ═══════════════════════════════════════════════════════════
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, signInAnonymously, type User } from 'firebase/auth';
 import { getFirestore, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -32,6 +33,21 @@ const firebaseConfig = {
 
 // Prevent re-initializing on hot-reload in Next.js dev mode
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+export const auth = getAuth(app);
+let signInPromise: Promise<User> | null = null;
+
+/** Ensure every client has an identity before it accesses Firestore. */
+export async function ensureAuthenticated(): Promise<User> {
+  await auth.authStateReady();
+  if (auth.currentUser) return auth.currentUser;
+  if (!signInPromise) {
+    signInPromise = signInAnonymously(auth)
+      .then(credential => credential.user)
+      .finally(() => { signInPromise = null; });
+  }
+  return signInPromise;
+}
 
 // Use experimentalForceLongPolling to suppress "WebChannelConnection
 // RPC 'Listen' stream transport errored" in dev and on some networks.

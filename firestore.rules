@@ -1,17 +1,117 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /sessions/{sessionId} {
-      allow read: if true;
-      allow create: if true;
-      allow update: if request.resource.data.hostToken == resource.data.hostToken;
-      allow delete: if request.resource.data.hostToken == resource.data.hostToken;
+    function signedIn() {
+      return request.auth != null;
+    }
 
-      match /history/{entry} {
-        allow read: if true;
-        allow write: if request.resource.data.hostToken ==
-          get(/databases/$(database)/documents/sessions/$(sessionId)).data.hostToken;
+    function ownsSession() {
+      return signedIn() && resource.data.hostUid == request.auth.uid;
+    }
+
+    function validSessionShape(data) {
+      return data.keys().hasAll([
+          'hostUid', 'revision', 'gameMode', 'queueMode', 'elimType',
+          'players', 'queue', 'playAllRel', 'tournamentMatches',
+          'tournamentActive', 'tournamentWinner', 'createdAt', 'updatedAt',
+          'lastActiveAt'
+        ])
+        && data.keys().hasOnly([
+          'hostUid', 'revision', 'gameMode', 'queueMode', 'elimType',
+          'players', 'queue', 'playAllRel', 'tournamentMatches',
+          'tournamentActive', 'tournamentWinner', 'liveScore', 'isLive',
+          'accessPin', 'courtName', 'doublesEngineState', 'singlesEngineState',
+          'courtSlots', 'lockedPartners', 'sittingOut',
+          'createdAt', 'updatedAt', 'lastActiveAt'
+        ])
+        && data.hostUid is string && data.hostUid.size() <= 128
+        && data.revision is int && data.revision >= 0
+        && data.gameMode in ['singles', 'doubles']
+        && data.queueMode in ['default', 'tournament', 'playall', 'skilled']
+        && data.elimType in ['single', 'double']
+        && data.players is list && data.players.size() <= 100
+        && data.queue is list && data.queue.size() <= 100
+        && data.playAllRel is map && data.playAllRel.size() <= 100
+        && data.tournamentMatches is list && data.tournamentMatches.size() <= 256
+        && data.tournamentActive is bool
+        && (data.tournamentWinner == null || (data.tournamentWinner is string && data.tournamentWinner.size() <= 200))
+        && data.get('isLive', false) is bool
+        && (data.get('accessPin', null) == null || (data.accessPin is string && data.accessPin.size() <= 4))
+        && data.get('courtName', '') is string && data.get('courtName', '').size() <= 60
+        && (data.get('liveScore', null) == null || data.liveScore is map)
+        && (data.get('doublesEngineState', null) == null || data.doublesEngineState is map)
+        && (data.get('singlesEngineState', null) == null || data.singlesEngineState is map)
+        && data.get('courtSlots', []) is list && data.get('courtSlots', []).size() <= 6
+        && data.get('lockedPartners', []) is list && data.get('lockedPartners', []).size() <= 50
+        && data.get('sittingOut', []) is list && data.get('sittingOut', []).size() <= 100
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.lastActiveAt is timestamp;
+    }
+
+    function validHistory(data, entryId) {
+      return data.keys().hasAll([
+          'id', 'mode', 'players', 'winner', 'timestamp', 'commandId', 'revision'
+        ])
+        && data.keys().hasOnly([
+          'id', 'mode', 'players', 'winner', 'score', 'timestamp',
+          'commandId', 'revision'
+        ])
+        && data.id is int
+        && data.mode is string && data.mode.size() <= 80
+        && data.players is string && data.players.size() <= 500
+        && data.winner is string && data.winner.size() <= 200
+        && data.get('score', '') is string && data.get('score', '').size() <= 40
+        && data.timestamp is string && data.timestamp.size() <= 80
+        && data.commandId is string && data.commandId == entryId
+        && data.commandId.size() <= 64
+        && data.revision is int && data.revision > 0;
+    }
+
+    match /sessions/{sessionId} {
+      // Room codes are capabilities for viewing, but every client must at least
+      // have a valid Firebase identity. Host-only fields are not secrets.
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.revision == 0
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastActiveAt == request.time
+        && validSessionShape(request.resource.data);
+
+      allow update: if ownsSession()
+        && request.resource.data.hostUid == resource.data.hostUid
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.revision >= resource.data.revision
+        && request.resource.data.revision <= resource.data.revision + 1
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.lastActiveAt == request.time
+        && validSessionShape(request.resource.data);
+
+      allow delete: if ownsSession();
+
+      match /history/{entryId} {
+        function parent() {
+          return /databases/$(database)/documents/sessions/$(sessionId);
+        }
+
+        function parentOwned() {
+          return signedIn() && get(parent()).data.hostUid == request.auth.uid;
+        }
+
+        allow read: if signedIn() && exists(parent());
+        allow create: if parentOwned()
+          && validHistory(request.resource.data, entryId)
+          && getAfter(parent()).data.revision == request.resource.data.revision;
+        allow update: if false;
+        allow delete: if parentOwned();
       }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }

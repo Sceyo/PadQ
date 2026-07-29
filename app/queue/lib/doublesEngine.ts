@@ -1,7 +1,6 @@
-import { shuffleArray } from './playerUtils';
-
 export type CyclePhase = 'INIT' | 'WINNERS' | 'LOSERS';
 export type Team = [string, string];
+export type LockedPartnerPair = [string, string];
 
 export interface Match {
   teamA: Team;
@@ -27,8 +26,6 @@ const RECENT_PAIRS_CAP    = 6;
 const RECENT_MATCHES_CAP  = 4;
 const SELECTION_WINDOW    = 8;
 const MAX_POOL_SIZE        = 8;
-const MAX_SHUFFLE_ATTEMPTS = 6;
-
 const PENALTY_REPEAT_PAIR    = 3;
 const PENALTY_REPEAT_MATCH   = 5;
 const PENALTY_FATIGUE        = 2;
@@ -256,6 +253,7 @@ export function buildNextMatch(
   skillMap: Record<string, number> = {},
 ): Match {
   const lastMatchPlayers = lastMatchPlayerSet(state.recentMatches);
+  const eligible = new Set(allPlayers);
 
   if (state.phase === 'INIT') {
     const base = state.matchIndexInPhase * 4;
@@ -269,9 +267,12 @@ export function buildNextMatch(
   }
 
   if (state.phase === 'WINNERS') {
-    let candidates = [...state.w1];
+    let candidates = state.w1.filter(p => eligible.has(p));
     if (candidates.length < 4) {
-      candidates = [...candidates, ...state.l1.slice(0, 4 - candidates.length)];
+      candidates = [
+        ...candidates,
+        ...state.l1.filter(p => eligible.has(p)).slice(0, 4 - candidates.length),
+      ];
     }
     if (candidates.length < 4) return fallbackMatch(candidates);
     const selected = smartSelectPool(candidates, state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap);
@@ -279,9 +280,12 @@ export function buildNextMatch(
     return formTeams(selected[0], selected[1], selected[2], selected[3], state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap);
   }
 
-  let candidates = [...state.l1];
+  let candidates = state.l1.filter(p => eligible.has(p));
   if (candidates.length < 4) {
-    candidates = [...candidates, ...state.w1.slice(0, 4 - candidates.length)];
+    candidates = [
+      ...candidates,
+      ...state.w1.filter(p => eligible.has(p)).slice(0, 4 - candidates.length),
+    ];
   }
   if (candidates.length < 4) return fallbackMatch(candidates);
   const selected = smartSelectPool(candidates, state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap);
@@ -443,4 +447,129 @@ export function deserializePaddleState(s: SerializablePaddleState): PaddleState 
     winnersPool: s.winnersPool.map(t => [t.a, t.b] as Team),
     losersPool:  s.losersPool.map(t => [t.a, t.b] as Team),
   };
+}
+
+export interface PartnerAwareSelection {
+  onCourt: string[];
+  waiting: string[];
+}
+
+/**
+ * Select four players without ever splitting an available locked pair.
+ * The ranked input comes from the paddle engine, so among valid four-player
+ * combinations we keep the one with the lowest aggregate queue position.
+ */
+export function selectPartnerAwareMatch(
+  rankedPlayers: string[],
+  lockedPairs: LockedPartnerPair[],
+): PartnerAwareSelection {
+  const players = rankedPlayers.filter((player, index, all) =>
+    player.length > 0 && all.indexOf(player) === index
+  );
+  const playerSet = new Set(players);
+  const partnerOf = new Map<string, string>();
+
+  for (const [a, b] of lockedPairs) {
+    if (a === b || !playerSet.has(a) || !playerSet.has(b)) continue;
+    if (partnerOf.has(a) || partnerOf.has(b)) continue;
+    partnerOf.set(a, b);
+    partnerOf.set(b, a);
+  }
+
+  const consumed = new Set<string>();
+  const units: string[][] = [];
+  for (const player of players) {
+    if (consumed.has(player)) continue;
+    const partner = partnerOf.get(player);
+    if (partner) {
+      const pair = [player, partner].sort(
+        (a, b) => players.indexOf(a) - players.indexOf(b)
+      );
+      units.push(pair);
+      consumed.add(player);
+      consumed.add(partner);
+    } else {
+      units.push([player]);
+      consumed.add(player);
+    }
+  }
+
+  let bestUnits: string[][] | null = null;
+  let bestScore = Number.POSITIVE_INFINITY;
+  const search = (index: number, chosen: string[][], size: number) => {
+    if (size === 4) {
+      // A locked pair owns one queue position: the position of whichever
+      // partner has waited longest. Charging both player indices would make a
+      // pair with one late-listed member starve behind four single players.
+      const score = chosen.reduce(
+        (sum, unit) => sum + Math.min(...unit.map(p => players.indexOf(p))),
+        0,
+      );
+      if (score < bestScore) {
+        bestScore = score;
+        bestUnits = [...chosen];
+      }
+      return;
+    }
+    if (size > 4 || index >= units.length) return;
+    search(index + 1, [...chosen, units[index]], size + units[index].length);
+    search(index + 1, chosen, size);
+  };
+  search(0, [], 0);
+
+  // Fewer than four eligible players: preserve atomicity and return the
+  // earliest units that fit, allowing callers to show an incomplete court.
+  const selectedUnits: string[][] = bestUnits ?? [];
+  if (!bestUnits) {
+    let size = 0;
+    for (const unit of units) {
+      if (size + unit.length > 4) continue;
+      selectedUnits.push(unit);
+      size += unit.length;
+    }
+  }
+
+  const selected = new Set(selectedUnits.flat());
+  const lockedTeams = selectedUnits.filter(unit => unit.length === 2);
+  const singles = selectedUnits.filter(unit => unit.length === 1).flat();
+  const onCourt = lockedTeams.length === 0
+    ? players.filter(p => selected.has(p))
+    : [...lockedTeams.flat(), ...singles];
+
+  return {
+    onCourt,
+    waiting: players.filter(p => !selected.has(p)),
+  };
+}
+
+export function seedMultiCourtDoubles(
+  players: string[],
+  courtCount: number,
+  lockedPairs: LockedPartnerPair[],
+): { courts: string[][]; waiting: string[] } {
+  const courts: string[][] = [];
+  let waiting = [...players];
+  for (let i = 0; i < courtCount; i += 1) {
+    const selection = selectPartnerAwareMatch(waiting, lockedPairs);
+    courts.push(selection.onCourt);
+    waiting = selection.waiting;
+  }
+  return { courts, waiting };
+}
+
+/**
+ * Rotate one independently finishing court through a shared FIFO bench.
+ * Finishers go to the back; locked pairs remain one indivisible queue unit.
+ */
+export function rotateMultiCourtDoubles(
+  waitingPlayers: string[],
+  finishedPlayers: string[],
+  lockedPairs: LockedPartnerPair[],
+): PartnerAwareSelection {
+  const finishedSet = new Set(finishedPlayers);
+  const ranked = [
+    ...waitingPlayers.filter(player => !finishedSet.has(player)),
+    ...finishedPlayers,
+  ];
+  return selectPartnerAwareMatch(ranked, lockedPairs);
 }

@@ -234,7 +234,7 @@ describe('skilledMatchmakingEngine — rotatePlayers (rest pool routing)', () =>
 describe('skilledMatchmakingEngine — reassignCourt', () => {
   it('fills an idle court from the skill queue when enough players are available', () => {
     const players = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7', 'P8'];
-    let state = initSkilledState(players, brackets(players, [], []), courts(1));
+    const state = initSkilledState(players, brackets(players, [], []), courts(1));
     // Court is full from init; simulate it finishing and reassign with remaining waiting players.
     const next = reassignCourt('c1', state, brackets(players, [], []));
     expect(next.courts[0].players).toHaveLength(4);
@@ -242,7 +242,7 @@ describe('skilledMatchmakingEngine — reassignCourt', () => {
 
   it('increments idleCycles when no group can be formed (not enough players left)', () => {
     const players = ['P1', 'P2', 'P3', 'P4'];
-    let state = initSkilledState(players, brackets(players, [], []), courts(1));
+    const state = initSkilledState(players, brackets(players, [], []), courts(1));
     // skillQueue is now empty (all 4 on court). Reassigning with nothing left should mark idle.
     const next = reassignCourt('c1', state, brackets(players, [], []));
     expect(next.courts[0].players).toEqual([]);

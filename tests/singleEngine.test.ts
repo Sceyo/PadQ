@@ -232,7 +232,7 @@ describe('singleEngine — addPlayerToSinglesWaiting', () => {
 
 describe('singleEngine — newQueue output shape', () => {
   it('newQueue puts the king first when a king exists', () => {
-    let s = freshSinglesState(P(4));
+    const s = freshSinglesState(P(4));
     const { newQueue } = advanceSinglesState(s, 'P1', P(4));
     expect(newQueue[0]).toBe('P1');
   });
@@ -240,7 +240,7 @@ describe('singleEngine — newQueue output shape', () => {
   it('newQueue has no king prefix on the very first (init) advance if king ends up null (defensive — should not happen, but verifying contract)', () => {
     // This test documents existing behavior: after the init match, king is always
     // set to the winner, so newQueue[0] should always be a real name post-init.
-    let s = freshSinglesState(P(4));
+    const s = freshSinglesState(P(4));
     const { newQueue } = advanceSinglesState(s, 'P2', P(4));
     expect(newQueue[0]).toBe('P2');
   });

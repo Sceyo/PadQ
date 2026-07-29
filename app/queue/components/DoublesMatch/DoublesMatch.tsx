@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Swords, Sparkles, Trophy, Play, UserX } from 'lucide-react';
 import type { PlayerStat } from '../../lib/types';
 import type { LiveScoreState } from '@/lib/sessionService';
@@ -19,19 +19,18 @@ export const DoublesMatch: React.FC<{
   viewerScore?:     LiveScoreState | null;
   onMarkAbsent?:    (player: string) => void;
 }> = ({ firstFour, suggestedTeamA, suggestedTeamB, playAllScore, statsMap, isHost, onMatch, onScoreChange, viewerScore, onMarkAbsent }) => {
-  const [teamA, setTeamA] = useState<string[]>([]);
-  const [teamB, setTeamB] = useState<string[]>([]);
+  const [teamA, setTeamA] = useState<string[]>(() =>
+    firstFour.length === 4
+      ? (suggestedTeamA ? [...suggestedTeamA] : [firstFour[0], firstFour[1]])
+      : []
+  );
+  const [teamB, setTeamB] = useState<string[]>(() =>
+    firstFour.length === 4
+      ? (suggestedTeamB ? [...suggestedTeamB] : [firstFour[2], firstFour[3]])
+      : []
+  );
   const [winner, setWinner] = useState<'A' | 'B' | null>(null);
   const [pendingScore, setPendingScore] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    if (firstFour.length !== 4) { setTeamA([]); setTeamB([]); }
-    else {
-      setTeamA(suggestedTeamA ? [...suggestedTeamA] : [firstFour[0], firstFour[1]]);
-      setTeamB(suggestedTeamB ? [...suggestedTeamB] : [firstFour[2], firstFour[3]]);
-    }
-    setWinner(null); setPendingScore(undefined);
-  }, [firstFour, suggestedTeamA, suggestedTeamB]);
 
   const toggle = (p: string) => {
     if (!isHost) return;

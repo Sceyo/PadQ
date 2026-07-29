@@ -368,7 +368,7 @@ export function rotatePlayers(
 
   // Tick the rest pool — graduate players whose rest is done
   const stillResting: RestEntry[] = [];
-  let sq = {
+  const sq = {
     beginner:     [...state.skillQueue.beginner],
     intermediate: [...state.skillQueue.intermediate],
     advanced:     [...state.skillQueue.advanced],
@@ -529,7 +529,7 @@ export function recalculateRest(
 
   // Flush the rest pool if rest just became impossible
   if (!restEnabled && state.restPool.length > 0) {
-    let sq = {
+    const sq = {
       beginner:     [...s.skillQueue.beginner],
       intermediate: [...s.skillQueue.intermediate],
       advanced:     [...s.skillQueue.advanced],
@@ -610,7 +610,7 @@ export function fillIdleCourts(
       const earlyNames = earlyOnes.map(e => e.name);
       const newRest    = s.restPool.filter(e => !earlyNames.includes(e.name));
 
-      let tempSq = {
+      const tempSq = {
         beginner:     [...s.skillQueue.beginner],
         intermediate: [...s.skillQueue.intermediate],
         advanced:     [...s.skillQueue.advanced],

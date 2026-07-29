@@ -77,7 +77,7 @@ export function advanceSinglesState(
   allPlayers: string[],
 ): { nextState: SinglesState; newQueue: string[] } {
   let nextQueue   = [...state.queue, ...state.waitingQueue];
-  let nextWaiting: string[] = [];
+  const nextWaiting: string[] = [];
 
   const match     = buildSinglesMatch(state);
   const loser     = match.playerA === winner ? match.playerB : match.playerA;
@@ -96,7 +96,7 @@ export function advanceSinglesState(
   const nextPlayedThisCycle = allHavePlayed ? new Set<string>() : newPlayed;
 
   let nextKing: string | null;
-  let nextWinStreak: Record<string, number> = { ...state.winStreak };
+  const nextWinStreak: Record<string, number> = { ...state.winStreak };
 
   if (wasInit) {
     nextQueue = nextQueue.filter(p => p !== match.playerA && p !== match.playerB);

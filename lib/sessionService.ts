@@ -22,14 +22,13 @@ import {
   runTransaction,
   serverTimestamp,
   collection,
-  addDoc,
   query,
   orderBy,
   limit,
   Unsubscribe,
   Timestamp,
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, ensureAuthenticated } from './firebase';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -40,7 +39,8 @@ export interface MatchHistoryEntry {
   winner: string;
   score?: string;
   timestamp: string;
-  hostToken?: string;   // attached server-side for rule validation
+  commandId?: string;
+  revision?: number;
 }
 
 export interface TournamentMatch {
@@ -72,7 +72,8 @@ export interface LiveScoreState {
  * All fields are optional so partial updates work cleanly.
  */
 export interface SessionDoc {
-  hostToken: string;
+  hostUid: string;
+  revision: number;
   gameMode: 'singles' | 'doubles';
   queueMode: 'default' | 'tournament' | 'playall' | 'skilled';
   elimType: 'single' | 'double';
@@ -109,6 +110,8 @@ export interface SessionDoc {
    * When undefined, the session runs in single-court mode.
    */
   courtSlots?: CourtSlot[];
+  /** Firestore-safe partner pairs (nested arrays are not supported). */
+  lockedPartners?: Array<{ a: string; b: string }>;
   sittingOut?: string[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
@@ -143,27 +146,27 @@ const sessionRef = (id: string) => doc(db, 'sessions', id);
 /**
  * createSession
  * Called when the host clicks "Start Queue".
- * Returns { sessionId, hostToken } — host saves both to localStorage.
+ * Returns the room code; Firebase Auth persistence proves host ownership.
  */
 export async function createSession(
-  data: Omit<SessionDoc, 'hostToken' | 'createdAt' | 'updatedAt' | 'lastActiveAt'>,
-): Promise<{ sessionId: string; hostToken: string }> {
+  data: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt' | 'lastActiveAt'>,
+): Promise<{ sessionId: string }> {
+  const user = await ensureAuthenticated();
   let sessionId = generateRoomCode();
   while ((await getDoc(sessionRef(sessionId))).exists()) {
     sessionId = generateRoomCode();
   }
-  const hostToken  = generateId();
-
   await setDoc(sessionRef(sessionId), {
     ...data,
-    hostToken,
+    hostUid: user.uid,
+    revision: 0,
     isLive:       false,           // ← host must explicitly go live
     createdAt:    serverTimestamp(),
     updatedAt:    serverTimestamp(),
     lastActiveAt: serverTimestamp(),
   });
 
-  return { sessionId, hostToken };
+  return { sessionId };
 }
 
 /**
@@ -172,6 +175,7 @@ export async function createSession(
  * Returns null if the session doesn't exist.
  */
 export async function loadSession(sessionId: string): Promise<SessionDoc | null> {
+  await ensureAuthenticated();
   const snap = await getDoc(sessionRef(sessionId));
   return snap.exists() ? (snap.data() as SessionDoc) : null;
 }
@@ -184,18 +188,17 @@ export async function loadSession(sessionId: string): Promise<SessionDoc | null>
  */
 export async function updateSession(
   sessionId: string,
-  hostToken: string,
-  patch: Partial<Omit<SessionDoc, 'hostToken' | 'createdAt'>>,
+  patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>,
 ): Promise<void> {
+  await ensureAuthenticated();
   try {
     await updateDoc(sessionRef(sessionId), {
       ...patch,
-      hostToken,
       updatedAt:    serverTimestamp(),
       lastActiveAt: serverTimestamp(),   // ← resets TTL countdown on every host write
     });
-  } catch (err: any) {
-    if (err?.code === 'failed-precondition') return;
+  } catch (err: unknown) {
+    if ((err as { code?: string })?.code === 'failed-precondition') return;
     throw err;
   }
 }
@@ -214,10 +217,11 @@ export async function updateSession(
  */
 export async function updateQueueSafely(
   sessionId: string,
-  hostToken: string,
+  expectedRevision: number,
   updater: (current: Pick<SessionDoc, 'queue' | 'players' | 'tournamentMatches'>) =>
     Partial<SessionDoc>,
-): Promise<void> {
+): Promise<number> {
+  const user = await ensureAuthenticated();
   const ref = sessionRef(sessionId);
 
   try {
@@ -226,7 +230,10 @@ export async function updateQueueSafely(
       if (!snap.exists()) throw new Error('Session not found');
 
       const current = snap.data() as SessionDoc;
-      if (current.hostToken !== hostToken) throw new Error('Not the host');
+      if (current.hostUid !== user.uid) throw new Error('Not the host');
+      if (current.revision !== expectedRevision) {
+        throw new StaleSessionRevisionError(expectedRevision, current.revision);
+      }
 
       const patch = updater({
         queue:             current.queue,
@@ -236,16 +243,20 @@ export async function updateQueueSafely(
 
       tx.update(ref, {
         ...patch,
-        hostToken,
+        revision: expectedRevision + 1,
         updatedAt:    serverTimestamp(),
         lastActiveAt: serverTimestamp(),   // ← resets TTL countdown
       });
+      return expectedRevision + 1;
     });
-  } catch (err: any) {
+    return expectedRevision + 1;
+  } catch (err: unknown) {
     // Silently ignore optimistic concurrency conflicts — the real-time
     // listener (onSnapshot) will reconcile state automatically.
     // Any other error (auth, network) is re-thrown.
-    if (err?.code === 'failed-precondition') return;
+    if ((err as { code?: string })?.code === 'failed-precondition') {
+      throw new StaleSessionRevisionError(expectedRevision, expectedRevision + 1);
+    }
     throw err;
   }
 }
@@ -258,9 +269,9 @@ export async function updateQueueSafely(
  */
 export async function addHistoryEntry(
   sessionId: string,
-  hostToken: string,
-  entry: Omit<MatchHistoryEntry, 'hostToken'>,
+  entry: MatchHistoryEntry,
 ): Promise<void> {
+  await ensureAuthenticated();
   const histRef = collection(db, 'sessions', sessionId, 'history');
   // Build a clean object with no undefined values
   const clean: Record<string, unknown> = {
@@ -269,11 +280,37 @@ export async function addHistoryEntry(
     players:   entry.players,
     winner:    entry.winner,
     timestamp: entry.timestamp,
-    hostToken,
   };
   // Only include score if it's actually set
   if (entry.score !== undefined) clean.score = entry.score;
-  await addDoc(histRef, clean);
+  await setDoc(doc(histRef, entry.commandId ?? generateId()), clean);
+}
+
+/** Revision-checked update for fields that can change the next match assignment. */
+export async function updateSessionSafely(
+  sessionId: string,
+  expectedRevision: number,
+  patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>,
+): Promise<number> {
+  const user = await ensureAuthenticated();
+  return runTransaction(db, async tx => {
+    const ref = sessionRef(sessionId);
+    const snap = await tx.get(ref);
+    if (!snap.exists()) throw new Error('Session not found');
+    const current = snap.data() as SessionDoc;
+    if (current.hostUid !== user.uid) throw new Error('Not the host');
+    if (current.revision !== expectedRevision) {
+      throw new StaleSessionRevisionError(expectedRevision, current.revision);
+    }
+    const nextRevision = expectedRevision + 1;
+    tx.update(ref, {
+      ...patch,
+      revision: nextRevision,
+      updatedAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
+    });
+    return nextRevision;
+  });
 }
 
 /**
@@ -284,35 +321,53 @@ export async function addHistoryEntry(
  * history entry. Replaces the two-step updateQueueSafely + addHistoryEntry
  * pattern used in commitMatchResult.
  */
+export class StaleSessionRevisionError extends Error {
+  constructor(public expected: number, public actual: number) {
+    super(`Session changed before this result was saved (expected revision ${expected}, found ${actual})`);
+    this.name = 'StaleSessionRevisionError';
+  }
+}
+
+export type CommitMatchResult = { status: 'committed' | 'duplicate'; revision: number };
+
 export async function batchMatchResult(
   sessionId: string,
-  hostToken: string,
-  patch: Partial<Omit<SessionDoc, 'hostToken' | 'createdAt'>>,
-  entry: Omit<MatchHistoryEntry, 'hostToken'>,
-): Promise<void> {
-  const batch  = writeBatch(db);
+  expectedRevision: number,
+  commandId: string,
+  patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>,
+  entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>,
+): Promise<CommitMatchResult> {
+  const user = await ensureAuthenticated();
   const sRef   = sessionRef(sessionId);
-  const hRef   = doc(collection(db, 'sessions', sessionId, 'history'));
+  const hRef   = doc(db, 'sessions', sessionId, 'history', commandId);
 
-  batch.update(sRef, {
-    ...patch,
-    hostToken,
-    updatedAt:    serverTimestamp(),
-    lastActiveAt: serverTimestamp(),
+  return runTransaction(db, async tx => {
+    const sessionSnap = await tx.get(sRef);
+    const historySnap = await tx.get(hRef);
+    if (!sessionSnap.exists()) throw new Error('Session not found');
+    const current = sessionSnap.data() as SessionDoc;
+    if (current.hostUid !== user.uid) throw new Error('Not the host');
+    if (historySnap.exists()) return { status: 'duplicate', revision: current.revision };
+    if (current.revision !== expectedRevision) {
+      throw new StaleSessionRevisionError(expectedRevision, current.revision);
+    }
+
+    const nextRevision = expectedRevision + 1;
+    tx.update(sRef, {
+      ...patch,
+      revision: nextRevision,
+      updatedAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
+    });
+    const clean: Record<string, unknown> = {
+      id: entry.id, mode: entry.mode, players: entry.players,
+      winner: entry.winner, timestamp: entry.timestamp,
+      commandId, revision: nextRevision,
+    };
+    if (entry.score !== undefined) clean.score = entry.score;
+    tx.set(hRef, clean);
+    return { status: 'committed', revision: nextRevision };
   });
-
-  const clean: Record<string, unknown> = {
-    id:        entry.id,
-    mode:      entry.mode,
-    players:   entry.players,
-    winner:    entry.winner,
-    timestamp: entry.timestamp,
-    hostToken,
-  };
-  if (entry.score !== undefined) clean.score = entry.score;
-  batch.set(hRef, clean);
-
-  await batch.commit();
 }
 
 /**
@@ -323,11 +378,11 @@ export async function batchMatchResult(
  */
 export async function touchSession(
   sessionId: string,
-  hostToken: string,
 ): Promise<void> {
   try {
+    await ensureAuthenticated();
     await updateDoc(sessionRef(sessionId), {
-      hostToken,
+      updatedAt: serverTimestamp(),
       lastActiveAt: serverTimestamp(),
     });
   } catch {
@@ -343,14 +398,10 @@ export async function touchSession(
  */
 export async function deleteSession(
   sessionId: string,
-  hostToken: string,
 ): Promise<void> {
-  // Firestore delete rule requires hostToken in the request —
-  // we do a final update (which validates hostToken) then delete.
-  // The rules allow delete if request.resource.data.hostToken matches,
-  // so we use updateDoc first to confirm identity, then deleteDoc.
+  // Firestore rules validate the current authenticated UID against hostUid.
   try {
-    await updateDoc(sessionRef(sessionId), { hostToken, lastActiveAt: serverTimestamp() });
+    await ensureAuthenticated();
     await deleteDoc(sessionRef(sessionId));
   } catch {
     // If already deleted, ignore
@@ -365,10 +416,10 @@ export async function deleteSession(
  */
 export async function clearHistory(
   sessionId: string,
-  hostToken: string,
 ): Promise<void> {
+  const user = await ensureAuthenticated();
   const sessionSnap = await getDoc(sessionRef(sessionId));
-  if (sessionSnap.exists() && (sessionSnap.data() as SessionDoc).hostToken !== hostToken) {
+  if (sessionSnap.exists() && (sessionSnap.data() as SessionDoc).hostUid !== user.uid) {
     throw new Error('Not the host');
   }
   const histRef = collection(db, 'sessions', sessionId, 'history');
@@ -385,6 +436,7 @@ export async function clearHistory(
  * Used by the undo feature to roll back the last match result.
  */
 export async function deleteLatestHistoryEntry(sessionId: string): Promise<void> {
+  await ensureAuthenticated();
   const q = query(
     collection(db, 'sessions', sessionId, 'history'),
     orderBy('id', 'desc'),
@@ -450,20 +502,17 @@ const LS_SESSION_ID  = 'padq_session_id';
 const LS_HOST_TOKEN  = 'padq_host_token';
 const LS_GAME_MODE   = 'padq_game_mode';
 
-export function saveHostToStorage(sessionId: string, hostToken: string, gameMode: string) {
+export function saveHostToStorage(sessionId: string, gameMode: string) {
   localStorage.setItem(LS_SESSION_ID, sessionId);
-  localStorage.setItem(LS_HOST_TOKEN, hostToken);
   localStorage.setItem(LS_GAME_MODE,  gameMode);
 }
 
 export function loadHostFromStorage(): {
   sessionId: string | null;
-  hostToken: string | null;
   gameMode: string | null;
 } {
   return {
     sessionId: localStorage.getItem(LS_SESSION_ID),
-    hostToken:  localStorage.getItem(LS_HOST_TOKEN),
     gameMode:   localStorage.getItem(LS_GAME_MODE),
   };
 }
@@ -494,7 +543,6 @@ const LS_COURT_GROUP = 'padq_court_group';
 
 export interface CourtEntry {
   sessionId: string;
-  hostToken: string;
   gameMode: string;
   name: string;      // "Court 1", "Court 2", etc.
 }

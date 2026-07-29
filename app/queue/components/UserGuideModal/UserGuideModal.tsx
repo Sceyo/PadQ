@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X } from 'lucide-react';
 
 const GUIDE_SECTIONS = [
@@ -37,22 +37,25 @@ const GUIDE_SECTIONS = [
 export const UserGuide: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [section, setSection] = useState(0);
 
-  useEffect(() => { if (isOpen) setSection(0); }, [isOpen]);
+  const handleClose = useCallback(() => {
+    setSection(0);
+    onClose();
+  }, [onClose]);
   useEffect(() => {
     if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') handleClose(); };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [isOpen, onClose]);
+  }, [isOpen, handleClose]);
 
   if (!isOpen) return null;
   const cur = GUIDE_SECTIONS[section];
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={handleClose}>
       <div className="modal-content guide-modal" onClick={e => e.stopPropagation()}>
         <div className="guide-header">
           <span className="guide-title">PADQ — User Guide</span>
-          <button className="guide-close-x" onClick={onClose} title="Close"><X size={15} /></button>
+          <button className="guide-close-x" onClick={handleClose} title="Close"><X size={15} /></button>
         </div>
         <div className="guide-nav">
           {GUIDE_SECTIONS.map((s, i) => (

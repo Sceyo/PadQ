@@ -8,19 +8,17 @@
 //  3. Subscribes to Firestore (onSnapshot) and feeds changes
 //     back into local React state for all clients in real-time
 //
-// FIX v2:
-//  • joinSession: destructure hostToken out of `data` before
-//    spreading so `hostToken: null` is never overwritten by
-//    the Firestore document's hostToken (TS error 2783)
-//  • commitMatchResult: removed simplified queue logic; the
-//    caller now passes the already-computed queue from useQueue
+// The host is identified by Firebase Anonymous Auth. Match writes carry a
+// revision and deterministic command ID so concurrent results cannot overwrite.
 // ═══════════════════════════════════════════════════════════
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { auth } from '@/lib/firebase';
 import {
   createSession,
   loadSession,
   updateSession,
+  updateSessionSafely,
   updateQueueSafely,
   batchMatchResult,
   clearHistory,
@@ -37,6 +35,8 @@ import {
   TournamentMatch,
   LiveScoreState,
   CourtSlot,
+  StaleSessionRevisionError,
+  type CommitMatchResult,
 } from '@/lib/sessionService';
 
 // ── Types ──────────────────────────────────────────────────
@@ -46,7 +46,7 @@ type EliminationType = 'single' | 'double';
 
 export interface SessionState {
   sessionId:         string | null;
-  hostToken:         string | null;
+  revision:          number;
   isHost:            boolean;
   isConnected:       boolean;   // true once first Firestore snapshot arrives
   isSaving:          boolean;   // true while a write is in-flight
@@ -66,18 +66,19 @@ export interface SessionState {
   liveScore:         LiveScoreState | null;
   isLive:            boolean;   // true only after host explicitly clicks "Go Live"
   courtSlots:        CourtSlot[];  // empty = single-court mode
+  lockedPartners:    [string, string][];
   doublesEngineState: Record<string, unknown> | null;
   singlesEngineState: Record<string, unknown> | null;
   sittingOut:        string[];
 }
 
 export interface SessionActions {
-  startSession:      (data: Omit<SessionDoc, 'hostToken' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  startSession:      (data: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   joinSession:       (sessionId: string) => Promise<boolean>;
   endSession:        () => void;
-  commitMatchResult: (patch: Partial<SessionDoc>, entry: Omit<MatchHistoryEntry, 'hostToken'>) => Promise<void>;
+  commitMatchResult: (patch: Partial<SessionDoc>, entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>) => Promise<CommitMatchResult | null>;
   undoLastMatch:     (patch: Partial<SessionDoc>) => Promise<void>;
-  syncField:         (patch: Partial<Omit<SessionDoc, 'hostToken' | 'createdAt'>>) => Promise<void>;
+  syncField:         (patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>) => Promise<void>;
   clearMatchHistory: () => Promise<void>;
 }
 
@@ -85,7 +86,7 @@ export interface SessionActions {
 
 const INITIAL_STATE: SessionState = {
   sessionId:         null,
-  hostToken:         null,
+  revision:          0,
   isHost:            false,
   isConnected:       false,
   isSaving:          false,
@@ -103,6 +104,7 @@ const INITIAL_STATE: SessionState = {
   liveScore:         null,
   isLive:            false,
   courtSlots:        [],
+  lockedPartners:    [],
   doublesEngineState: null,
   singlesEngineState: null,
   sittingOut:        [],
@@ -117,7 +119,7 @@ export function useSession(): SessionState & SessionActions {
   // Refs so async callbacks always see the latest values
   // without stale closures
   const sessionIdRef        = useRef<string | null>(null);
-  const hostTokenRef        = useRef<string | null>(null);
+  const revisionRef         = useRef(0);
   const unsubSessionRef     = useRef<(() => void) | null>(null);
   const unsubHistoryRef     = useRef<(() => void) | null>(null);
 
@@ -125,6 +127,7 @@ export function useSession(): SessionState & SessionActions {
 
   /** Map a Firestore SessionDoc to the SessionState persisted fields */
   const docToState = (data: SessionDoc): Partial<SessionState> => ({
+    revision:          data.revision ?? 0,
     players:           data.players           ?? [],
     queue:             data.queue             ?? [],
     playAllRel:        data.playAllRel        ?? {},
@@ -136,6 +139,7 @@ export function useSession(): SessionState & SessionActions {
     liveScore:         data.liveScore         ?? null,
     isLive:            data.isLive            ?? false,
     courtSlots:        data.courtSlots        ?? [],
+    lockedPartners:    (data.lockedPartners ?? []).map(({ a, b }) => [a, b]),
     doublesEngineState: (data.doublesEngineState as Record<string, unknown>) ?? null,
     singlesEngineState: (data.singlesEngineState as Record<string, unknown>) ?? null,
     sittingOut:         data.sittingOut ?? [],
@@ -153,6 +157,7 @@ export function useSession(): SessionState & SessionActions {
       sessionId,
       // onChange: normal update
       (data) => {
+        revisionRef.current = data.revision ?? 0;
         setState(prev => ({
           ...prev,
           isConnected:    true,
@@ -189,11 +194,10 @@ export function useSession(): SessionState & SessionActions {
     if (!state.isHost) return;
     const id = setInterval(() => {
       const sid = sessionIdRef.current;
-      const htk = hostTokenRef.current;
-      if (sid && htk) touchSession(sid, htk);
+      if (sid) touchSession(sid);
       // Touch all other courts in the group so idle courts don't expire
       loadCourtGroup().forEach(c => {
-        if (c.sessionId !== sid) touchSession(c.sessionId, c.hostToken);
+        if (c.sessionId !== sid) touchSession(c.sessionId);
       });
     }, 5 * 60 * 1000);
     return () => clearInterval(id);
@@ -202,8 +206,8 @@ export function useSession(): SessionState & SessionActions {
   // ── Mount: resume from localStorage ────────────────────────
 
   useEffect(() => {
-    const { sessionId, hostToken } = loadHostFromStorage();
-    if (!sessionId || !hostToken) return;
+    const { sessionId } = loadHostFromStorage();
+    if (!sessionId) return;
 
     loadSession(sessionId).then(data => {
       if (!data) {
@@ -215,17 +219,16 @@ export function useSession(): SessionState & SessionActions {
       }
 
       sessionIdRef.current = sessionId;
-      hostTokenRef.current = hostToken;
+      // Anonymous Auth persistence proves ownership on this browser.
 
       // Touch the session so TTL clock resets on resume.
       // Fire-and-forget — don't await, don't block the UI.
-      touchSession(sessionId, hostToken);
+      touchSession(sessionId);
 
       setState(prev => ({
         ...prev,
         sessionId,
-        hostToken,
-        isHost: true,
+        isHost: data.hostUid === auth.currentUser?.uid,
         ...docToState(data),
       }));
 
@@ -248,21 +251,21 @@ export function useSession(): SessionState & SessionActions {
    * Creates a Firestore document and saves credentials to localStorage.
    */
   const startSession = useCallback(async (
-    initialData: Omit<SessionDoc, 'hostToken' | 'createdAt' | 'updatedAt'>,
+    initialData: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt'>,
   ) => {
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      const { sessionId, hostToken } = await createSession(initialData);
+      const { sessionId } = await createSession(initialData);
 
       sessionIdRef.current = sessionId;
-      hostTokenRef.current = hostToken;
+      revisionRef.current = 0;
 
-      saveHostToStorage(sessionId, hostToken, initialData.gameMode);
+      saveHostToStorage(sessionId, initialData.gameMode);
 
       setState(prev => ({
         ...prev,
         sessionId,
-        hostToken,
+        revision: 0,
         isHost:   true,
         isSaving: false,
         ...docToState(initialData as SessionDoc),
@@ -288,16 +291,13 @@ export function useSession(): SessionState & SessionActions {
     if (!data) return false;
 
     sessionIdRef.current = upperCode;
-    // hostTokenRef stays null — viewers cannot write
-
-    // Destructure hostToken out so it never reaches our state
+    // Destructure ownership metadata out of viewer state.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { hostToken: _secret, ...safeData } = data;
+    const { hostUid: _owner, ...safeData } = data;
 
     setState(prev => ({
       ...prev,
       sessionId:   upperCode,
-      hostToken:   null,
       isHost:      false,
       isConnected: false,
       isExpired:   false,
@@ -318,7 +318,7 @@ export function useSession(): SessionState & SessionActions {
     unsubHistoryRef.current?.();
     clearHostFromStorage();
     sessionIdRef.current = null;
-    hostTokenRef.current = null;
+    revisionRef.current = 0;
     setState(INITIAL_STATE);
   }, []);
 
@@ -335,17 +335,23 @@ export function useSession(): SessionState & SessionActions {
    */
   const commitMatchResult = useCallback(async (
     patch: Partial<SessionDoc>,
-    entry: Omit<MatchHistoryEntry, 'hostToken'>,
+    entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>,
   ) => {
     const sessionId = sessionIdRef.current;
-    const hostToken = hostTokenRef.current;
-    if (!sessionId || !hostToken) return;
+    if (!sessionId) return null;
+    const commandId = crypto.randomUUID();
+    const expectedRevision = revisionRef.current;
 
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      await batchMatchResult(sessionId, hostToken, patch, entry);
+      const result = await batchMatchResult(sessionId, expectedRevision, commandId, patch, entry);
+      revisionRef.current = result.revision;
+      setState(prev => ({ ...prev, revision: result.revision }));
+      return result;
     } catch (err) {
       console.error('[useSession] commitMatchResult error:', err);
+      if (err instanceof StaleSessionRevisionError) return null;
+      return null;
     } finally {
       setState(prev => ({ ...prev, isSaving: false }));
     }
@@ -358,12 +364,12 @@ export function useSession(): SessionState & SessionActions {
    */
   const undoLastMatch = useCallback(async (patch: Partial<SessionDoc>) => {
     const sessionId = sessionIdRef.current;
-    const hostToken = hostTokenRef.current;
-    if (!sessionId || !hostToken) return;
+    if (!sessionId) return;
 
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      await updateQueueSafely(sessionId, hostToken, () => patch);
+      const revision = await updateQueueSafely(sessionId, revisionRef.current, () => patch);
+      revisionRef.current = revision;
       await deleteLatestHistoryEntry(sessionId);
     } catch (err) {
       console.error('[useSession] undoLastMatch error:', err);
@@ -379,18 +385,30 @@ export function useSession(): SessionState & SessionActions {
    * Safe for: queueMode, elimType, players list, queue reorder.
    */
   const syncField = useCallback(async (
-    patch: Partial<Omit<SessionDoc, 'hostToken' | 'createdAt'>>,
+    patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>,
   ) => {
     const sessionId = sessionIdRef.current;
-    const hostToken = hostTokenRef.current;
-    if (!sessionId || !hostToken) return;
+    if (!sessionId || !state.isHost) return;
 
     try {
-      await updateSession(sessionId, hostToken, patch);
+      const revisionSensitive = new Set<keyof SessionDoc>([
+        'players', 'queue', 'playAllRel', 'queueMode', 'elimType',
+        'tournamentMatches', 'tournamentActive', 'tournamentWinner',
+        'doublesEngineState', 'singlesEngineState', 'courtSlots',
+        'lockedPartners', 'sittingOut',
+      ]);
+      const needsRevision = Object.keys(patch).some(key => revisionSensitive.has(key as keyof SessionDoc));
+      if (needsRevision) {
+        const revision = await updateSessionSafely(sessionId, revisionRef.current, patch);
+        revisionRef.current = revision;
+        setState(prev => ({ ...prev, revision }));
+      } else {
+        await updateSession(sessionId, patch);
+      }
     } catch (err) {
       console.error('[useSession] syncField error:', err);
     }
-  }, []);
+  }, [state.isHost]);
 
   /**
    * clearMatchHistory
@@ -401,19 +419,18 @@ export function useSession(): SessionState & SessionActions {
    */
   const clearMatchHistory = useCallback(async () => {
     const sessionId = sessionIdRef.current;
-    const hostToken = hostTokenRef.current;
     if (!sessionId) {
       setState(prev => ({ ...prev, matchHistory: [] }));
       return;
     }
-    if (!hostToken) return;
+    if (!state.isHost) return;
     setState(prev => ({ ...prev, matchHistory: [] }));
     try {
-      await clearHistory(sessionId, hostToken);
+      await clearHistory(sessionId);
     } catch (err) {
       console.error('[useSession] clearMatchHistory error:', err);
     }
-  }, []);
+  }, [state.isHost]);
 
   return {
     ...state,

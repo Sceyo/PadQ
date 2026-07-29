@@ -15,7 +15,7 @@
  *  4. Viewer can ONLY see the mode/view the host is currently on
  *     (no tab-switching, no bracket reseed, no scoring)
  *  5. All interactive elements are hidden or disabled
- *  6. hostToken is never exposed — viewers only read public fields
+ *  6. viewers are anonymous-authenticated but remain read-only
  * ═══════════════════════════════════════════════════════════
  */
 
@@ -119,6 +119,7 @@ function WatchPageContent() {
   const params    = useParams();
   const router    = useRouter();
   const sessionId = (params?.sessionId as string ?? '').toUpperCase();
+  const validSessionId = sessionId.length >= 4;
 
   // ── Access control: PIN gate ─────────────────────────────
   const { access, submitPin } = useSessionAccess(sessionId);
@@ -126,8 +127,8 @@ function WatchPageContent() {
   // ── Firebase state ──────────────────────────────────────
   const [session,         setSession]         = useState<SessionDoc | null>(null);
   const [history,         setHistory]         = useState<MatchHistoryEntry[]>([]);
-  const [status,          setStatus]          = useState<'loading' | 'live' | 'reconnecting' | 'error' | 'ended' | 'expired'>('loading');
-  const [errorMsg,        setErrorMsg]        = useState('');
+  const [status,          setStatus]          = useState<'loading' | 'live' | 'reconnecting' | 'error' | 'ended' | 'expired'>(validSessionId ? 'loading' : 'error');
+  const [errorMsg,        setErrorMsg]        = useState(validSessionId ? '' : 'Invalid room code.');
   const [showHistory,     setShowHistory]     = useState(true);
   const [showAllHistory,  setShowAllHistory]  = useState(false);
 
@@ -138,11 +139,7 @@ function WatchPageContent() {
   // ── Guardrail: validate session exists before subscribing ──
 
   useEffect(() => {
-    if (!sessionId || sessionId.length < 4) {
-      setStatus('error');
-      setErrorMsg('Invalid room code.');
-      return;
-    }
+    if (!validSessionId) return;
 
     let unsubSession: (() => void) | null  = null;
     let unsubHistory: (() => void) | null  = null;
@@ -193,7 +190,7 @@ function WatchPageContent() {
       unsubSession?.();
       unsubHistory?.();
     };
-  }, [sessionId]);
+  }, [sessionId, showHistory, validSessionId]);
 
   // ── Match change detection — fires announcement ──────────
   useEffect(() => {
@@ -209,10 +206,13 @@ function WatchPageContent() {
       const text = gm === 'singles'
         ? `${q[0]} vs ${q[1]}`
         : `${q[0]} & ${q[1]}  vs  ${q[2]} & ${q[3]}`;
-      setAnnouncement(text);
-      const timer = setTimeout(() => setAnnouncement(null), 6000);
       prevMatchKeyRef.current = key;
-      return () => clearTimeout(timer);
+      const showTimer = setTimeout(() => setAnnouncement(text), 0);
+      const clearTimer = setTimeout(() => setAnnouncement(null), 6000);
+      return () => {
+        clearTimeout(showTimer);
+        clearTimeout(clearTimer);
+      };
     }
     prevMatchKeyRef.current = key;
   }, [session]);
@@ -317,7 +317,7 @@ function WatchPageContent() {
         <div className="w-not-live-icon">📡</div>
         <h2 className="w-error-title" style={{ color: '#f0f4ff' }}>Session Not Live Yet</h2>
         <p className="w-error-msg">
-          The host hasn't started broadcasting yet.<br />
+          The host hasn&apos;t started broadcasting yet.<br />
           This page will update automatically when they go live.
         </p>
         <div className="w-not-live-room">
@@ -561,18 +561,22 @@ function WatchPageContent() {
             ) : (
               <p className="w-muted">Courts not yet assigned.</p>
             )}
-            {queue.length > 0 && (
-              <div className="w-waiting-queue">
-                <h3 className="w-subsection-title">Waiting Queue</h3>
-                <div className="w-queue-chips">
-                  {queue.map((p, i) => (
-                    <span key={`wq-${i}-${p}`} className="w-queue-chip">
-                      <span className="w-queue-num">#{i + 1}</span> {p}
-                    </span>
-                  ))}
+            {(() => {
+              const onCourtSet = new Set(courtSlots.flatMap(c => c.onCourt));
+              const waitingOnly = queue.filter(p => !onCourtSet.has(p));
+              return waitingOnly.length > 0 ? (
+                <div className="w-waiting-queue">
+                  <h3 className="w-subsection-title">Waiting Queue</h3>
+                  <div className="w-queue-chips">
+                    {waitingOnly.map((p, i) => (
+                      <span key={`wq-${i}-${p}`} className="w-queue-chip">
+                        <span className="w-queue-num">#{i + 1}</span> {p}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : null;
+            })()}
           </div>
         )}
 
@@ -603,18 +607,22 @@ function WatchPageContent() {
                 );
               })}
             </div>
-            {queue.length > 0 && (
-              <div className="w-waiting-queue">
-                <h3 className="w-subsection-title">Waiting Queue</h3>
-                <div className="w-queue-chips">
-                  {queue.map((p, i) => (
-                    <span key={`wq-${i}-${p}`} className="w-queue-chip">
-                      <span className="w-queue-num">#{i + 1}</span> {p}
-                    </span>
-                  ))}
+            {(() => {
+              const onCourtSet = new Set(courtSlots.flatMap(c => c.onCourt));
+              const waitingOnly = queue.filter(p => !onCourtSet.has(p));
+              return waitingOnly.length > 0 ? (
+                <div className="w-waiting-queue">
+                  <h3 className="w-subsection-title">Waiting Queue</h3>
+                  <div className="w-queue-chips">
+                    {waitingOnly.map((p, i) => (
+                      <span key={`wq-${i}-${p}`} className="w-queue-chip">
+                        <span className="w-queue-num">#{i + 1}</span> {p}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              ) : null;
+            })()}
           </div>
         )}
 

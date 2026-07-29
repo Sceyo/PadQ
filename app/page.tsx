@@ -63,7 +63,7 @@ const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       setCameraError('QR scanning not supported in this browser. Use the code tab or scan with your phone camera app.');
       return;
     }
-    // @ts-ignore
+    // @ts-expect-error BarcodeDetector is not yet included in every TypeScript DOM lib.
     const detector = new BarcodeDetector({ formats: ['qr_code'] });
     scanIntervalRef.current = setInterval(async () => {
       if (!videoRef.current || !cameraReady) return;

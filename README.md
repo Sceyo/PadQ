@@ -14,7 +14,7 @@ PAD-Q is an independently developed product in **active development**. The curre
 
 - Deployed on Vercel
 - Backed by Firebase Cloud Firestore
-- 146 automated tests currently passing
+- 149 automated tests currently passing
 - Designed for browser-based host and spectator experiences
 
 The project is functional, but it should still be treated as a testing build rather than a production-secure service. Current limitations are documented below.
@@ -39,14 +39,15 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 - Singles and doubles session setup
 - Four-character room codes, direct watch links, and QR sharing
 - Explicit **Go Live** control before a session is shown to viewers
-- Optional viewer PIN gate
-- Host session-key recovery on the same or another device
+- Optional viewer PIN gate (a convenience gate, not database authorization)
+- Automatic same-browser host recovery through Firebase Anonymous Authentication
 - Responsive light and dark interfaces
 
 ### Match and court operations
 
 - Default, tournament, Play-All, and skill-based queue modes
 - Multi-court assignment and a read-only coordinator overview
+- Shared FIFO multi-court rotation with optional permanent partner pairs
 - Point-by-point live scoring with configurable 11- or 21-point targets and deuce handling
 - Player sit-out, return, substitution, and “sit next” controls
 - Single-step undo for supported match flows
@@ -125,7 +126,7 @@ flowchart LR
 2. The resulting session state is sent through `useSession` and `lib/sessionService.ts`.
 3. Firestore stores shared state in `sessions/{sessionId}` and results in its `history` subcollection.
 4. Real-time `onSnapshot` listeners update connected host and spectator browsers.
-5. A completed match uses a Firestore write batch so the session update and history entry are committed together.
+5. A completed match uses a revision-checked Firestore transaction so the session update and idempotent history entry commit together without lost updates.
 
 There is no separate REST or GraphQL backend in this repository. The browser uses the Firebase SDK directly, making Firestore rules the effective authorization boundary.
 
@@ -177,8 +178,8 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 The current Vitest suite reports:
 
 ```text
-Test Files  5 passed (5)
-Tests       146 passed (146)
+Test Files  6 passed (6)
+Tests       149 passed (149)
 ```
 
 The suite focuses on deterministic domain logic and verifies:
@@ -216,7 +217,7 @@ npm install
 
 ### 3. Configure Firebase
 
-Create a Firebase project, enable Cloud Firestore, and register a web application. Create `.env.local` in the repository root using placeholder values like these:
+Create a Firebase project, enable Cloud Firestore, enable the **Anonymous** sign-in provider in Firebase Authentication, and register a web application. Add every production and local hostname to the Firebase API key's allowed HTTP referrers. Create `.env.local` in the repository root using placeholder values like these:
 
 ```dotenv
 NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
@@ -235,7 +236,7 @@ Deploy the repository's Firestore rules and indexes to your selected Firebase pr
 npx -y firebase-tools@latest deploy --only firestore:rules,firestore:indexes
 ```
 
-Review `firestore.rules` and the security limitation below before using a project that contains real or sensitive data.
+Review `firestore.rules` and run `npm run test:rules` before using a project that contains real or sensitive data. The rules suite requires Java 21 or newer for the local Firestore emulator.
 
 ### 4. Start the development server
 
@@ -270,20 +271,20 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 
 ## Known limitations
 
-- **Prototype authorization:** Firebase Authentication is not currently used. The host token and optional viewer PIN are stored in a session document that is readable under the present Firestore rules. They should not be treated as production-grade access controls.
-- **Deletion-rule behavior:** Firestore delete authorization needs dedicated emulator verification and correction before undo, history clearing, and hard deletion can be considered reliable in production.
+- **Anonymous host identity:** ownership persists in the same browser, but safe cross-device host recovery requires account linking and is sealed for V1.
+- **Viewer PIN scope:** the optional PIN is a UI convenience, not strong authorization; do not store sensitive personal data in sessions.
 - **No guaranteed 30-minute expiry:** activity timestamps exist, but an appropriate expiration timestamp and confirmed deployed TTL policy do not.
 - **Browser-local data:** saved rosters, skill assignments, court groups, recovery data, and career statistics are device-specific.
 - **Online-first behavior:** explicit offline persistence and conflict recovery are not implemented.
 - **Multi-court navigation:** switching between independently stored court sessions can require a page reload.
-- **Partial test boundary:** the matchmaking engines have substantial automated coverage, but Firestore rules, UI components, and complete user journeys do not.
-- **Open quality findings:** the test suite passes, but linting currently reports unresolved errors and warnings.
+- **Partial test boundary:** the matchmaking engines and Firestore rules have automated coverage, but UI components and complete user journeys remain incomplete.
+- **Open quality findings:** the test suite and build pass; linting still reports warnings.
 - **Large controllers:** the main host and spectator pages still contain substantial orchestration logic and would benefit from further decomposition.
 
 ## Planned improvements
 
-1. Replace bearer-token authorization with Firebase Authentication or a trusted server-side mutation boundary.
-2. Separate public spectator data from private host credentials and add Firestore Emulator security tests.
+1. Add optional permanent account linking for safe cross-device host recovery.
+2. Separate public spectator data into a dedicated projection if stronger viewer privacy is required.
 3. Implement an explicit `expireAt` strategy and enable a verified Firestore TTL policy.
 4. Add React component and browser end-to-end tests for host, spectator, scoring, recovery, and multi-court workflows.
 5. Add continuous integration for tests, TypeScript, linting, and production builds.

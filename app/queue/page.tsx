@@ -9,7 +9,7 @@ import {
   Sun, Moon, ArrowLeft,
   Star, Sparkles, RefreshCw, Layers,
   BarChart2, Wifi, WifiOff,
-  Check, Copy, UserX, ArrowUp,
+  UserX, ArrowUp,
 } from 'lucide-react';
 import useQueue, {
   suggestNextDoublesMatch,
@@ -20,9 +20,9 @@ import { useSession } from '@/hooks/useSession';
 import type { LiveScoreState } from '@/lib/sessionService';
 import {
   loadCourtGroup, addCourtToGroup,
-  removeCourtFromGroup, clearCourtGroup, loadHostFromStorage, saveHostToStorage, clearHostFromStorage,
+  removeCourtFromGroup, clearCourtGroup, saveHostToStorage, clearHostFromStorage,
   loadRoster, mergeIntoRoster, removeFromRoster, setRosterEntrySkill,
-  loadSession, loadCareerStats, recordCareerResult,
+  loadCareerStats, recordCareerResult,
   loadSkilledBrackets, saveSkilledBrackets, clearSkilledBrackets,
   type CourtEntry, type CourtSlot, type SessionDoc, type CareerStatsMap,
   type RosterEntry, type SkillBracket,
@@ -43,7 +43,11 @@ import {
   type SkilledState, type SkilledCourt, type SkillLevel, type CourtDef,
 } from './lib/skilledMatchmakingEngine';
 import type { PaddleState, SerializablePaddleState, Team } from './lib/doublesEngine';
-import { freshPaddleState, advancePaddleState, addPlayerToWaiting, serializePaddleState, deserializePaddleState } from './lib/doublesEngine';
+import {
+  freshPaddleState, advancePaddleState, addPlayerToWaiting,
+  serializePaddleState, deserializePaddleState,
+  seedMultiCourtDoubles, rotateMultiCourtDoubles,
+} from './lib/doublesEngine';
 import type { SinglesState, SerializableSinglesState } from './lib/singleEngine';
 import { freshSinglesState, advanceSinglesState, addPlayerToSinglesWaiting, serializeSinglesState, deserializeSinglesState } from './lib/singleEngine';
 
@@ -121,7 +125,7 @@ function QueueSystemContent() {
     setGameMode, setPlayers, playSingles, playDoubles,
     randomizeQueue, setQueue, recordPlayAllDoubles,
     recordPlayAllSingles, resetPlayAllRelationships,
-  } = useQueue();
+  } = useQueue(gameModeFromUrl);
 
 
   const session = useSession();
@@ -134,7 +138,7 @@ function QueueSystemContent() {
   }, [session.players, session.isConnected]);
 
   useEffect(() => {
-    if (!session.isConnected || !session.queue.length || session.isSaving) return;
+    if (!session.isConnected || session.isSaving) return;
     if (session.queue.join(',') !== queue.join(',')) setQueue(session.queue);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.queue, session.isConnected, session.isSaving]);
@@ -162,21 +166,8 @@ function QueueSystemContent() {
   const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadCareerStats());
 
   // ── Host key banner (one-time, shown after startSession) ──
-  const [hostKeyToken,   setHostKeyToken]   = useState<string | null>(null);
-  const [hostKeyCopied,  setHostKeyCopied]  = useState(false);
-  const newSessionRef = useRef(false);
   const queueRef = useRef<string[]>([]);
   const courtSlotsRef = useRef<CourtSlot[]>([]);
-
-  // Show banner once after a new session is created (not on resume)
-  useEffect(() => {
-    if (session.isHost && session.sessionId && newSessionRef.current) {
-      newSessionRef.current = false;
-      const { hostToken } = loadHostFromStorage();
-      if (hostToken) setHostKeyToken(hostToken);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session.isHost, session.sessionId]);
 
   // ── Roster (setup screen) ──────────────────────────────────
   const [roster,         setRoster]         = useState<RosterEntry[]>([]);
@@ -187,10 +178,16 @@ function QueueSystemContent() {
   const [setupPin,       setSetupPin]       = useState('');
   const [setupCourtName, setSetupCourtName] = useState('Court 1');
   const [lockedPartners, setLockedPartners] = useState<[string, string][]>([]);
+  const lockedPartnersRef = useRef<[string, string][]>([]);
   const [courtCount,     setCourtCount]     = useState(1);
 
   // ── Multi-court shared-queue slots ──────────────────────────
   const [localCourtSlots, setLocalCourtSlots] = useState<CourtSlot[]>([]);
+
+  useEffect(() => {
+    const persisted = session.isConnected ? session.lockedPartners : lockedPartners;
+    lockedPartnersRef.current = persisted;
+  }, [lockedPartners, session.isConnected, session.lockedPartners]);
 
   // ── Legacy court group (tab switching between independent sessions) ──
   const [courts, setCourts] = useState<CourtEntry[]>(() => loadCourtGroup());
@@ -230,7 +227,7 @@ function QueueSystemContent() {
       singlesStateRef.current = s;
       setSinglesStateUI(s);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [session.isHost, session.doublesEngineState, session.singlesEngineState]);
 
   // ── Undo snapshot ──────────────────────────────────────────
@@ -261,7 +258,7 @@ function QueueSystemContent() {
       intermediate: prev.intermediate.filter(n => playerSet.has(n)),
       advanced:     prev.advanced.filter(n => playerSet.has(n)),
     }));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [players]);
 
   const activeSittingOut = session.isConnected ? (session.sittingOut ?? []) : localSittingOut;
@@ -306,8 +303,17 @@ function QueueSystemContent() {
   const waitingPlayers = useMemo(() => {
     if (courtSlots.length === 0) return [];
     const onCourtSet = new Set(courtSlots.flatMap(c => c.onCourt));
-    return players.filter(p => !onCourtSet.has(p));
-  }, [courtSlots, players]);
+    const ordered = queue.filter(
+      p => !onCourtSet.has(p) && !activeSittingOut.includes(p)
+    );
+    const orderedSet = new Set(ordered);
+    // During the brief optimistic-start window, include any eligible player
+    // not yet present in the synchronized queue without disturbing queue order.
+    const missing = players.filter(
+      p => !onCourtSet.has(p) && !activeSittingOut.includes(p) && !orderedSet.has(p)
+    );
+    return [...ordered, ...missing];
+  }, [courtSlots, queue, players, activeSittingOut]);
 
   const handleGoLive = (live: boolean) => {
     setIsLiveLocal(live);
@@ -348,10 +354,12 @@ function QueueSystemContent() {
         : activeQueueMode === 'default'
           ? { singlesEngineState: serializeSinglesState(singlesStateRef.current) as unknown as Record<string, unknown> }
           : {};
-      session.commitMatchResult(
+      void session.commitMatchResult(
         { queue: queueToCommit, ...enginePatch },
         { id: entry.id, mode: entry.mode, players: entry.players, winner: entry.winner, score: entry.score, timestamp: entry.timestamp }
-      );
+      ).then(result => {
+        if (!result) showToast('Result was not saved because the session changed. Please confirm the court again.');
+      });
     }
   };
 
@@ -466,35 +474,17 @@ function QueueSystemContent() {
     let initialCourtSlots: CourtSlot[] | undefined;
     let initialQueue: string[];
     if (gameMode === 'doubles' && courtCount > 1) {
-      // Respect locked partners: locked pairs always appear together on the
-      // same team. Build an ordered player list where locked pairs are
-      // adjacent, then slice into courts of 4 (pair0 + pair1 per court).
-      const lockedSet = new Set(lockedPartners.flat());
-      const unlockedPlayers = orderedPlayers.filter(p => !lockedSet.has(p));
-
-      // Build a seeding order: locked pairs first (each pair is 2 players),
-      // then remaining unpaired players.
-      const seededOrder: string[] = [];
-      const usedPairs = new Set<number>();
-      // For each court slot (4 players = 2 pairs), fill with locked pairs first
-      for (const [i, pair] of lockedPartners.entries()) {
-        if (pair.every(p => orderedPlayers.includes(p))) {
-          seededOrder.push(...pair);
-          usedPairs.add(i);
-        }
-      }
-      // Fill remaining slots with unpaired players
-      seededOrder.push(...unlockedPlayers);
+      const seeded = seedMultiCourtDoubles(orderedPlayers, courtCount, lockedPartners);
 
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
         id: `court-${i}`,
         name: `Court ${i + 1}`,
-        onCourt: seededOrder.slice(i * 4, (i + 1) * 4),
+        onCourt: seeded.courts[i],
       }));
-      initialQueue = seededOrder.slice(courtCount * 4);
+      initialQueue = seeded.waiting;
       setLocalCourtSlots(initialCourtSlots);
       courtSlotsRef.current = initialCourtSlots;
-      setLockedPartners([]); // clear after session starts
+      lockedPartnersRef.current = lockedPartners;
     } else if (gameMode === 'singles' && courtCount > 1) {
       // Singles multi-court: seed 2 players per court, rest go to shared queue
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
@@ -504,10 +494,13 @@ function QueueSystemContent() {
       }));
       initialQueue = orderedPlayers.slice(courtCount * 2);
       setLocalCourtSlots(initialCourtSlots);
+      courtSlotsRef.current = initialCourtSlots;
     } else {
       initialCourtSlots = undefined;
       initialQueue = orderedPlayers;
     }
+    setQueue(initialQueue);
+    queueRef.current = initialQueue;
 
     let initialBracket: TournamentMatch[] = [];
     if (localQueueMode === 'tournament') {
@@ -524,14 +517,15 @@ function QueueSystemContent() {
     }
     const pin = setupPin.trim().toUpperCase().slice(0, 4) || null;
     const courtName = courtCount > 1 ? `${courtCount} Courts` : (setupCourtName.trim() || 'Court 1');
-    newSessionRef.current = true;
+    setIsLiveLocal(true); // go live automatically — no manual step needed
     await session.startSession({
       gameMode: gameMode ?? 'singles', queueMode: localQueueMode, elimType: localElimType,
       players: tempPlayers, queue: initialQueue, playAllRel: {},
       tournamentMatches: initialBracket, tournamentActive: localQueueMode === 'tournament',
-      tournamentWinner: null, isLive: false,
+      tournamentWinner: null, isLive: true,
       accessPin: pin,
       courtName,
+      lockedPartners: lockedPartners.map(([a, b]) => ({ a, b })),
       ...(initialCourtSlots ? { courtSlots: initialCourtSlots } : {}),
     });
   };
@@ -643,11 +637,17 @@ function QueueSystemContent() {
     const snap = undoSnapshotRef.current;
     if (!snap) return;
     setQueue(snap.queue);
+    queueRef.current = snap.queue;
     paddleStateRef.current = snap.paddleState;
     setPaddleStateUI(snap.paddleState);
     singlesStateRef.current = snap.singlesState;
     setSinglesStateUI(snap.singlesState);
-    if (snap.courtSlots) setLocalCourtSlots(snap.courtSlots);
+    if (snap.courtSlots) {
+      setLocalCourtSlots(snap.courtSlots);
+      courtSlotsRef.current = snap.courtSlots;
+    }
+    // Trim local history immediately — also removes from Firestore via
+    // deleteLatestHistoryEntry called inside session.undoLastMatch.
     setLocalHistory(prev => prev.slice(1));
     if (session.sessionId) {
       session.undoLastMatch({
@@ -877,33 +877,19 @@ function QueueSystemContent() {
     );
     const activePlayers = players.filter(p => !lockedSet.has(p) && !activeSittingOut.includes(p));
 
-    let nextOnCourt: string[];
-    let nextWaiting: string[];
-
-    {
-      const skillMap = Object.fromEntries(
-        Object.entries(statsMap).map(([name, s]) => [
-          name,
-          (s as PlayerStat).gamesPlayed >= 3
-            ? (s as PlayerStat).winRate
-            : bracketSkillValue(rosterSkillMap[name]),
-        ])
-      );
-      const { nextState, newQueue: engineQueue } = advancePaddleState(
-        paddleStateRef.current, winnerTeam, loserTeam, activePlayers, skillMap
-      );
-      paddleStateRef.current = nextState;
-      setPaddleStateUI(nextState);
-      nextOnCourt = engineQueue.slice(0, 4);
-      nextWaiting = engineQueue.slice(4);
-    }
+    const selection = rotateMultiCourtDoubles(
+      queueRef.current.filter(player => activePlayers.includes(player)),
+      slot.onCourt,
+      lockedPartnersRef.current,
+    );
+    const nextOnCourt = selection.onCourt;
+    const nextWaiting = selection.waiting;
 
     const updatedSlots = currentSlots.map(c =>
       c.id === courtId ? { ...c, onCourt: nextOnCourt } : c
     );
 
-    const lockedList = currentSlots.filter(c => c.id !== courtId).flatMap(c => c.onCourt);
-    const newQueue   = [...lockedList, ...nextWaiting];
+    const newQueue = nextWaiting;
 
     const winnerNames = winnerTeam.join(' & ');
     const entry: MatchHistoryEntry = {
@@ -915,16 +901,20 @@ function QueueSystemContent() {
     };
 
     setLocalCourtSlots(updatedSlots);
+    courtSlotsRef.current = updatedSlots;
     setQueue(newQueue);
+    queueRef.current = newQueue;
     setLocalHistory(prev => [entry, ...prev]);
     recordCareerResult(entry.players, entry.winner);
     setCareerStats(loadCareerStats());
 
     if (session.sessionId) {
-      session.commitMatchResult(
+      void session.commitMatchResult(
         { queue: newQueue, courtSlots: updatedSlots, doublesEngineState: serializePaddleState(paddleStateRef.current) as unknown as Record<string, unknown> },
         entry
-      );
+      ).then(result => {
+        if (!result) showToast('Another court saved first. This result was not applied; please confirm it again.');
+      });
     }
 
     setModalWinner(`${winnerNames} win!`);
@@ -975,7 +965,9 @@ function QueueSystemContent() {
     setLocalHistory(prev => [entry, ...prev]);
     recordCareerResult(entry.players, entry.winner);
     setCareerStats(loadCareerStats());
-    if (session.sessionId) session.commitMatchResult({ queue }, entry);
+    if (session.sessionId) void session.commitMatchResult({ queue }, entry).then(result => {
+      if (!result) showToast('Result was not saved because the session changed. Please confirm the court again.');
+    });
 
     setModalWinner(`${winnerNames} win!`); setModalScore(undefined); setModalOpen(true);
     isProcessingMatchRef.current = false;
@@ -1008,23 +1000,11 @@ function QueueSystemContent() {
 
   const handleHardReset = () => { setPendingConfirm({ type: 'hard-reset' }); };
 
-  const handleRecoverHost = useCallback(async (token: string): Promise<boolean> => {
-    if (!session.sessionId) return false;
-    const data = await loadSession(session.sessionId);
-    if (!data || data.hostToken !== token) return false;
-    saveHostToStorage(session.sessionId, token, data.gameMode);
-    window.location.reload();
-    return true;
-  }, [session.sessionId]);
-
   // Save the current court to the court group once the session is created
   useEffect(() => {
     if (!session.sessionId || !session.isHost) return;
-    const { hostToken } = loadHostFromStorage();
-    if (!hostToken) return;
     const entry: CourtEntry = {
       sessionId: session.sessionId,
-      hostToken,
       gameMode: gameMode ?? 'singles',
       name: setupCourtName.trim() || 'Court 1',
     };
@@ -1037,7 +1017,7 @@ function QueueSystemContent() {
     if (targetSessionId === session.sessionId) return;
     const target = courts.find(c => c.sessionId === targetSessionId);
     if (!target) return;
-    saveHostToStorage(target.sessionId, target.hostToken, target.gameMode);
+    saveHostToStorage(target.sessionId, target.gameMode);
     window.location.reload();
   };
 
@@ -1293,34 +1273,13 @@ function QueueSystemContent() {
     onShowCoordinator: () => setShowCoordinator(true),
     canUndo,
     onUndo: handleUndoLastMatch,
-    onRecoverHost: !session.isHost && session.sessionId ? handleRecoverHost : undefined,
   };
-
-  // Host key banner (shown after new session creation)
-  const hostKeyBanner = hostKeyToken ? (
-    <div className="host-key-banner">
-      <span className="host-key-label">Save your Session Key for host recovery:</span>
-      <code className="host-key-code">{hostKeyToken}</code>
-      <button
-        className="host-key-copy"
-        onClick={() => {
-          navigator.clipboard.writeText(hostKeyToken);
-          setHostKeyCopied(true);
-          setTimeout(() => setHostKeyCopied(false), 2000);
-        }}
-      >
-        {hostKeyCopied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-      </button>
-      <button className="host-key-dismiss" onClick={() => setHostKeyToken(null)}>✕</button>
-    </div>
-  ) : null;
 
   // ── RENDER B — Tournament ─────────────────────────────────
   if (activeQueueMode === 'tournament' && activeTournamentActive) {
     const pendingMatch = activeTournamentM.find(m => !m.winner && !m.isBye && m.player1 && m.player2) ?? null;
     return (
       <div className={`queue-system game-view ${darkMode ? 'dark' : ''}`}>
-        {hostKeyBanner}
         <div className="topright-controls">
           <button className="dark-mode-toggle" onClick={() => setDarkMode(d => !d)}>{darkMode ? <Sun size={17} /> : <Moon size={17} />}</button>
           <GearMenu {...gearMenuProps} />
@@ -1416,7 +1375,6 @@ function QueueSystemContent() {
   const isSkilled = activeQueueMode === 'skilled';
   return (
     <div className={`queue-system game-view ${darkMode ? 'dark' : ''}`}>
-      {hostKeyBanner}
       <div className="topright-controls">
         <button className="dark-mode-toggle" onClick={() => setDarkMode(d => !d)}>{darkMode ? <Sun size={17} /> : <Moon size={17} />}</button>
         <GearMenu {...gearMenuProps} />
@@ -1627,7 +1585,7 @@ function QueueSystemContent() {
                 )}
               </>
             ) : isSkilled ? (
-              <p className="muted-hint">Initialising skilled courts… switch to another mode and back if courts don't appear.</p>
+              <p className="muted-hint">Initialising skilled courts… switch to another mode and back if courts don&apos;t appear.</p>
             ) : (
               /* ══════════════════════════════════════════════════
                  DEFAULT / PLAY-ALL LAYOUT (unchanged)
@@ -1729,6 +1687,7 @@ function QueueSystemContent() {
               <>
                 {gameMode === 'doubles' && queue.length >= 4 && (
                   <DoublesMatch
+                    key={`${firstFour.join('|')}::${playAllSuggestion?.suggestedTeamA?.join('|') ?? ''}::${playAllSuggestion?.suggestedTeamB?.join('|') ?? ''}`}
                     firstFour={firstFour}
                     suggestedTeamA={playAllSuggestion?.suggestedTeamA ?? null}
                     suggestedTeamB={playAllSuggestion?.suggestedTeamB ?? null}

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Settings, RotateCcw, HelpCircle, Copy, Check,
   QrCode, LayoutGrid, Undo2, KeyRound, LogIn,
@@ -32,34 +32,36 @@ export function GearMenu({
   const [open,          setOpen]          = useState(false);
   const [copied,        setCopied]        = useState(false);
   const [shareTab,      setShareTab]      = useState<'link' | 'qr'>('link');
-  const [watchUrl,      setWatchUrl]      = useState('');
   const [showRecovery,  setShowRecovery]  = useState(false);
   const [recoveryToken, setRecoveryToken] = useState('');
   const [recoveryError, setRecoveryError] = useState('');
   const [recovering,    setRecovering]    = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (sessionId) setWatchUrl(`${window.location.origin}/watch/${sessionId}`);
-  }, [sessionId]);
+  const watchUrl = sessionId && typeof window !== 'undefined'
+    ? `${window.location.origin}/watch/${sessionId}`
+    : '';
 
-  useEffect(() => {
-    if (!open) { setShowRecovery(false); setRecoveryToken(''); setRecoveryError(''); }
-  }, [open]);
+  const closeMenu = useCallback(() => {
+    setOpen(false);
+    setShowRecovery(false);
+    setRecoveryToken('');
+    setRecoveryError('');
+  }, []);
 
   useEffect(() => {
     if (!open) return;
     const onClick = (e: MouseEvent) => {
-      if (!menuRef.current?.contains(e.target as Node)) setOpen(false);
+      if (!menuRef.current?.contains(e.target as Node)) closeMenu();
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeMenu(); };
     document.addEventListener('mousedown', onClick);
     document.addEventListener('keydown',   onKey);
     return () => {
       document.removeEventListener('mousedown', onClick);
       document.removeEventListener('keydown',   onKey);
     };
-  }, [open]);
+  }, [open, closeMenu]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(watchUrl);
@@ -86,7 +88,7 @@ export function GearMenu({
     <div className="gear-menu-wrap" ref={menuRef}>
       <button
         className={`gear-menu-trigger ${open ? 'gear-menu-trigger--open' : ''}`}
-        onClick={() => setOpen(o => !o)}
+        onClick={() => { if (open) closeMenu(); else setOpen(true); }}
         title="Settings"
         aria-expanded={open}
         aria-haspopup="true"
@@ -161,7 +163,7 @@ export function GearMenu({
             <button
               className="gear-menu-item"
               role="menuitem"
-              onClick={() => { setOpen(false); onShowCoordinator(); }}
+              onClick={() => { closeMenu(); onShowCoordinator(); }}
             >
               <LayoutGrid size={14} /> All Courts
             </button>
@@ -171,7 +173,7 @@ export function GearMenu({
             <button
               className="gear-menu-item"
               role="menuitem"
-              onClick={() => { setOpen(false); onUndo(); }}
+              onClick={() => { closeMenu(); onUndo(); }}
             >
               <Undo2 size={14} /> Undo Last Match
             </button>
@@ -229,7 +231,7 @@ export function GearMenu({
             <button
               className="gear-menu-item gear-menu-item--danger"
               role="menuitem"
-              onClick={() => { setOpen(false); onHardReset(); }}
+              onClick={() => { closeMenu(); onHardReset(); }}
             >
               <RotateCcw size={14} /> Hard Reset
             </button>
@@ -238,7 +240,7 @@ export function GearMenu({
           <button
             className="gear-menu-item"
             role="menuitem"
-            onClick={() => { setOpen(false); onShowGuide(); }}
+            onClick={() => { closeMenu(); onShowGuide(); }}
           >
             <HelpCircle size={14} /> User Guide
           </button>
