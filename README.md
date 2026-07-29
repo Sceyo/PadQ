@@ -258,6 +258,11 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Deployment
 
+The authoritative go-live sequence and acceptance criteria are maintained in
+[`V1-RELEASE-GATES.md`](V1-RELEASE-GATES.md). Gate 1.5 (selective live scoring
+for three independent courts) and Gate 2 (free-tier capacity and real-life
+reliability) are blocking requirements for the official V1 release.
+
 The live application is hosted on Vercel at [pad-q.vercel.app](https://pad-q.vercel.app). A deployment requires the same six Firebase environment variables listed above to be configured in the hosting environment.
 
 Firestore is managed separately:
