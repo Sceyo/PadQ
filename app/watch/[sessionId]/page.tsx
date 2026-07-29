@@ -41,6 +41,7 @@ import { RankBadge } from '@/app/queue/components/atoms/RankBadge';
 import { StreakBadge } from '@/app/queue/components/atoms/StreakBadge';
 import type { RankTier, PlayerStat } from '@/app/queue/lib/types';
 import { buildPlayerStats } from '@/app/queue/lib/playerUtils';
+import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
 import './watch.css';
 
 // ═══════════════════════════════════════════════════════════
@@ -336,8 +337,9 @@ function WatchPageContent() {
   }
 
   // ── What the viewer sees — mirrors the HOST's current view ─
-  const isTournament  = session.queueMode === 'tournament' && session.tournamentActive;
-  const isSkilled     = session.queueMode === 'skilled';
+  const visibleQueueMode = V1_RELEASE.showQueueModeSelector ? session.queueMode : V1_RELEASE.queueMode;
+  const isTournament  = visibleQueueMode === 'tournament' && session.tournamentActive;
+  const isSkilled     = visibleQueueMode === 'skilled';
   const isMultiCourt  = (session.courtSlots ?? []).length > 0;
   const queue         = session.queue ?? [];
   const gameMode      = session.gameMode;
@@ -418,7 +420,7 @@ function WatchPageContent() {
         <div className="w-topbar-mode">
           {gameMode === 'singles' ? <Swords size={14} /> : <Users size={14} />}
           {gameMode === 'singles' ? 'Singles' : 'Doubles'} ·{' '}
-          {session.queueMode === 'tournament' ? 'Tournament' : session.queueMode === 'playall' ? 'Play-all' : 'Default'}
+          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : 'Default'}
         </div>
       </div>
 

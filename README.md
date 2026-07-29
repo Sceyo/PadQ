@@ -10,11 +10,11 @@
 
 ## Project status
 
-PAD-Q is an independently developed product in **active development**. The current build is deployed and used for field testing during games with friends and family.
+PAD-Q is an independently developed product in **active development**. The `main` branch is the focused V1 launch build; the complete experimental feature set is preserved on `codex/all-features-v1-archive`.
 
 - Deployed on Vercel
 - Backed by Firebase Cloud Firestore
-- 149 automated tests currently passing
+- 150 application tests and 5 Firestore rules tests currently passing
 - Designed for browser-based host and spectator experiences
 
 The project is functional, but it should still be treated as a testing build rather than a production-secure service. Current limitations are documented below.
@@ -39,14 +39,13 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 - Singles and doubles session setup
 - Four-character room codes, direct watch links, and QR sharing
 - Explicit **Go Live** control before a session is shown to viewers
-- Optional viewer PIN gate (a convenience gate, not database authorization)
 - Automatic same-browser host recovery through Firebase Anonymous Authentication
 - Responsive light and dark interfaces
 
 ### Match and court operations
 
-- Default, tournament, Play-All, and skill-based queue modes
-- Multi-court assignment and a read-only coordinator overview
+- Default singles and doubles queue rotation
+- Shared multi-court assignment for one to three courts
 - Shared FIFO multi-court rotation with optional permanent partner pairs
 - Point-by-point live scoring with configurable 11- or 21-point targets and deuce handling
 - Player sit-out, return, substitution, and “sit next” controls
@@ -69,11 +68,11 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 
 The homepage gives players and organizers direct access to singles, doubles, and spectator experiences.
 
-### Skilled matchmaking
+### Shared multi-court matchmaking
 
-![PAD-Q skilled matchmaking court and waiting queue](public/screenshots/skilled.jpg)
+![PAD-Q multi-court matchmaking and waiting queue](public/screenshots/skilled.jpg)
 
-Skill-aware matchmaking groups players by ability while tracking the waiting queue and preventing smaller groups from being skipped indefinitely.
+The V1 launch flow prioritizes a clear shared waiting queue, fair court assignment, sit-out handling, and optional permanent partner pairs.
 
 ### Host scoring
 
@@ -144,7 +143,7 @@ There is no separate REST or GraphQL backend in this repository. The browser use
 | Supporting UI | Lucide React, `qrcode.react` | Icons and session QR codes |
 | Deployment | Vercel | Hosted Next.js application |
 
-## Matchmaking and rotation modes
+## V1 matchmaking and rotation
 
 ### Default
 
@@ -152,19 +151,11 @@ There is no separate REST or GraphQL backend in this repository. The browser use
 - **Doubles:** an `INIT → WINNERS → LOSERS` state machine seeds the player pool and alternates between winner and loser groups.
 - Candidate doubles teams are scored to reduce repeated partners, repeated matchups, immediate replay, and skill imbalance.
 
-### Tournament
+### Deferred modes
 
-Supports single- and double-elimination match structures, winner advancement, and read-only bracket display for spectators.
+Tournament, Play-All, skill-based matchmaking, viewer PIN setup, and the legacy independent-court coordinator are hidden from the V1 production interface. Their implementations and documentation remain available on `codex/all-features-v1-archive` for later hardening and release.
 
-### Play-All
-
-Tracks previous teammate and opponent relationships. The player waiting longest remains the anchor, while the engine evaluates possible groups and team splits within a bounded look-ahead window. It prefers combinations with fewer repeated relationships.
-
-Play-All is an explainable greedy heuristic; it does not claim to produce a globally optimal or mathematically complete round-robin schedule.
-
-### Skilled
-
-Players can be tagged as Beginner, Intermediate, or Advanced. Court filling follows a priority cascade:
+The deferred skill engine groups players as Beginner, Intermediate, or Advanced. Court filling follows a priority cascade:
 
 1. four players from one skill group;
 2. a majority group plus an adjacent-level player;
@@ -178,8 +169,8 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 The current Vitest suite reports:
 
 ```text
-Test Files  6 passed (6)
-Tests       149 passed (149)
+Test Files  7 passed | 1 skipped (8)
+Tests       150 passed | 5 skipped (155)
 ```
 
 The suite focuses on deterministic domain logic and verifies:
@@ -192,7 +183,7 @@ The suite focuses on deterministic domain logic and verifies:
 
 The simulations check important invariants, including preventing a player from occupying two courts, keeping every player accounted for, bounding player-pool sizes, and ensuring waiting players eventually receive matches.
 
-The repository does not yet include Firestore Emulator rule tests, React component tests, browser end-to-end tests, or a CI quality gate. ESLint also has unresolved findings; these are tracked as development limitations rather than hidden behind the passing domain suite.
+The repository includes Firestore Emulator rule tests, but does not yet include React component tests, full browser end-to-end tests, or a CI quality gate. ESLint also has unresolved warnings; these are tracked as development limitations rather than hidden behind the passing domain suite.
 
 ## Local setup
 
@@ -272,7 +263,6 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 ## Known limitations
 
 - **Anonymous host identity:** ownership persists in the same browser, but safe cross-device host recovery requires account linking and is sealed for V1.
-- **Viewer PIN scope:** the optional PIN is a UI convenience, not strong authorization; do not store sensitive personal data in sessions.
 - **No guaranteed 30-minute expiry:** activity timestamps exist, but an appropriate expiration timestamp and confirmed deployed TTL policy do not.
 - **Browser-local data:** saved rosters, skill assignments, court groups, recovery data, and career statistics are device-specific.
 - **Online-first behavior:** explicit offline persistence and conflict recovery are not implemented.

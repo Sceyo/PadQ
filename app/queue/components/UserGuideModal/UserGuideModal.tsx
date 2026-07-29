@@ -6,15 +6,15 @@ import { X } from 'lucide-react';
 const GUIDE_SECTIONS = [
   {
     title: '🚀 Starting a Session',
-    body: 'Add 5–24 players, choose Singles or Doubles, then tap Start Queue. Players are queued in the order you enter them. A 4-character Room Code is generated for spectators.',
+    body: 'Add players, choose Singles or Doubles and up to 3 courts, then tap Start Queue. Players are queued in the order you enter them. A 4-character Room Code is generated for spectators.',
   },
   {
     title: '🏸 Paddle Queue (Default)',
     body: 'INIT — First 8 players play 2 warm-up matches:\n  Match 1: P1 & P2 vs P3 & P4\n  Match 2: P5 & P6 vs P7 & P8\nThis produces W1, W2 (winner pairs) and L1, L2 (loser pairs).\n\nWINNERS CYCLE:\n• Unplayed players waiting → W1 plays the unplayed pair; winner then faces W2\n• No unplayed → W1 vs W2 (partners swapped: [a,b]+[c,d] → [a,c] vs [b,d])\n\nLOSERS CYCLE (same structure with L1, L2)\n\nCycles alternate Winners → Losers → repeat.\nPartners always swap to avoid repeating the same teams.',
   },
   {
-    title: '🔄 Queue Modes',
-    body: 'Default (Advanced Paddle Queue) — structured Winners/Losers cycles with unplayed-player prioritisation.\nPlay-All — maximises variety; everyone faces everyone before repeating.\nTournament — single or double elimination bracket, auto-advances.',
+    title: '🔄 V1 Queue Rotation',
+    body: 'PAD-Q V1 uses the Default rotation: structured Winners/Losers cycles with unplayed-player prioritisation. For multi-court sessions, all courts draw from one shared waiting queue. Optional locked partner pairs stay together when assigned.',
   },
   {
     title: '🏆 Scoring',
@@ -22,7 +22,7 @@ const GUIDE_SECTIONS = [
   },
   {
     title: '📡 Go Live & Sharing',
-    body: 'Tap Go Live to allow spectators. Share via QR code, copy link, or native share sheet (WhatsApp/SMS). Viewers see the queue, score, and bracket in real time — no account needed.',
+    body: 'Tap Go Live to allow spectators. Share via QR code, copy link, or native share sheet (WhatsApp/SMS). Viewers see the queue, active courts, and score in real time — no account needed.',
   },
   {
     title: '📊 Stats & Suggestions',

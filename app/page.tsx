@@ -232,7 +232,7 @@ export default function HomePage() {
             { icon: null,                  label: '🔥 Win Streaks' },
             { icon: <Shield size={11} />, label: 'Rank Tiers'    },
             { icon: <Star size={11} />,   label: 'Player Stats'  },
-            { icon: null,                  label: '🏆 Tournaments' },
+            { icon: null,                  label: '🏟️ Multi-Court' },
             { icon: <Eye size={11} />,    label: 'Live Watch'    },
           ].map(({ icon, label }) => (
             <span key={label} className="hp-pill">{icon}{label}</span>

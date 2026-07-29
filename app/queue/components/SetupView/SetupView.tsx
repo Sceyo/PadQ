@@ -13,6 +13,9 @@ export interface SetupViewProps {
   onToggleDark:        () => void;
   courtCount:          number;
   onCourtCountChange:  (n: number) => void;
+  maxCourts:           number;
+  showAccessPin:       boolean;
+  showSkillTagging:    boolean;
   setupPin:            string;
   onPinChange:         (s: string) => void;
   roster:              RosterEntry[];
@@ -45,7 +48,7 @@ export interface SetupViewProps {
 
 export function SetupView({
   gameMode, darkMode, onToggleDark,
-  courtCount, onCourtCountChange,
+  courtCount, onCourtCountChange, maxCourts, showAccessPin, showSkillTagging,
   setupPin, onPinChange,
   roster, showRoster, onToggleRoster,
   rosterSelected, onRosterToggle, onSelectAllRoster, onAddFromRoster, onSaveToRoster, onRemoveFromRoster,
@@ -101,9 +104,9 @@ export function SetupView({
               <span className="court-count-value">{courtCount}</span>
               <button
                 className="court-count-btn court-count-adj"
-                onClick={() => onCourtCountChange(Math.min(6, courtCount + 1))}
+                onClick={() => onCourtCountChange(Math.min(maxCourts, courtCount + 1))}
                 type="button"
-                disabled={courtCount >= 6}
+                disabled={courtCount >= maxCourts}
               >+</button>
             </div>
             {courtCount > 1 && gameMode === 'doubles' && (
@@ -119,8 +122,8 @@ export function SetupView({
           </div>
         )}
 
-        {/* Optional access PIN */}
-        <div className="setup-field-row">
+        {/* Optional access PIN (deferred for V1) */}
+        {showAccessPin && <div className="setup-field-row">
           <label className="setup-field-label">
             Access PIN <span className="setup-field-hint">(optional, 4 chars)</span>
           </label>
@@ -133,7 +136,7 @@ export function SetupView({
             maxLength={4}
             autoComplete="off"
           />
-        </div>
+        </div>}
 
         {/* Club Roster import */}
         <div className="roster-row">
@@ -171,12 +174,12 @@ export function SetupView({
                           onChange={() => onRosterToggle(entry.name)}
                         />
                         <span
-                          className={`roster-name roster-name--clickable${isAdded ? ' roster-name--added' : ''}`}
-                          onClick={() => setSkillPickerFor(pickerOpen ? null : entry.name)}
-                          title="Tap to set skill bracket"
+                          className={`roster-name${showSkillTagging ? ' roster-name--clickable' : ''}${isAdded ? ' roster-name--added' : ''}`}
+                          onClick={showSkillTagging ? () => setSkillPickerFor(pickerOpen ? null : entry.name) : undefined}
+                          title={showSkillTagging ? 'Tap to set skill bracket' : undefined}
                         >
                           {entry.name}
-                          {entry.skill && (
+                          {showSkillTagging && entry.skill && (
                             <span className={`skill-badge skill-badge--${entry.skill}`}>
                               {SKILL_LABEL[entry.skill]}
                             </span>
@@ -189,7 +192,7 @@ export function SetupView({
                           title="Remove from roster"
                         >×</button>
                       </div>
-                      {pickerOpen && (
+                      {showSkillTagging && pickerOpen && (
                         <div className="skill-picker">
                           {SKILL_BRACKETS.map(bracket => (
                             <button

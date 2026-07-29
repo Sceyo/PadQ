@@ -50,6 +50,7 @@ import {
 } from './lib/doublesEngine';
 import type { SinglesState, SerializableSinglesState } from './lib/singleEngine';
 import { freshSinglesState, advanceSinglesState, addPlayerToSinglesWaiting, serializeSinglesState, deserializeSinglesState } from './lib/singleEngine';
+import { V1_RELEASE } from './lib/releaseConfig';
 
 // ── Components ───────────────────────────────────────────────
 import { PlayerLabel } from './components/atoms/PlayerLabel';
@@ -190,7 +191,7 @@ function QueueSystemContent() {
   }, [lockedPartners, session.isConnected, session.lockedPartners]);
 
   // ── Legacy court group (tab switching between independent sessions) ──
-  const [courts, setCourts] = useState<CourtEntry[]>(() => loadCourtGroup());
+  const [courts, setCourts] = useState<CourtEntry[]>(() => V1_RELEASE.showLegacyCourtCoordinator ? loadCourtGroup() : []);
 
   // ── Doubles Paddle Queue state ─────────────────────────────
   const paddleStateRef                        = useRef<PaddleState>(freshPaddleState());
@@ -364,7 +365,8 @@ function QueueSystemContent() {
   };
 
   // Resolved active values
-  const activeQueueMode        = session.isConnected ? session.queueMode         : localQueueMode;
+  const storedQueueMode        = session.isConnected ? session.queueMode         : localQueueMode;
+  const activeQueueMode: QueueMode = V1_RELEASE.showQueueModeSelector ? storedQueueMode : V1_RELEASE.queueMode;
   const activeElimType         = session.isConnected ? session.elimType          : localElimType;
   const activeTournamentM      = session.isConnected && session.tournamentMatches?.length > 0 ? session.tournamentMatches : localTournamentM;
   const activeTournamentActive = localTournamentActive || (session.isConnected ? session.tournamentActive : false);
@@ -515,13 +517,13 @@ function QueueSystemContent() {
       initialBracket = localElimType === 'single' ? buildSingleElim(bracketEntrants) : buildDoubleElim(bracketEntrants);
       setLocalTournamentM(initialBracket); setLocalTournamentActive(true);
     }
-    const pin = setupPin.trim().toUpperCase().slice(0, 4) || null;
+    const pin = V1_RELEASE.showAccessPinSetup ? (setupPin.trim().toUpperCase().slice(0, 4) || null) : null;
     const courtName = courtCount > 1 ? `${courtCount} Courts` : (setupCourtName.trim() || 'Court 1');
     setIsLiveLocal(true); // go live automatically — no manual step needed
     await session.startSession({
-      gameMode: gameMode ?? 'singles', queueMode: localQueueMode, elimType: localElimType,
+      gameMode: gameMode ?? 'singles', queueMode: V1_RELEASE.queueMode, elimType: localElimType,
       players: tempPlayers, queue: initialQueue, playAllRel: {},
-      tournamentMatches: initialBracket, tournamentActive: localQueueMode === 'tournament',
+      tournamentMatches: initialBracket, tournamentActive: false,
       tournamentWinner: null, isLive: true,
       accessPin: pin,
       courtName,
@@ -1002,6 +1004,7 @@ function QueueSystemContent() {
 
   // Save the current court to the court group once the session is created
   useEffect(() => {
+    if (!V1_RELEASE.showLegacyCourtCoordinator) return;
     if (!session.sessionId || !session.isHost) return;
     const entry: CourtEntry = {
       sessionId: session.sessionId,
@@ -1156,7 +1159,7 @@ function QueueSystemContent() {
   const canControl = !session.sessionId || session.isHost;
   const canUndo = session.isHost && hasUndo && courtSlots.length === 0;
 
-  const modeSelector = (
+  const modeSelector = V1_RELEASE.showQueueModeSelector ? (
     <div className="mode-selector">
       {(['default', 'tournament', 'playall', 'skilled'] as const).map(m => (
         <button key={m} className={`mode-btn ${activeQueueMode === m ? 'active' : ''}`} onClick={() => canControl && handleModeChange(m)} disabled={!canControl}>
@@ -1167,7 +1170,7 @@ function QueueSystemContent() {
         </button>
       ))}
     </div>
-  );
+  ) : null;
   const elimSelector = activeQueueMode === 'tournament' && (
     <div className="elim-selector">
       {(['single', 'double'] as const).map(t => (
@@ -1224,6 +1227,9 @@ function QueueSystemContent() {
         onToggleDark={() => setDarkMode(d => !d)}
         courtCount={courtCount}
         onCourtCountChange={setCourtCount}
+        maxCourts={V1_RELEASE.maxCourts}
+        showAccessPin={V1_RELEASE.showAccessPinSetup}
+        showSkillTagging={V1_RELEASE.showSkillTagging}
         setupPin={setupPin}
         onPinChange={setSetupPin}
         roster={roster}
@@ -1269,7 +1275,7 @@ function QueueSystemContent() {
     onToggleLive: handleGoLive,
     onHardReset: handleHardReset,
     onShowGuide: () => setShowGuide(true),
-    hasMultipleCourts: courts.length >= 2,
+    hasMultipleCourts: V1_RELEASE.showLegacyCourtCoordinator && courts.length >= 2,
     onShowCoordinator: () => setShowCoordinator(true),
     canUndo,
     onUndo: handleUndoLastMatch,
@@ -1342,7 +1348,7 @@ function QueueSystemContent() {
           ) : null;
         })()}
         <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
-        {showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
+        {V1_RELEASE.showLegacyCourtCoordinator && showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
         {toastMsg && (
           <div className="toast-notification" role="alert">
             <span>{toastMsg}</span>
@@ -1770,7 +1776,7 @@ function QueueSystemContent() {
         ) : null;
       })()}
       <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
-      {showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
+      {V1_RELEASE.showLegacyCourtCoordinator && showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
       {toastMsg && (
         <div className="toast-notification" role="alert">
           <span>{toastMsg}</span>
