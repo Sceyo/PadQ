@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   assertFails,
   assertSucceeds,
@@ -21,8 +21,9 @@ import { resolve } from 'node:path';
 
 const emulatorAvailable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 const suite = emulatorAvailable ? describe : describe.skip;
+const UUID_A = '11111111-1111-4111-8111-111111111111';
 
-function sessionData(hostUid: string) {
+function sessionData(hostUid: string, overrides: Record<string, unknown> = {}) {
   return {
     hostUid,
     revision: 0,
@@ -35,7 +36,7 @@ function sessionData(hostUid: string) {
     tournamentMatches: [],
     tournamentActive: false,
     tournamentWinner: null,
-    isLive: true,
+    isLive: false,
     accessPin: null,
     courtName: 'Court 1',
     courtSlots: [],
@@ -44,10 +45,23 @@ function sessionData(hostUid: string) {
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     lastActiveAt: serverTimestamp(),
+    ...overrides,
   };
 }
 
-suite('Firestore production rules', () => {
+function historyData(commandId = UUID_A, revision = 1) {
+  return {
+    id: 1,
+    mode: 'Doubles',
+    players: 'A & B vs C & D',
+    winner: 'A & B',
+    timestamp: '10:00',
+    commandId,
+    revision,
+  };
+}
+
+suite('Firestore V1 production rules', () => {
   let env: RulesTestEnvironment;
 
   beforeAll(async () => {
@@ -57,27 +71,36 @@ suite('Firestore production rules', () => {
     });
   });
 
+  beforeEach(async () => env.clearFirestore());
   afterAll(async () => env.cleanup());
 
-  it('requires authentication and binds session ownership to the creator UID', async () => {
+  it('allows a known-room get but denies unauthenticated access and session listing', async () => {
     const host = env.authenticatedContext('host-1').firestore();
     const viewer = env.authenticatedContext('viewer-1').firestore();
     const anonymous = env.unauthenticatedContext().firestore();
-    const ref = doc(host, 'sessions', 'AUTH');
+    const ref = doc(host, 'sessions', 'A2THQ7');
 
     await assertSucceeds(setDoc(ref, sessionData('host-1')));
-    await assertSucceeds(getDoc(doc(viewer, 'sessions', 'AUTH')));
-    await assertFails(getDoc(doc(anonymous, 'sessions', 'AUTH')));
-    await assertFails(setDoc(doc(host, 'sessions', 'FAKE'), sessionData('another-uid')));
+    await assertSucceeds(getDoc(doc(viewer, 'sessions', 'A2THQ7')));
+    await assertFails(getDoc(doc(anonymous, 'sessions', 'A2THQ7')));
+    await assertFails(getDocs(collection(viewer, 'sessions')));
   });
 
-  it('rejects non-host writes, ownership changes, unknown fields, and oversized payloads', async () => {
+  it('binds ownership to the creator and requires a production-format room ID', async () => {
     const host = env.authenticatedContext('host-2').firestore();
-    const attacker = env.authenticatedContext('attacker').firestore();
-    const ref = doc(host, 'sessions', 'LOCK');
-    await assertSucceeds(setDoc(ref, sessionData('host-2')));
+    await assertFails(setDoc(doc(host, 'sessions', 'B2FAK7'), sessionData('another-uid')));
+    await assertFails(setDoc(doc(host, 'sessions', 'AB3X'), sessionData('host-2')));
+    await assertFails(setDoc(doc(host, 'sessions', 'O0I1AA'), sessionData('host-2')));
+    await assertSucceeds(setDoc(doc(host, 'sessions', 'B2SAFE'), sessionData('host-2')));
+  });
 
-    await assertFails(updateDoc(doc(attacker, 'sessions', 'LOCK'), { isLive: false }));
+  it('rejects non-host writes, ownership changes, schema pollution and timestamp manipulation', async () => {
+    const host = env.authenticatedContext('host-3').firestore();
+    const attacker = env.authenticatedContext('attacker').firestore();
+    const ref = doc(host, 'sessions', 'C3LCK7');
+    await assertSucceeds(setDoc(ref, sessionData('host-3')));
+
+    await assertFails(updateDoc(doc(attacker, 'sessions', 'C3LCK7'), { isLive: true }));
     await assertFails(updateDoc(ref, {
       hostUid: 'attacker', updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
     }));
@@ -85,21 +108,77 @@ suite('Firestore production rules', () => {
       injectedAdmin: true, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
     }));
     await assertFails(updateDoc(ref, {
-      players: Array.from({ length: 101 }, (_, i) => `P${i}`),
-      updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
+      createdAt: new Date(0), updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
     }));
   });
 
-  it('requires an atomic revision increment for a history entry', async () => {
-    const host = env.authenticatedContext('host-3').firestore();
-    const ref = doc(host, 'sessions', 'MATCH');
-    await assertSucceeds(setDoc(ref, sessionData('host-3')));
+  it('seals deferred modes, tournament data, PINs and more than three courts', async () => {
+    const host = env.authenticatedContext('host-4').firestore();
+    const ref = doc(host, 'sessions', 'D4VN7E');
+    await assertSucceeds(setDoc(ref, sessionData('host-4')));
 
-    const standalone = doc(host, 'sessions', 'MATCH', 'history', 'standalone');
-    await assertFails(setDoc(standalone, {
-      id: 1, mode: 'Doubles', players: 'A & B vs C & D', winner: 'A & B',
-      timestamp: '10:00', commandId: 'standalone', revision: 1,
+    for (const patch of [
+      { queueMode: 'tournament' },
+      { queueMode: 'playall', playAllRel: { A: 1 } },
+      { queueMode: 'skilled' },
+      { tournamentActive: true },
+      { accessPin: '1234' },
+      { courtSlots: [0, 1, 2, 3].map(i => ({ id: `court-${i}`, name: `Court ${i + 1}`, onCourt: [] })) },
+    ]) {
+      await assertFails(updateDoc(ref, {
+        ...patch, revision: 1, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
+      }));
+    }
+  });
+
+  it('accepts a valid 30-player, three-court session with locked partners', async () => {
+    const host = env.authenticatedContext('host-5').firestore();
+    const players = Array.from({ length: 30 }, (_, i) => `Player ${i + 1}`);
+    const courts = [0, 1, 2].map(i => ({
+      id: `court-${i}`,
+      name: `Court ${i + 1}`,
+      onCourt: players.slice(i * 4, i * 4 + 4),
     }));
+    await assertSucceeds(setDoc(doc(host, 'sessions', 'E5REAL'), sessionData('host-5', {
+      players,
+      queue: players.slice(12),
+      courtName: '3 Courts',
+      courtSlots: courts,
+      lockedPartners: [{ a: 'Player 1', b: 'Player 2' }],
+    })));
+  });
+
+  it('rejects oversized player lists', async () => {
+    const host = env.authenticatedContext('host-6').firestore();
+    await assertFails(setDoc(doc(host, 'sessions', 'F6VER7'), sessionData('host-6', {
+      players: Array.from({ length: 31 }, (_, i) => `P${i}`),
+      queue: Array.from({ length: 31 }, (_, i) => `P${i}`),
+    })));
+  });
+
+  it('rejects malformed court, partner, score and engine payloads', async () => {
+    const host = env.authenticatedContext('host-7').firestore();
+    await assertFails(setDoc(doc(host, 'sessions', 'G7CRT7'), sessionData('host-7', {
+      courtSlots: [{ id: 'court-0', name: 'Court 1', onCourt: ['A', 'B', 'C'] }],
+    })));
+    await assertFails(setDoc(doc(host, 'sessions', 'G7PAR7'), sessionData('host-7', {
+      lockedPartners: [{ a: 'A', b: 'OUTSIDER' }],
+    })));
+    await assertFails(setDoc(doc(host, 'sessions', 'G7SCR7'), sessionData('host-7', {
+      liveScore: { scoreA: 999, scoreB: 0, labelA: 'A', labelB: 'B', limit: 11, baseLimit: 11, deuce: false, active: true },
+    })));
+    await assertFails(setDoc(doc(host, 'sessions', 'G7ENGN'), sessionData('host-7', {
+      doublesEngineState: { phase: 'HACKED' },
+    })));
+  });
+
+  it('requires an atomic revision increment for an immutable history entry', async () => {
+    const host = env.authenticatedContext('host-8').firestore();
+    const viewer = env.authenticatedContext('viewer-8').firestore();
+    const ref = doc(host, 'sessions', 'H8MTCH');
+    await assertSucceeds(setDoc(ref, sessionData('host-8')));
+
+    await assertFails(setDoc(doc(host, 'sessions', 'H8MTCH', 'history', UUID_A), historyData()));
 
     await assertSucceeds(runTransaction(host, async tx => {
       const snap = await tx.get(ref);
@@ -108,44 +187,52 @@ suite('Firestore production rules', () => {
         queue: ['E', 'F', 'A', 'B', 'C', 'D'], revision: 1,
         updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
       });
-      tx.set(doc(host, 'sessions', 'MATCH', 'history', 'command-1'), {
-        id: 1, mode: 'Doubles', players: 'A & B vs C & D', winner: 'A & B',
-        timestamp: '10:00', commandId: 'command-1', revision: 1,
-      });
+      tx.set(doc(host, 'sessions', 'H8MTCH', 'history', UUID_A), historyData());
     }));
+
+    await assertSucceeds(getDocs(collection(viewer, 'sessions', 'H8MTCH', 'history')));
+    await assertFails(updateDoc(doc(host, 'sessions', 'H8MTCH', 'history', UUID_A), { winner: 'C & D' }));
+  });
+
+  it('denies orphan history access and non-host history writes', async () => {
+    const host = env.authenticatedContext('host-9').firestore();
+    const attacker = env.authenticatedContext('attacker-9').firestore();
+    await assertFails(getDocs(collection(attacker, 'sessions', 'J9NONE', 'history')));
+
+    const ref = doc(host, 'sessions', 'J9HST7');
+    await assertSucceeds(setDoc(ref, sessionData('host-9')));
+    await assertFails(setDoc(
+      doc(attacker, 'sessions', 'J9HST7', 'history', UUID_A),
+      historyData(),
+    ));
   });
 
   it('serializes simultaneous court results instead of losing an update', async () => {
-    const host = env.authenticatedContext('host-4').firestore();
-    const ref = doc(host, 'sessions', 'RACE');
-    await assertSucceeds(setDoc(ref, sessionData('host-4')));
+    const host = env.authenticatedContext('host-a').firestore();
+    const ref = doc(host, 'sessions', 'KARTCE');
+    await assertSucceeds(setDoc(ref, sessionData('host-a')));
 
-    const commit = (commandId: string) => runTransaction(host, async tx => {
+    const commit = (commandId: string, id: number) => runTransaction(host, async tx => {
       const snap = await tx.get(ref);
       if (snap.data()?.revision !== 0) throw new Error('stale-revision');
-      tx.update(ref, {
-        revision: 1, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
-      });
-      tx.set(doc(host, 'sessions', 'RACE', 'history', commandId), {
-        id: commandId === 'court-a' ? 1 : 2,
-        mode: 'Doubles', players: 'A & B vs C & D', winner: 'A & B',
-        timestamp: '10:00', commandId, revision: 1,
-      });
+      tx.update(ref, { revision: 1, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp() });
+      tx.set(doc(host, 'sessions', 'KARTCE', 'history', commandId), { ...historyData(commandId, 1), id });
     });
 
-    const outcomes = await Promise.allSettled([commit('court-a'), commit('court-b')]);
+    const UUID_B = '22222222-2222-4222-8222-222222222222';
+    const outcomes = await Promise.allSettled([commit(UUID_A, 1), commit(UUID_B, 2)]);
     expect(outcomes.filter(result => result.status === 'fulfilled')).toHaveLength(1);
     expect(outcomes.filter(result => result.status === 'rejected')).toHaveLength(1);
     expect((await getDoc(ref)).data()?.revision).toBe(1);
-    expect((await getDocs(collection(host, 'sessions', 'RACE', 'history'))).size).toBe(1);
+    expect((await getDocs(collection(host, 'sessions', 'KARTCE', 'history'))).size).toBe(1);
   });
 
   it('allows only the host to delete history or the session', async () => {
-    const host = env.authenticatedContext('host-5').firestore();
-    const attacker = env.authenticatedContext('attacker-5').firestore();
-    const ref = doc(host, 'sessions', 'DELETE');
-    await assertSucceeds(setDoc(ref, sessionData('host-5')));
-    await assertFails(deleteDoc(doc(attacker, 'sessions', 'DELETE')));
+    const host = env.authenticatedContext('host-b').firestore();
+    const attacker = env.authenticatedContext('attacker-b').firestore();
+    const ref = doc(host, 'sessions', 'LDELET');
+    await assertSucceeds(setDoc(ref, sessionData('host-b')));
+    await assertFails(deleteDoc(doc(attacker, 'sessions', 'LDELET')));
     await assertSucceeds(deleteDoc(ref));
   });
 });

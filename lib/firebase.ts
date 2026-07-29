@@ -21,6 +21,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously, type User } from 'firebase/auth';
 import { getFirestore, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -33,6 +34,17 @@ const firebaseConfig = {
 
 // Prevent re-initializing on hot-reload in Next.js dev mode
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
+// Enable only after the production web app is registered in Firebase App Check.
+// Monitor verified requests before turning on Firestore enforcement.
+const appCheckEnabled = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_ENABLED === 'true';
+const appCheckSiteKey = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY;
+if (typeof window !== 'undefined' && appCheckEnabled && appCheckSiteKey) {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+    isTokenAutoRefreshEnabled: true,
+  });
+}
 
 export const auth = getAuth(app);
 let signInPromise: Promise<User> | null = null;

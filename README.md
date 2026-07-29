@@ -14,7 +14,7 @@ PAD-Q is an independently developed product in **active development**. The `main
 
 - Deployed on Vercel
 - Backed by Firebase Cloud Firestore
-- 150 application tests and 5 Firestore rules tests currently passing
+- 151 application tests and 11 Firestore rules tests currently passing
 - Designed for browser-based host and spectator experiences
 
 The project is functional, but it should still be treated as a testing build rather than a production-secure service. Current limitations are documented below.
@@ -37,7 +37,7 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 ### Session management
 
 - Singles and doubles session setup
-- Four-character room codes, direct watch links, and QR sharing
+- Six-character room codes, direct watch links, and QR sharing
 - Explicit **Go Live** control before a session is shown to viewers
 - Automatic same-browser host recovery through Firebase Anonymous Authentication
 - Responsive light and dark interfaces
@@ -169,8 +169,8 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 The current Vitest suite reports:
 
 ```text
-Test Files  7 passed | 1 skipped (8)
-Tests       150 passed | 5 skipped (155)
+Test Files  8 passed | 1 skipped (9)
+Tests       151 passed | 11 skipped (162)
 ```
 
 The suite focuses on deterministic domain logic and verifies:
@@ -217,9 +217,17 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 NEXT_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
+NEXT_PUBLIC_FIREBASE_APP_CHECK_ENABLED=false
+NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY=your_recaptcha_enterprise_site_key
 ```
 
 Do not commit `.env.local` or paste real project configuration into issues, screenshots, or documentation.
+
+For production, register the web app with Firebase App Check using reCAPTCHA
+Enterprise, add the site key in Vercel, then set
+`NEXT_PUBLIC_FIREBASE_APP_CHECK_ENABLED=true`. Monitor verified requests before
+enabling Firestore enforcement in Firebase Console. Keep the switch false for
+unregistered local and preview environments.
 
 Deploy the repository's Firestore rules and indexes to your selected Firebase project:
 

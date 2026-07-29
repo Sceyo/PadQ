@@ -16,6 +16,7 @@ import {
   X, ArrowRight, Loader2,
 } from 'lucide-react';
 import { loadSession } from '@/lib/sessionService';
+import { ROOM_CODE_LENGTH } from '@/lib/roomCode';
 import './Homepage.css';
 
 // ── Watch Modal ──────────────────────────────────────────
@@ -93,7 +94,7 @@ const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const handleJoin = async (rawCode?: string) => {
     const roomCode = (rawCode ?? code).trim().toUpperCase();
     if (!roomCode) { setError('Enter a room code'); return; }
-    if (roomCode.length < 4) { setError('Room codes are at least 4 characters'); return; }
+    if (roomCode.length < 4 || roomCode.length > ROOM_CODE_LENGTH) { setError('Enter a valid room code'); return; }
     setLoading(true); setError('');
     try {
       const sess = await loadSession(roomCode);
@@ -141,11 +142,11 @@ const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
         {tab === 'code' && (
           <div className="watch-code-area">
-            <p className="watch-code-hint">Ask the host for their 4-letter room code</p>
+            <p className="watch-code-hint">Ask the host for their 6-character room code</p>
             <div className="watch-code-input-row">
               <input className="watch-code-input" value={code}
                 onChange={e => { setCode(e.target.value.toUpperCase()); setError(''); }}
-                placeholder="e.g. AB3X" maxLength={6}
+                placeholder="e.g. 7K3MQR" maxLength={ROOM_CODE_LENGTH}
                 onKeyDown={e => e.key === 'Enter' && handleJoin()} autoFocus />
               <button className="watch-join-btn" onClick={() => handleJoin()} disabled={loading || !code.trim()}>
                 {loading ? <Loader2 size={16} className="spin" /> : <ArrowRight size={16} />}

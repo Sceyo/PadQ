@@ -1,110 +1,253 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function signedIn() {
+    // =============================================================
+    // Assumed V1 data model
+    // =============================================================
+    // sessions/{sessionId}: host-owned queue state. New IDs are six
+    // unambiguous uppercase characters. Spectators may get a known room,
+    // but collection listing is denied.
+    // sessions/{sessionId}/history/{commandId}: immutable match result,
+    // created atomically with a parent revision increment.
+
+    function isAuthenticated() {
       return request.auth != null;
     }
 
-    function ownsSession() {
-      return signedIn() && resource.data.hostUid == request.auth.uid;
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
     }
 
-    function validSessionShape(data) {
+    function isDocOwner() {
+      return isOwner(resource.data.hostUid);
+    }
+
+    function uidUnchanged(data) {
+      return data.hostUid == request.auth.uid;
+    }
+
+    function uidNotModified(data) {
+      return data.hostUid == resource.data.hostUid;
+    }
+
+    function validRoomCode(id) {
+      return id.matches('^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$');
+    }
+
+    function validPlayerRoster(values) {
+      return values is list && values.size() <= 30;
+    }
+
+    function validPlayerSubset(values) {
+      return values is list && values.size() <= 30;
+    }
+
+    function validMetricMap(values, players) {
+      return values is map && values.size() <= 30 &&
+        values.keys().hasOnly(players);
+    }
+
+    function validShortStringAt(values, index, maxLength) {
+      return values.size() <= index ||
+        (values[index] is string && values[index].size() <= maxLength);
+    }
+
+    function validShortStringList(values, maxSize, maxLength) {
+      return values is list && values.size() <= maxSize &&
+        validShortStringAt(values, 0, maxLength) && validShortStringAt(values, 1, maxLength) &&
+        validShortStringAt(values, 2, maxLength) && validShortStringAt(values, 3, maxLength) &&
+        validShortStringAt(values, 4, maxLength) && validShortStringAt(values, 5, maxLength) &&
+        validShortStringAt(values, 6, maxLength) && validShortStringAt(values, 7, maxLength);
+    }
+
+    function validTeam(team, players) {
+      return team is map && team.keys().hasAll(['a', 'b']) &&
+        team.keys().hasOnly(['a', 'b']) &&
+        team.a is string && team.b is string && team.a != team.b &&
+        team.a in players && team.b in players;
+    }
+
+    function validTeamAt(teams, players, index) {
+      return teams.size() <= index || validTeam(teams[index], players);
+    }
+
+    function validTeamList(teams, players) {
+      return teams is list && teams.size() <= 8 &&
+        validTeamAt(teams, players, 0) && validTeamAt(teams, players, 1) &&
+        validTeamAt(teams, players, 2) && validTeamAt(teams, players, 3) &&
+        validTeamAt(teams, players, 4) && validTeamAt(teams, players, 5) &&
+        validTeamAt(teams, players, 6) && validTeamAt(teams, players, 7);
+    }
+
+    function validCourt(court, gameMode) {
+      return court is map && court.keys().hasAll(['id', 'name', 'onCourt']) &&
+        court.keys().hasOnly(['id', 'name', 'onCourt']) &&
+        court.id is string && court.id.size() >= 1 && court.id.size() <= 20 &&
+        court.name is string && court.name.size() >= 1 && court.name.size() <= 40 &&
+        validPlayerSubset(court.onCourt) &&
+        (court.onCourt.size() == 0 ||
+         (gameMode == 'singles' && court.onCourt.size() == 2) ||
+         (gameMode == 'doubles' && court.onCourt.size() == 4));
+    }
+
+    function validCourtAt(courts, gameMode, index) {
+      return courts.size() <= index || validCourt(courts[index], gameMode);
+    }
+
+    function validCourts(courts, gameMode) {
+      return courts is list && courts.size() <= 3 &&
+        validCourtAt(courts, gameMode, 0) &&
+        validCourtAt(courts, gameMode, 1) &&
+        validCourtAt(courts, gameMode, 2);
+    }
+
+    function validLockedPairAt(pairs, players, index) {
+      return pairs.size() <= index || validTeam(pairs[index], players);
+    }
+
+    function validLockedPairs(pairs, players) {
+      return pairs is list && pairs.size() <= 15 &&
+        validLockedPairAt(pairs, players, 0) && validLockedPairAt(pairs, players, 1) &&
+        validLockedPairAt(pairs, players, 2) && validLockedPairAt(pairs, players, 3) &&
+        validLockedPairAt(pairs, players, 4) && validLockedPairAt(pairs, players, 5) &&
+        validLockedPairAt(pairs, players, 6) && validLockedPairAt(pairs, players, 7) &&
+        validLockedPairAt(pairs, players, 8) && validLockedPairAt(pairs, players, 9) &&
+        validLockedPairAt(pairs, players, 10) && validLockedPairAt(pairs, players, 11) &&
+        validLockedPairAt(pairs, players, 12) && validLockedPairAt(pairs, players, 13) &&
+        validLockedPairAt(pairs, players, 14);
+    }
+
+    function validLiveScore(score) {
+      return score == null ||
+        (score is map &&
+         score.keys().hasAll(['scoreA', 'scoreB', 'labelA', 'labelB', 'limit', 'baseLimit', 'deuce', 'active']) &&
+         score.keys().hasOnly(['scoreA', 'scoreB', 'labelA', 'labelB', 'limit', 'baseLimit', 'deuce', 'active']) &&
+         score.scoreA is int && score.scoreA >= 0 && score.scoreA <= 100 &&
+         score.scoreB is int && score.scoreB >= 0 && score.scoreB <= 100 &&
+         score.labelA is string && score.labelA.size() <= 130 &&
+         score.labelB is string && score.labelB.size() <= 130 &&
+         score.limit is int && score.limit >= 1 && score.limit <= 100 &&
+         score.baseLimit is int && score.baseLimit in [11, 21] &&
+         score.deuce is bool && score.active is bool);
+    }
+
+    function validDoublesEngine(state, players) {
+      return state == null ||
+        (state is map &&
+         state.keys().hasAll(['phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentPairs', 'recentMatches', 'lastPlayedMap', 'winnersPool', 'losersPool']) &&
+         state.keys().hasOnly(['phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentPairs', 'recentMatches', 'lastPlayedMap', 'winnersPool', 'losersPool']) &&
+         state.phase in ['INIT', 'WINNERS', 'LOSERS'] &&
+         state.matchIndexInPhase is int && state.matchIndexInPhase >= 0 && state.matchIndexInPhase <= 100000 &&
+         state.matchCount is int && state.matchCount >= 0 && state.matchCount <= 100000 &&
+         validPlayerSubset(state.w1) && validPlayerSubset(state.l1) &&
+         validPlayerSubset(state.waitingQueue) && validPlayerSubset(state.playedThisCycle) &&
+         validShortStringList(state.recentPairs, 6, 130) &&
+         validShortStringList(state.recentMatches, 4, 260) &&
+         validMetricMap(state.lastPlayedMap, players) &&
+         validTeamList(state.winnersPool, players) && validTeamList(state.losersPool, players));
+    }
+
+    function validSinglesEngine(state, players) {
+      return state == null ||
+        (state is map &&
+         state.keys().hasAll(['queue', 'king', 'matchIndex', 'lastPlayedMap', 'winStreak', 'playedThisCycle', 'waitingQueue']) &&
+         state.keys().hasOnly(['queue', 'king', 'matchIndex', 'lastPlayedMap', 'winStreak', 'playedThisCycle', 'waitingQueue']) &&
+         validPlayerSubset(state.queue) &&
+         (state.king == null || (state.king is string && state.king in players)) &&
+         state.matchIndex is int && state.matchIndex >= 0 && state.matchIndex <= 100000 &&
+         validMetricMap(state.lastPlayedMap, players) &&
+         validMetricMap(state.winStreak, players) &&
+         validPlayerSubset(state.playedThisCycle) &&
+         validPlayerSubset(state.waitingQueue));
+    }
+
+    function validSession(data) {
+      let players = data.players;
+      let courts = data.get('courtSlots', []);
       return data.keys().hasAll([
           'hostUid', 'revision', 'gameMode', 'queueMode', 'elimType',
           'players', 'queue', 'playAllRel', 'tournamentMatches',
           'tournamentActive', 'tournamentWinner', 'createdAt', 'updatedAt',
           'lastActiveAt'
-        ])
-        && data.keys().hasOnly([
+        ]) &&
+        data.keys().hasOnly([
           'hostUid', 'revision', 'gameMode', 'queueMode', 'elimType',
           'players', 'queue', 'playAllRel', 'tournamentMatches',
           'tournamentActive', 'tournamentWinner', 'liveScore', 'isLive',
           'accessPin', 'courtName', 'doublesEngineState', 'singlesEngineState',
           'courtSlots', 'lockedPartners', 'sittingOut',
           'createdAt', 'updatedAt', 'lastActiveAt'
-        ])
-        && data.hostUid is string && data.hostUid.size() <= 128
-        && data.revision is int && data.revision >= 0
-        && data.gameMode in ['singles', 'doubles']
-        && data.queueMode in ['default', 'tournament', 'playall', 'skilled']
-        && data.elimType in ['single', 'double']
-        && data.players is list && data.players.size() <= 100
-        && data.queue is list && data.queue.size() <= 100
-        && data.playAllRel is map && data.playAllRel.size() <= 100
-        && data.tournamentMatches is list && data.tournamentMatches.size() <= 256
-        && data.tournamentActive is bool
-        && (data.tournamentWinner == null || (data.tournamentWinner is string && data.tournamentWinner.size() <= 200))
-        && data.get('isLive', false) is bool
-        && (data.get('accessPin', null) == null || (data.accessPin is string && data.accessPin.size() <= 4))
-        && data.get('courtName', '') is string && data.get('courtName', '').size() <= 60
-        && (data.get('liveScore', null) == null || data.liveScore is map)
-        && (data.get('doublesEngineState', null) == null || data.doublesEngineState is map)
-        && (data.get('singlesEngineState', null) == null || data.singlesEngineState is map)
-        && data.get('courtSlots', []) is list && data.get('courtSlots', []).size() <= 6
-        && data.get('lockedPartners', []) is list && data.get('lockedPartners', []).size() <= 50
-        && data.get('sittingOut', []) is list && data.get('sittingOut', []).size() <= 100
-        && data.createdAt is timestamp
-        && data.updatedAt is timestamp
-        && data.lastActiveAt is timestamp;
+        ]) &&
+        data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128 &&
+        data.revision is int && data.revision >= 0 && data.revision <= 1000000 &&
+        data.gameMode in ['singles', 'doubles'] &&
+        data.queueMode == 'default' && data.elimType == 'single' &&
+        players is list && players.size() >= 5 && validPlayerRoster(players) &&
+        validPlayerSubset(data.queue) &&
+        data.playAllRel is map && data.playAllRel.size() == 0 &&
+        data.tournamentMatches is list && data.tournamentMatches.size() == 0 &&
+        data.tournamentActive == false && data.tournamentWinner == null &&
+        data.get('isLive', false) is bool && data.get('accessPin', null) == null &&
+        data.get('courtName', '') is string && data.get('courtName', '').size() <= 60 &&
+        validLiveScore(data.get('liveScore', null)) &&
+        validCourts(courts, data.gameMode) &&
+        validLockedPairs(data.get('lockedPartners', []), players) &&
+        validPlayerSubset(data.get('sittingOut', [])) &&
+        validDoublesEngine(data.get('doublesEngineState', null), players) &&
+        validSinglesEngine(data.get('singlesEngineState', null), players) &&
+        (data.gameMode == 'doubles' || data.get('doublesEngineState', null) == null) &&
+        (data.gameMode == 'singles' || data.get('singlesEngineState', null) == null) &&
+        data.createdAt is timestamp && data.updatedAt is timestamp && data.lastActiveAt is timestamp;
     }
 
     function validHistory(data, entryId) {
-      return data.keys().hasAll([
-          'id', 'mode', 'players', 'winner', 'timestamp', 'commandId', 'revision'
-        ])
-        && data.keys().hasOnly([
-          'id', 'mode', 'players', 'winner', 'score', 'timestamp',
-          'commandId', 'revision'
-        ])
-        && data.id is int
-        && data.mode is string && data.mode.size() <= 80
-        && data.players is string && data.players.size() <= 500
-        && data.winner is string && data.winner.size() <= 200
-        && data.get('score', '') is string && data.get('score', '').size() <= 40
-        && data.timestamp is string && data.timestamp.size() <= 80
-        && data.commandId is string && data.commandId == entryId
-        && data.commandId.size() <= 64
-        && data.revision is int && data.revision > 0;
+      return data.keys().hasAll(['id', 'mode', 'players', 'winner', 'timestamp', 'commandId', 'revision']) &&
+        data.keys().hasOnly(['id', 'mode', 'players', 'winner', 'score', 'timestamp', 'commandId', 'revision']) &&
+        data.id is int && data.id >= 0 && data.id <= 9999999999999999 &&
+        data.mode is string && data.mode.size() >= 1 && data.mode.size() <= 80 &&
+        data.players is string && data.players.size() >= 1 && data.players.size() <= 500 &&
+        data.winner is string && data.winner.size() >= 1 && data.winner.size() <= 130 &&
+        data.get('score', '') is string && data.get('score', '').size() <= 40 &&
+        data.timestamp is string && data.timestamp.size() >= 1 && data.timestamp.size() <= 80 &&
+        data.commandId is string && data.commandId == entryId &&
+        data.commandId.matches('^[0-9a-fA-F-]{36}$') &&
+        data.revision is int && data.revision > 0 && data.revision <= 1000000;
     }
 
     match /sessions/{sessionId} {
-      // Room codes are capabilities for viewing, but every client must at least
-      // have a valid Firebase identity. Host-only fields are not secrets.
-      allow read: if signedIn();
+      allow get: if isAuthenticated();
+      allow list: if false;
 
-      allow create: if signedIn()
-        && request.resource.data.hostUid == request.auth.uid
-        && request.resource.data.revision == 0
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.updatedAt == request.time
-        && request.resource.data.lastActiveAt == request.time
-        && validSessionShape(request.resource.data);
+      allow create: if isAuthenticated() && validRoomCode(sessionId) &&
+        uidUnchanged(request.resource.data) && request.resource.data.revision == 0 &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.lastActiveAt == request.time &&
+        validSession(request.resource.data);
 
-      allow update: if ownsSession()
-        && request.resource.data.hostUid == resource.data.hostUid
-        && request.resource.data.createdAt == resource.data.createdAt
-        && request.resource.data.revision >= resource.data.revision
-        && request.resource.data.revision <= resource.data.revision + 1
-        && request.resource.data.updatedAt == request.time
-        && request.resource.data.lastActiveAt == request.time
-        && validSessionShape(request.resource.data);
+      allow update: if isDocOwner() && uidNotModified(request.resource.data) &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.revision >= resource.data.revision &&
+        request.resource.data.revision <= resource.data.revision + 1 &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.lastActiveAt == request.time &&
+        validSession(request.resource.data);
 
-      allow delete: if ownsSession();
+      allow delete: if isDocOwner();
 
       match /history/{entryId} {
-        function parent() {
+        function parentPath() {
           return /databases/$(database)/documents/sessions/$(sessionId);
         }
 
         function parentOwned() {
-          return signedIn() && get(parent()).data.hostUid == request.auth.uid;
+          return isAuthenticated() && exists(parentPath()) &&
+            get(parentPath()).data.hostUid == request.auth.uid;
         }
 
-        allow read: if signedIn() && exists(parent());
-        allow create: if parentOwned()
-          && validHistory(request.resource.data, entryId)
-          && getAfter(parent()).data.revision == request.resource.data.revision;
+        allow get, list: if isAuthenticated() && exists(parentPath());
+        allow create: if parentOwned() && validHistory(request.resource.data, entryId) &&
+          getAfter(parentPath()).data.revision == request.resource.data.revision;
         allow update: if false;
         allow delete: if parentOwned();
       }

@@ -6,6 +6,7 @@ describe('V1 release surface', () => {
     expect(V1_RELEASE).toMatchObject({
       queueMode: 'default',
       maxCourts: 3,
+      maxPlayers: 30,
       showQueueModeSelector: false,
       showAccessPinSetup: false,
       showSkillTagging: false,

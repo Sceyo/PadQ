@@ -445,15 +445,24 @@ function QueueSystemContent() {
   const addTempPlayer = () => {
     const t = currentName.trim();
     if (!t) return;
-    if (tempPlayers.includes(t)) { setSetupErrorMsg(`"${t}" is already in the list`); return; }
+    if (tempPlayers.length >= V1_RELEASE.maxPlayers) { setSetupErrorMsg(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
+    if (t.length > 60) { setSetupErrorMsg('Player names must be 60 characters or fewer'); return; }
+    if (tempPlayers.some(name => name.toLowerCase() === t.toLowerCase())) { setSetupErrorMsg(`"${t}" is already in the list`); return; }
     setSetupErrorMsg(null);
     setTempPlayers(prev => [...prev, t]); setCurrentName('');
   };
   const removeTempPlayer = (i: number) => setTempPlayers(prev => prev.filter((_, j) => j !== i));
 
   const addFromPaste = () => {
-    const names = pasteInput.split(/[,\n]+/).map(n => n.trim()).filter(n => n.length > 0);
-    const fresh = names.filter(n => !tempPlayers.includes(n));
+    const names = pasteInput.split(/[,\n]+/).map(n => n.trim()).filter(n => n.length > 0 && n.length <= 60);
+    const available = V1_RELEASE.maxPlayers - tempPlayers.length;
+    const seen = new Set(tempPlayers.map(name => name.toLowerCase()));
+    const fresh = names.filter(name => {
+      const key = name.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    }).slice(0, available);
     if (fresh.length === 0) { setPasteInput(''); return; }
     setTempPlayers(prev => [...prev, ...fresh]);
     setPasteInput('');
@@ -976,22 +985,25 @@ function QueueSystemContent() {
   };
 
   const handleAddPlayerLive = (name: string) => {
-    if (players.includes(name)) { showToast(`"${name}" is already in the session`); return; }
-    const np = [...players, name], nq = [...queue, name];
+    const trimmedName = name.trim();
+    if (players.some(player => player.toLowerCase() === trimmedName.toLowerCase())) { showToast(`"${trimmedName}" is already in the session`); return; }
+    if (players.length >= V1_RELEASE.maxPlayers) { showToast(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
+    if (trimmedName.length === 0 || trimmedName.length > 60) { showToast('Player names must be 60 characters or fewer'); return; }
+    const np = [...players, trimmedName], nq = [...queue, trimmedName];
     setPlayers(np); setQueue(nq);
     if (activeQueueMode === 'default' && gameMode === 'doubles') {
-      const newPaddleState = addPlayerToWaiting(paddleStateRef.current, name);
+      const newPaddleState = addPlayerToWaiting(paddleStateRef.current, trimmedName);
       paddleStateRef.current = newPaddleState;
       setPaddleStateUI(newPaddleState);
     } else if (activeQueueMode === 'default' && gameMode === 'singles') {
-      const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, name);
+      const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, trimmedName);
       singlesStateRef.current = newSinglesState;
       setSinglesStateUI(newSinglesState);
     } else if (activeQueueMode === 'skilled' && skilledState) {
       const activeCount = np.filter(p => !activeSittingOut.includes(p)).length;
       setSkilledState(prev => {
         if (!prev) return prev;
-        const afterAdd = addPlayerToSkilledStateEngine(name, prev, skilledBrackets);
+        const afterAdd = addPlayerToSkilledStateEngine(trimmedName, prev, skilledBrackets);
         return recalculateRestEngine(afterAdd, activeCount);
       });
     }
@@ -1081,7 +1093,9 @@ function QueueSystemContent() {
   };
 
   const handleAddFromRoster = () => {
-    const fresh = [...rosterSelected].filter(n => !tempPlayers.includes(n));
+    const available = V1_RELEASE.maxPlayers - tempPlayers.length;
+    const existing = new Set(tempPlayers.map(name => name.toLowerCase()));
+    const fresh = [...rosterSelected].filter(name => !existing.has(name.toLowerCase()) && name.length <= 60).slice(0, available);
     if (fresh.length === 0) return;
     setTempPlayers(prev => [...prev, ...fresh]);
     setRosterSelected(new Set());

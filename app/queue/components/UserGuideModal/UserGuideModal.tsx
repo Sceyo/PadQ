@@ -6,7 +6,7 @@ import { X } from 'lucide-react';
 const GUIDE_SECTIONS = [
   {
     title: '🚀 Starting a Session',
-    body: 'Add players, choose Singles or Doubles and up to 3 courts, then tap Start Queue. Players are queued in the order you enter them. A 4-character Room Code is generated for spectators.',
+    body: 'Add up to 30 players, choose Singles or Doubles and up to 3 courts, then tap Start Queue. Players are queued in the order you enter them. A 6-character Room Code is generated for spectators.',
   },
   {
     title: '🏸 Paddle Queue (Default)',

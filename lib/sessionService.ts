@@ -14,7 +14,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  setDoc,
   updateDoc,
   deleteDoc,
   writeBatch,
@@ -29,6 +28,7 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { db, ensureAuthenticated } from './firebase';
+import { generateRoomCode } from './roomCode';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -127,17 +127,7 @@ export interface SessionDoc {
 
 // ── Helpers ───────────────────────────────────────────────
 
-/** Generate a UUID-style room code */
-function generateId(): string {
-  return crypto.randomUUID
-    ? crypto.randomUUID()
-    : Math.random().toString(36).slice(2, 10).toUpperCase();
-}
-
-/** Short human-readable room code shown in the UI (e.g. "AB3X") */
-export function generateRoomCode(): string {
-  return Math.random().toString(36).slice(2, 6).toUpperCase();
-}
+class RoomCodeCollisionError extends Error {}
 
 const sessionRef = (id: string) => doc(db, 'sessions', id);
 
@@ -152,21 +142,28 @@ export async function createSession(
   data: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt' | 'lastActiveAt'>,
 ): Promise<{ sessionId: string }> {
   const user = await ensureAuthenticated();
-  let sessionId = generateRoomCode();
-  while ((await getDoc(sessionRef(sessionId))).exists()) {
-    sessionId = generateRoomCode();
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const sessionId = generateRoomCode();
+    try {
+      await runTransaction(db, async tx => {
+        const ref = sessionRef(sessionId);
+        if ((await tx.get(ref)).exists()) throw new RoomCodeCollisionError();
+        tx.set(ref, {
+          ...data,
+          hostUid: user.uid,
+          revision: 0,
+          isLive:       false,
+          createdAt:    serverTimestamp(),
+          updatedAt:    serverTimestamp(),
+          lastActiveAt: serverTimestamp(),
+        });
+      });
+      return { sessionId };
+    } catch (error) {
+      if (!(error instanceof RoomCodeCollisionError)) throw error;
+    }
   }
-  await setDoc(sessionRef(sessionId), {
-    ...data,
-    hostUid: user.uid,
-    revision: 0,
-    isLive:       false,           // ← host must explicitly go live
-    createdAt:    serverTimestamp(),
-    updatedAt:    serverTimestamp(),
-    lastActiveAt: serverTimestamp(),
-  });
-
-  return { sessionId };
+  throw new Error('Unable to reserve a room code. Please try again.');
 }
 
 /**
@@ -259,31 +256,6 @@ export async function updateQueueSafely(
     }
     throw err;
   }
-}
-
-/**
- * addHistoryEntry
- * Match history is a Firestore subcollection.
- * IMPORTANT: Firestore rejects `undefined` values — we strip them here
- * so optional fields like `score` don't cause "Unsupported field value" errors.
- */
-export async function addHistoryEntry(
-  sessionId: string,
-  entry: MatchHistoryEntry,
-): Promise<void> {
-  await ensureAuthenticated();
-  const histRef = collection(db, 'sessions', sessionId, 'history');
-  // Build a clean object with no undefined values
-  const clean: Record<string, unknown> = {
-    id:        entry.id,
-    mode:      entry.mode,
-    players:   entry.players,
-    winner:    entry.winner,
-    timestamp: entry.timestamp,
-  };
-  // Only include score if it's actually set
-  if (entry.score !== undefined) clean.score = entry.score;
-  await setDoc(doc(histRef, entry.commandId ?? generateId()), clean);
 }
 
 /** Revision-checked update for fields that can change the next match assignment. */
