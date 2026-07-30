@@ -250,11 +250,33 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+### Safe local Firebase browser testing
+
+Use two PowerShell terminals so browser tests cannot write to production.
+
+Terminal 1:
+
+```powershell
+npm.cmd run emulators
+```
+
+Terminal 2:
+
+```powershell
+$env:NEXT_PUBLIC_USE_FIREBASE_EMULATORS="true"
+npm.cmd run dev
+```
+
+Set the switch before starting Next.js. If the development server was already
+running, stop and restart it. The local Emulator UI is available at
+[http://127.0.0.1:4000](http://127.0.0.1:4000).
+
 ## Available commands
 
 | Command | Purpose |
 |---|---|
 | `npm run dev` | Start the Next.js development server |
+| `npm run emulators` | Start local Authentication and Firestore for safe browser tests |
 | `npm run build` | Create a production build |
 | `npm run start` | Serve the production build |
 | `npm run lint` | Run ESLint |

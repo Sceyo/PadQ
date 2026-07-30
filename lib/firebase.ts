@@ -19,8 +19,13 @@
 // ═══════════════════════════════════════════════════════════
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, signInAnonymously, type User } from 'firebase/auth';
-import { getFirestore, initializeFirestore, CACHE_SIZE_UNLIMITED } from 'firebase/firestore';
+import { connectAuthEmulator, getAuth, signInAnonymously, type User } from 'firebase/auth';
+import {
+  CACHE_SIZE_UNLIMITED,
+  connectFirestoreEmulator,
+  getFirestore,
+  initializeFirestore,
+} from 'firebase/firestore';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
 const firebaseConfig = {
@@ -34,12 +39,13 @@ const firebaseConfig = {
 
 // Prevent re-initializing on hot-reload in Next.js dev mode
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const useFirebaseEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === 'true';
 
 // Enable only after the production web app is registered in Firebase App Check.
 // Monitor verified requests before turning on Firestore enforcement.
 const appCheckEnabled = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_ENABLED === 'true';
 const appCheckSiteKey = process.env.NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY;
-if (typeof window !== 'undefined' && appCheckEnabled && appCheckSiteKey) {
+if (typeof window !== 'undefined' && !useFirebaseEmulators && appCheckEnabled && appCheckSiteKey) {
   initializeAppCheck(app, {
     provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
     isTokenAutoRefreshEnabled: true,
@@ -47,6 +53,30 @@ if (typeof window !== 'undefined' && appCheckEnabled && appCheckSiteKey) {
 }
 
 export const auth = getAuth(app);
+
+// Use experimentalForceLongPolling to suppress "WebChannelConnection
+// RPC 'Listen' stream transport errored" in dev and on some networks.
+// Long polling is slightly less efficient than WebSockets but is far
+// more reliable behind proxies, VPNs, and corporate firewalls.
+// In production on Vercel this makes no measurable difference.
+export const db = getApps().length > 1
+  ? getFirestore(app)
+  : initializeFirestore(app, {
+      experimentalForceLongPolling: true,
+      cacheSizeBytes: CACHE_SIZE_UNLIMITED,
+    });
+
+// Local browser tests must never fall through to production Firebase. Set the
+// public switch before starting Next.js, then run the Auth + Firestore emulators.
+const emulatorGlobal = globalThis as typeof globalThis & {
+  __padqFirebaseEmulatorsConnected?: boolean;
+};
+if (typeof window !== 'undefined' && useFirebaseEmulators && !emulatorGlobal.__padqFirebaseEmulatorsConnected) {
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  emulatorGlobal.__padqFirebaseEmulatorsConnected = true;
+}
+
 let signInPromise: Promise<User> | null = null;
 
 /** Ensure every client has an identity before it accesses Firestore. */
@@ -60,17 +90,5 @@ export async function ensureAuthenticated(): Promise<User> {
   }
   return signInPromise;
 }
-
-// Use experimentalForceLongPolling to suppress "WebChannelConnection
-// RPC 'Listen' stream transport errored" in dev and on some networks.
-// Long polling is slightly less efficient than WebSockets but is far
-// more reliable behind proxies, VPNs, and corporate firewalls.
-// In production on Vercel this makes no measurable difference.
-export const db = getApps().length > 1
-  ? getFirestore(app)
-  : initializeFirestore(app, {
-      experimentalForceLongPolling: true,
-      cacheSizeBytes: CACHE_SIZE_UNLIMITED,
-    });
 
 export default app;
