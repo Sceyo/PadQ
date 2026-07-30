@@ -14,7 +14,7 @@ PAD-Q is an independently developed product in **active development**. The `main
 
 - Deployed on Vercel
 - Backed by Firebase Cloud Firestore
-- 154 application tests passing; 12 Firestore rules tests are maintained for the emulator
+- 154 application tests and 15 Firestore emulator rules tests passing
 - Designed for browser-based host and spectator experiences
 
 The project is functional, but it should still be treated as a testing build rather than a production-secure service. Current limitations are documented below.
@@ -88,6 +88,8 @@ For a single court, spectators can follow the optional live score. In
 multi-court sessions, **Live Court Status** lets a viewer choose Court 1, 2, or
 3 and see its current players, together with the shared next-player queue,
 without requiring the host to enter every point.
+
+V1 supports one optional locked partner pair per event.
 
 ### Multi-court management
 
@@ -173,7 +175,7 @@ The current Vitest suite reports:
 
 ```text
 Test Files  9 passed | 1 skipped (10)
-Tests       154 passed | 12 skipped (166)
+Tests       154 passed | 15 skipped (169)
 ```
 
 The suite focuses on deterministic domain logic and verifies:

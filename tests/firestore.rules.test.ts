@@ -134,6 +134,30 @@ suite('Firestore V1 production rules', () => {
     }
   });
 
+  it('accepts a valid 30-player waiting roster', async () => {
+    const host = env.authenticatedContext('host-5a').firestore();
+    const players = Array.from({ length: 30 }, (_, i) => `Player ${i + 1}`);
+    await assertSucceeds(setDoc(doc(host, 'sessions', 'E5WAT7'), sessionData('host-5a', {
+      players,
+      queue: players,
+    })));
+  });
+
+  it('accepts three populated courts before the roster reaches 30 players', async () => {
+    const host = env.authenticatedContext('host-5c').firestore();
+    const players = Array.from({ length: 16 }, (_, i) => `Player ${i + 1}`);
+    const courts = [0, 1, 2].map(i => ({
+      id: `court-${i}`,
+      name: `Court ${i + 1}`,
+      onCourt: players.slice(i * 4, i * 4 + 4),
+    }));
+    await assertSucceeds(setDoc(doc(host, 'sessions', 'E5CRTS'), sessionData('host-5c', {
+      players,
+      queue: players.slice(12),
+      courtSlots: courts,
+    })));
+  });
+
   it('accepts a valid 30-player, three-court session with locked partners', async () => {
     const host = env.authenticatedContext('host-5').firestore();
     const players = Array.from({ length: 30 }, (_, i) => `Player ${i + 1}`);
@@ -142,6 +166,12 @@ suite('Firestore V1 production rules', () => {
       name: `Court ${i + 1}`,
       onCourt: players.slice(i * 4, i * 4 + 4),
     }));
+    await assertSucceeds(setDoc(doc(host, 'sessions', 'E5BASE'), sessionData('host-5', {
+      players,
+      queue: players.slice(12),
+      courtName: '3 Courts',
+      courtSlots: courts,
+    })));
     await assertSucceeds(setDoc(doc(host, 'sessions', 'E5REAL'), sessionData('host-5', {
       players,
       queue: players.slice(12),
@@ -171,13 +201,23 @@ suite('Firestore V1 production rules', () => {
     })));
   });
 
+  it('rejects a session with a required field removed', async () => {
+    const host = env.authenticatedContext('host-6b').firestore();
+    const invalid = sessionData('host-6b') as Record<string, unknown>;
+    delete invalid.queue;
+    await assertFails(setDoc(doc(host, 'sessions', 'F6MISS'), invalid));
+  });
+
   it('rejects malformed court, partner, score and engine payloads', async () => {
     const host = env.authenticatedContext('host-7').firestore();
     await assertFails(setDoc(doc(host, 'sessions', 'G7CRT7'), sessionData('host-7', {
       courtSlots: [{ id: 'court-0', name: 'Court 1', onCourt: ['A', 'B', 'C'] }],
     })));
     await assertFails(setDoc(doc(host, 'sessions', 'G7PAR7'), sessionData('host-7', {
-      lockedPartners: [{ a: 'A', b: 'OUTSIDER' }],
+      lockedPartners: Array.from({ length: 2 }, (_, i) => ({ a: `A${i}`, b: `B${i}` })),
+    })));
+    await assertFails(setDoc(doc(host, 'sessions', 'G7BIGP'), sessionData('host-7', {
+      lockedPartners: [{ a: 'A'.repeat(101), b: 'B' }],
     })));
     await assertFails(setDoc(doc(host, 'sessions', 'G7SCR7'), sessionData('host-7', {
       liveScore: { scoreA: 999, scoreB: 0, labelA: 'A', labelB: 'B', limit: 11, baseLimit: 11, deuce: false, active: true },

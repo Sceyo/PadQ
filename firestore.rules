@@ -64,7 +64,7 @@ service cloud.firestore {
       return team is map && team.keys().hasAll(['a', 'b']) &&
         team.keys().hasOnly(['a', 'b']) &&
         team.a is string && team.b is string && team.a != team.b &&
-        team.a in players && team.b in players;
+        players.hasAll([team.a, team.b]);
     }
 
     function validTeamAt(teams, players, index) {
@@ -95,31 +95,35 @@ service cloud.firestore {
     }
 
     function validCourts(courts, gameMode) {
+      let court0 = courts.size() > 0 ? courts[0].onCourt : [];
+      let court1 = courts.size() > 1 ? courts[1].onCourt : [];
+      let court2 = courts.size() > 2 ? courts[2].onCourt : [];
+      let assigned = court0.concat(court1).concat(court2);
       return courts is list && courts.size() <= 3 &&
         validCourtAt(courts, gameMode, 0) &&
         validCourtAt(courts, gameMode, 1) &&
         validCourtAt(courts, gameMode, 2) &&
-        (courts.size() < 2 || !courts[0].onCourt.hasAny(courts[1].onCourt)) &&
-        (courts.size() < 3 || (
-          !courts[0].onCourt.hasAny(courts[2].onCourt) &&
-          !courts[1].onCourt.hasAny(courts[2].onCourt)
-        ));
+        assigned.toSet().size() == assigned.size();
     }
 
-    function validLockedPairAt(pairs, players, index) {
-      return pairs.size() <= index || validTeam(pairs[index], players);
+    function validLockedPair(pair) {
+      return pair is map && pair.keys().hasAll(['a', 'b']) &&
+        pair.keys().hasOnly(['a', 'b']) &&
+        pair.a is string && pair.a.size() >= 1 && pair.a.size() <= 100 &&
+        pair.b is string && pair.b.size() >= 1 && pair.b.size() <= 100 &&
+        pair.a != pair.b;
     }
 
-    function validLockedPairs(pairs, players) {
-      return pairs is list && pairs.size() <= 15 &&
-        validLockedPairAt(pairs, players, 0) && validLockedPairAt(pairs, players, 1) &&
-        validLockedPairAt(pairs, players, 2) && validLockedPairAt(pairs, players, 3) &&
-        validLockedPairAt(pairs, players, 4) && validLockedPairAt(pairs, players, 5) &&
-        validLockedPairAt(pairs, players, 6) && validLockedPairAt(pairs, players, 7) &&
-        validLockedPairAt(pairs, players, 8) && validLockedPairAt(pairs, players, 9) &&
-        validLockedPairAt(pairs, players, 10) && validLockedPairAt(pairs, players, 11) &&
-        validLockedPairAt(pairs, players, 12) && validLockedPairAt(pairs, players, 13) &&
-        validLockedPairAt(pairs, players, 14);
+    function validLockedPairAt(pairs, index) {
+      return pairs.size() <= index || validLockedPair(pairs[index]);
+    }
+
+    function validLockedPairs(pairs) {
+      // The host client validates roster membership and uniqueness. Rules
+      // validate every pair's bounded shape without scanning a 30-player
+      // roster for each value and exceeding the 1,000-expression limit.
+      return pairs is list && pairs.size() <= 1 &&
+        validLockedPairAt(pairs, 0);
     }
 
     function validLiveScore(score) {
@@ -169,13 +173,7 @@ service cloud.firestore {
     function validSession(data) {
       let players = data.players;
       let courts = data.get('courtSlots', []);
-      return data.keys().hasAll([
-          'hostUid', 'revision', 'gameMode', 'queueMode', 'elimType',
-          'players', 'queue', 'playAllRel', 'tournamentMatches',
-          'tournamentActive', 'tournamentWinner', 'createdAt', 'updatedAt',
-          'lastActiveAt'
-        ]) &&
-        data.keys().hasOnly([
+      return data.keys().hasOnly([
           'hostUid', 'revision', 'gameMode', 'queueMode', 'elimType',
           'players', 'queue', 'playAllRel', 'tournamentMatches',
           'tournamentActive', 'tournamentWinner', 'liveScore', 'isLive',
@@ -196,7 +194,7 @@ service cloud.firestore {
         data.get('courtName', '') is string && data.get('courtName', '').size() <= 60 &&
         validLiveScore(data.get('liveScore', null)) &&
         validCourts(courts, data.gameMode) &&
-        validLockedPairs(data.get('lockedPartners', []), players) &&
+        validLockedPairs(data.get('lockedPartners', [])) &&
         validPlayerSubset(data.get('sittingOut', [])) &&
         validDoublesEngine(data.get('doublesEngineState', null), players) &&
         validSinglesEngine(data.get('singlesEngineState', null), players) &&

@@ -42,6 +42,7 @@ export interface SetupViewProps {
   errorMsg?:           string;
   /** Pre-session locked partner pairs — only relevant for doubles multi-court */
   lockedPartners:      [string, string][];
+  maxLockedPartners:   number;
   onAddLockedPair:     (a: string, b: string) => void;
   onRemoveLockedPair:  (i: number) => void;
 }
@@ -57,7 +58,7 @@ export function SetupView({
   onAddPlayer, onRemoveTempPlayer, onAddFromPaste,
   onStartQueue, isSaving, onBack, errorMsg,
   onSetRosterSkill,
-  lockedPartners, onAddLockedPair, onRemoveLockedPair,
+  lockedPartners, maxLockedPartners, onAddLockedPair, onRemoveLockedPair,
 }: SetupViewProps) {
   const minPlayers = gameMode === 'doubles' && courtCount > 1
     ? courtCount * 4
@@ -288,11 +289,11 @@ export function SetupView({
               <span>Lock Partners <span className="setup-field-hint">(optional)</span></span>
             </div>
             <p className="partner-lock-hint">
-              Tap two players to pair them as permanent partners. Locked pairs always play on the same team.
+              Tap two players to pair them as permanent partners. V1 supports one locked partner pair per event.
             </p>
 
             {/* Player grid — tap to select first, then second */}
-            <div className="partner-player-grid">
+            {lockedPartners.length < maxLockedPartners ? <div className="partner-player-grid">
               {tempPlayers
                 .filter(p => !lockedPartners.some(pair => pair.includes(p)))
                 .map(p => {
@@ -318,7 +319,7 @@ export function SetupView({
                     </button>
                   );
                 })}
-            </div>
+            </div> : <p className="partner-lock-hint">Partner-pair limit reached.</p>}
 
             {/* Locked pairs list */}
             {lockedPartners.length > 0 && (

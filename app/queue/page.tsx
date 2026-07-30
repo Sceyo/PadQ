@@ -1269,7 +1269,9 @@ function QueueSystemContent() {
         onBack={() => router.push('/')}
         errorMsg={setupErrorMsg ?? undefined}
         lockedPartners={lockedPartners}
+        maxLockedPartners={V1_RELEASE.maxLockedPartners}
         onAddLockedPair={(a, b) => setLockedPartners(prev => {
+          if (prev.length >= V1_RELEASE.maxLockedPartners) return prev;
           // Prevent duplicate pairs and each player appearing in more than one pair
           const alreadyPaired = new Set(prev.flat());
           if (alreadyPaired.has(a) || alreadyPaired.has(b)) return prev;

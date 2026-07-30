@@ -4,6 +4,7 @@
 **Hosting constraint:** Vercel Hobby (free tier)  
 **Backend constraint:** Firebase Spark (free tier)  
 **Supported V1 event:** up to 30 players on 3 courts
+**Partner requests:** 1 locked pair per event
 
 V1 is ready to launch only when every blocking checkbox below is complete. A
 passing build alone is not a release approval.
@@ -34,7 +35,7 @@ passing build alone is not a release approval.
 
 ## Gate 1.5 — Live Court Status spectator view
 
-**Status: Implementation complete; emulator and browser verification pending**
+**Status: Implementation and emulator verification complete; browser verification pending**
 
 PADQ's central V1 promise is that players can see who is currently playing on
 every court, choose the court they want to focus on, see who plays next, see the
@@ -58,7 +59,7 @@ result so court operations remain practical and Firestore usage stays low.
       queue/court assignment.
 - [x] Extend Firestore rules and tests so a player cannot occupy two courts and
       only the host can change assignments; the Firebase rules dry run passes.
-- [ ] Run the emulator tests for cross-room access, unauthorized assignment updates,
+- [x] Run the emulator tests for cross-room access, unauthorized assignment updates,
       court switching, concurrent results, and atomic match completion.
 - [x] Add component tests for selecting Court 1–3, focused current players, safe
       fallback selection, and next-player group size.

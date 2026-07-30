@@ -62,11 +62,13 @@ Operations:
 ## Firestore rules evaluation constraint
 
 Firestore caps a request at 1,000 evaluated rule expressions. Deep validation
-of every value across a 30-player roster, queue and three court lists exceeds
-that limit. The rules therefore enforce strict document keys, list counts,
-mode/court limits and structured map schemas; the client separately enforces
-name length and duplicates. App Check remains required to reduce hostile-client
-abuse, and Firestore's document-size ceiling provides the final payload bound.
+of every value across a 30-player roster, queue, three court lists and many locked
+partner pairs exceeds that limit and rejects valid rooms. The rules therefore
+enforce strict document keys, list counts, mode/court limits and one strictly
+bounded partner-pair record; the host client and queue engine enforce
+partner membership and uniqueness.
+App Check remains required to reduce hostile-client abuse, and Firestore's
+document-size ceiling provides the final payload bound.
 
 ## Query compatibility requirements
 
@@ -101,6 +103,7 @@ abuse, and Firestore's document-size ceiling provides the final payload bound.
 | Query mismatch | Known-room session get and bounded known-parent history queries pass |
 | Validator pattern | Both session create and update call `validSession`; history is immutable |
 
-Current suite: 12 adversarial rules tests. Firebase dry-run compilation passes.
-The updated suite still needs an emulator rerun on a machine with Java; this
-workstation cannot start the Firestore emulator because Java is not installed.
+Emulator outcome: 15/15 adversarial rules tests passed, including separate
+30-player roster, three populated court, combined real-life room, missing-field,
+duplicate-court-player, ownership and atomic-history cases. Firebase dry-run
+compilation also passes.
