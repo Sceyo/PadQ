@@ -64,9 +64,13 @@ Operations:
 Firestore caps a request at 1,000 evaluated rule expressions. Deep validation
 of every value across a 30-player roster, queue, three court lists and many locked
 partner pairs exceeds that limit and rejects valid rooms. The rules therefore
-enforce strict document keys, list counts, mode/court limits and one strictly
-bounded partner-pair record; the host client and queue engine enforce
-partner membership and uniqueness.
+enforce strict document keys, list counts, mode/court limits and a partner-pair
+count no greater than half the roster; the host client and queue engine enforce
+pair shape, player-name bounds, roster membership and uniqueness.
+Room creation performs the deepest engine validation. Host-only updates validate
+the complete outer engine schema, enums, scalar ranges and collection bounds but
+do not rescan every nested engine value, leaving expression budget for atomic
+three-court result and history writes.
 App Check remains required to reduce hostile-client abuse, and Firestore's
 document-size ceiling provides the final payload bound.
 
@@ -103,7 +107,13 @@ document-size ceiling provides the final payload bound.
 | Query mismatch | Known-room session get and bounded known-parent history queries pass |
 | Validator pattern | Both session create and update call `validSession`; history is immutable |
 
-Emulator outcome: 15/15 adversarial rules tests passed, including separate
+Emulator outcome: 16/16 adversarial rules tests passed, including separate
 30-player roster, three populated court, combined real-life room, missing-field,
 duplicate-court-player, ownership and atomic-history cases. Firebase dry-run
-compilation also passes.
+compilation passed for the preceding candidate. The exact final rules compile
+in the local emulator; repeat the remote compile-only dry run before deployment.
+
+Application outcome: automated multi-court simulations pass with 30 players,
+three courts, all 15 possible partner pairs, and 150 staggered rotations. The
+live editor restricts new pairs to players currently sharing one court or the
+waiting queue, preventing cross-court pairing from interrupting active matches.

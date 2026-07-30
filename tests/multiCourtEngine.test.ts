@@ -79,4 +79,30 @@ describe('partner-aware multi-court doubles', () => {
 
     expect(seen).toEqual(new Set(players));
   });
+
+  it('stress test: keeps all 15 possible pairs together across three courts', () => {
+    const players = Array.from({ length: 30 }, (_, i) => `P${i + 1}`);
+    const locked: LockedPartnerPair[] = Array.from(
+      { length: 15 },
+      (_, i) => [players[i * 2], players[i * 2 + 1]],
+    );
+    const seeded = seedMultiCourtDoubles(players, 3, locked);
+    const courts = seeded.courts.map(onCourt => [...onCourt]);
+    let waiting = [...seeded.waiting];
+    const seen = new Set(courts.flat());
+
+    for (let round = 0; round < 150; round += 1) {
+      const courtIndex = round % 3;
+      const next = rotateMultiCourtDoubles(waiting, courts[courtIndex], locked);
+      courts[courtIndex] = next.onCourt;
+      waiting = next.waiting;
+      next.onCourt.forEach(player => seen.add(player));
+
+      expectValidPartition(players, courts, waiting, locked);
+      expect(courts.every(court => court.length === 4)).toBe(true);
+    }
+
+    expect(seen).toEqual(new Set(players));
+  });
+
 });

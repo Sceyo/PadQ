@@ -63,7 +63,7 @@ import { UserGuide } from './components/UserGuideModal/UserGuideModal';
 import { PaddleStatusPanel } from './components/PaddleStatusPanel/PaddleStatusPanel';
 import { SinglesStatusPanel } from './components/SinglesStatusPanel/SinglesStatusPanel';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard/AnalyticsDashboard';
-import { AddPlayerPanel, ManualQueuePanel } from './components/LiveManagement/LiveManagement';
+import { AddPlayerPanel, ManualQueuePanel, PartnerPanel } from './components/LiveManagement/LiveManagement';
 import { SmartSuggestions } from './components/SmartSuggestions/SmartSuggestions';
 import { SessionBar } from './components/SessionBar/SessionBar';
 import { CourtTabs } from './components/CourtTabs/CourtTabs';
@@ -186,9 +186,10 @@ function QueueSystemContent() {
   const [localCourtSlots, setLocalCourtSlots] = useState<CourtSlot[]>([]);
 
   useEffect(() => {
-    const persisted = session.isConnected ? session.lockedPartners : lockedPartners;
-    lockedPartnersRef.current = persisted;
-  }, [lockedPartners, session.isConnected, session.lockedPartners]);
+    if (!session.isConnected) return;
+    setLockedPartners(session.lockedPartners);
+    lockedPartnersRef.current = session.lockedPartners;
+  }, [session.isConnected, session.lockedPartners]);
 
   // ── Legacy court group (tab switching between independent sessions) ──
   const [courts, setCourts] = useState<CourtEntry[]>(() => V1_RELEASE.showLegacyCourtCoordinator ? loadCourtGroup() : []);
@@ -480,12 +481,14 @@ function QueueSystemContent() {
     resetSinglesState(tempPlayers);
     setPlayers(tempPlayers); setTempPlayers([]); setLocalHistory([]);
     setLocalTournamentActive(false); setLocalTournamentWinner(null); setLocalTournamentM([]);
+    setLockedPartners([]);
+    lockedPartnersRef.current = [];
 
     // Build initial court slots for multi-court doubles mode
     let initialCourtSlots: CourtSlot[] | undefined;
     let initialQueue: string[];
     if (gameMode === 'doubles' && courtCount > 1) {
-      const seeded = seedMultiCourtDoubles(orderedPlayers, courtCount, lockedPartners);
+      const seeded = seedMultiCourtDoubles(orderedPlayers, courtCount, []);
 
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
         id: `court-${i}`,
@@ -495,7 +498,6 @@ function QueueSystemContent() {
       initialQueue = seeded.waiting;
       setLocalCourtSlots(initialCourtSlots);
       courtSlotsRef.current = initialCourtSlots;
-      lockedPartnersRef.current = lockedPartners;
     } else if (gameMode === 'singles' && courtCount > 1) {
       // Singles multi-court: seed 2 players per court, rest go to shared queue
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
@@ -536,7 +538,7 @@ function QueueSystemContent() {
       tournamentWinner: null, isLive: true,
       accessPin: pin,
       courtName,
-      lockedPartners: lockedPartners.map(([a, b]) => ({ a, b })),
+      lockedPartners: [],
       ...(initialCourtSlots ? { courtSlots: initialCourtSlots } : {}),
     });
   };
@@ -1010,6 +1012,27 @@ function QueueSystemContent() {
     if (session.sessionId) session.syncField({ players: np, queue: nq });
   };
 
+  const handlePartnerPairsChange = (nextPairs: [string, string][]) => {
+    const playerSet = new Set(players);
+    const used = new Set<string>();
+    const maxPairs = Math.floor(players.length / 2);
+    const validPairs = nextPairs.filter(([a, b]) => {
+      if (a === b || !playerSet.has(a) || !playerSet.has(b)) return false;
+      if (used.has(a) || used.has(b)) return false;
+      used.add(a);
+      used.add(b);
+      return true;
+    }).slice(0, maxPairs);
+
+    setLockedPartners(validPairs);
+    lockedPartnersRef.current = validPairs;
+    if (session.sessionId) {
+      void session.syncField({
+        lockedPartners: validPairs.map(([a, b]) => ({ a, b })),
+      });
+    }
+  };
+
   const handleFullReset = () => { setPendingConfirm({ type: 'clear-history' }); };
 
   const handleHardReset = () => { setPendingConfirm({ type: 'hard-reset' }); };
@@ -1268,16 +1291,6 @@ function QueueSystemContent() {
         isSaving={session.isSaving}
         onBack={() => router.push('/')}
         errorMsg={setupErrorMsg ?? undefined}
-        lockedPartners={lockedPartners}
-        maxLockedPartners={V1_RELEASE.maxLockedPartners}
-        onAddLockedPair={(a, b) => setLockedPartners(prev => {
-          if (prev.length >= V1_RELEASE.maxLockedPartners) return prev;
-          // Prevent duplicate pairs and each player appearing in more than one pair
-          const alreadyPaired = new Set(prev.flat());
-          if (alreadyPaired.has(a) || alreadyPaired.has(b)) return prev;
-          return [...prev, [a, b]];
-        })}
-        onRemoveLockedPair={(i) => setLockedPartners(prev => prev.filter((_, j) => j !== i))}
       />
     );
   }
@@ -1459,6 +1472,14 @@ function QueueSystemContent() {
                   <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
                     onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
                     onRemove={i => { const nq = queue.filter((_, j) => j !== i); setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
+                  />
+                )}
+                {!isSkilled && gameMode === 'doubles' && courtSlots.length > 0 && (
+                  <PartnerPanel
+                    players={players}
+                    playerGroups={[queue, ...courtSlots.map(court => court.onCourt)]}
+                    pairs={lockedPartners}
+                    onChange={handlePartnerPairsChange}
                   />
                 )}
               </div>

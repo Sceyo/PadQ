@@ -4,7 +4,7 @@
 **Hosting constraint:** Vercel Hobby (free tier)  
 **Backend constraint:** Firebase Spark (free tier)  
 **Supported V1 event:** up to 30 players on 3 courts
-**Partner requests:** 1 locked pair per event
+**Partner requests:** up to `floor(players / 2)` locked pairs per event
 
 V1 is ready to launch only when every blocking checkbox below is complete. A
 passing build alone is not a release approval.
@@ -28,7 +28,10 @@ passing build alone is not a release approval.
 - [x] Validate the V1 session schema, player and court limits, timestamps,
       queue state, scores, and atomic match history in Firestore rules.
 - [x] Reject deferred modes and fields at the database boundary.
-- [x] Pass adversarial Firestore emulator tests and a Firebase rules dry run.
+- [x] Pass adversarial Firestore emulator tests.
+- [ ] Repeat the Firebase CLI rules dry run for the exact final candidate
+      (the local emulator compiler passes; this environment blocked the final
+      remote compile-only check).
 - [ ] Deploy the reviewed Firestore rules to `padq-ccb6a` during the controlled
       release window.
 - [ ] Smoke-test host and viewer access against the deployed rules.
@@ -58,7 +61,7 @@ result so court operations remain practical and Firestore usage stays low.
 - [x] Commit a finished result atomically to durable match history and the next
       queue/court assignment.
 - [x] Extend Firestore rules and tests so a player cannot occupy two courts and
-      only the host can change assignments; the Firebase rules dry run passes.
+      only the host can change assignments; the local rules compiler passes.
 - [x] Run the emulator tests for cross-room access, unauthorized assignment updates,
       court switching, concurrent results, and atomic match completion.
 - [x] Add component tests for selecting Court 1–3, focused current players, safe
@@ -79,11 +82,16 @@ result so court operations remain practical and Firestore usage stays low.
 
 ## Gate 2 — Free-tier capacity and real-life reliability
 
-**Status: Pending — V1 launch blocker**
+**Status: Automated partner verification complete; capacity test pending**
 
 - [ ] Stress-test 30 players, 3 courts, and 30 viewer devices/tabs.
-- [ ] Verify partner requests keep both players together through waiting,
+- [x] Verify partner requests keep both players together through waiting,
       assignment, completion, and requeueing.
+- [x] Stress-test all 15 possible pairs across 30 players, 3 courts, 150
+      staggered court rotations, and live pair edits within a waiting/court group.
+- [x] Move partner setup into the active multi-court host controls, cap pairs
+      at `floor(players / 2)`, and save the complete configuration in one
+      Firestore write.
 - [ ] Test simultaneous court completions, rapid result actions, duplicate taps,
       host refresh, viewer reconnect, court switching, late arrivals, sit-outs,
       substitutions, and one unavailable court.
@@ -133,7 +141,7 @@ result so court operations remain practical and Firestore usage stays low.
 
 - [ ] Run unit, simulation, Firestore rules, component, and browser end-to-end
       tests from a clean checkout.
-- [ ] Pass TypeScript, lint with no errors, and the production build.
+- [x] Pass TypeScript, lint with no errors, and the production build.
 - [ ] Test the production environment variables without exposing their values.
 - [ ] Verify Anonymous Authentication and authorized production domains.
 - [ ] Decide the App Check launch state explicitly. If enabled, register every

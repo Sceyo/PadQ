@@ -6,7 +6,6 @@ export const V1_RELEASE = {
   queueMode: 'default',
   maxCourts: 3,
   maxPlayers: 30,
-  maxLockedPartners: 1,
   showQueueModeSelector: false,
   showAccessPinSetup: false,
   showSkillTagging: false,

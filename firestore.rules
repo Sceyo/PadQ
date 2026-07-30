@@ -106,24 +106,13 @@ service cloud.firestore {
         assigned.toSet().size() == assigned.size();
     }
 
-    function validLockedPair(pair) {
-      return pair is map && pair.keys().hasAll(['a', 'b']) &&
-        pair.keys().hasOnly(['a', 'b']) &&
-        pair.a is string && pair.a.size() >= 1 && pair.a.size() <= 100 &&
-        pair.b is string && pair.b.size() >= 1 && pair.b.size() <= 100 &&
-        pair.a != pair.b;
-    }
-
-    function validLockedPairAt(pairs, index) {
-      return pairs.size() <= index || validLockedPair(pairs[index]);
-    }
-
-    function validLockedPairs(pairs) {
-      // The host client validates roster membership and uniqueness. Rules
-      // validate every pair's bounded shape without scanning a 30-player
-      // roster for each value and exceeding the 1,000-expression limit.
-      return pairs is list && pairs.size() <= 1 &&
-        validLockedPairAt(pairs, 0);
+    function validLockedPairs(pairs, playerCount) {
+      // Only the host can write this preference. The client validates each
+      // pair's shape, roster membership and uniqueness. Rules cap pair count
+      // without scanning the 30-player roster for every pair and exceeding
+      // Firestore's 1,000-expression evaluation limit.
+      return pairs is list && pairs.size() <= 15 &&
+        pairs.size() * 2 <= playerCount;
     }
 
     function validLiveScore(score) {
@@ -170,6 +159,37 @@ service cloud.firestore {
          validPlayerSubset(state.waitingQueue));
     }
 
+    function validDoublesEngineUpdate(state) {
+      return state == null ||
+        (state is map &&
+         state.keys().hasAll(['phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentPairs', 'recentMatches', 'lastPlayedMap', 'winnersPool', 'losersPool']) &&
+         state.keys().hasOnly(['phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentPairs', 'recentMatches', 'lastPlayedMap', 'winnersPool', 'losersPool']) &&
+         state.phase in ['INIT', 'WINNERS', 'LOSERS'] &&
+         state.matchIndexInPhase is int && state.matchIndexInPhase >= 0 && state.matchIndexInPhase <= 100000 &&
+         state.matchCount is int && state.matchCount >= 0 && state.matchCount <= 100000 &&
+         validPlayerSubset(state.w1) && validPlayerSubset(state.l1) &&
+         validPlayerSubset(state.waitingQueue) && validPlayerSubset(state.playedThisCycle) &&
+         state.recentPairs is list && state.recentPairs.size() <= 6 &&
+         state.recentMatches is list && state.recentMatches.size() <= 4 &&
+         state.lastPlayedMap is map && state.lastPlayedMap.size() <= 30 &&
+         state.winnersPool is list && state.winnersPool.size() <= 8 &&
+         state.losersPool is list && state.losersPool.size() <= 8);
+    }
+
+    function validSinglesEngineUpdate(state) {
+      return state == null ||
+        (state is map &&
+         state.keys().hasAll(['queue', 'king', 'matchIndex', 'lastPlayedMap', 'winStreak', 'playedThisCycle', 'waitingQueue']) &&
+         state.keys().hasOnly(['queue', 'king', 'matchIndex', 'lastPlayedMap', 'winStreak', 'playedThisCycle', 'waitingQueue']) &&
+         validPlayerSubset(state.queue) &&
+         (state.king == null || state.king is string) &&
+         state.matchIndex is int && state.matchIndex >= 0 && state.matchIndex <= 100000 &&
+         state.lastPlayedMap is map && state.lastPlayedMap.size() <= 30 &&
+         state.winStreak is map && state.winStreak.size() <= 30 &&
+         validPlayerSubset(state.playedThisCycle) &&
+         validPlayerSubset(state.waitingQueue));
+    }
+
     function validSession(data) {
       let players = data.players;
       let courts = data.get('courtSlots', []);
@@ -194,13 +214,78 @@ service cloud.firestore {
         data.get('courtName', '') is string && data.get('courtName', '').size() <= 60 &&
         validLiveScore(data.get('liveScore', null)) &&
         validCourts(courts, data.gameMode) &&
-        validLockedPairs(data.get('lockedPartners', [])) &&
+        validLockedPairs(data.get('lockedPartners', []), players.size()) &&
+        (data.gameMode == 'doubles' || data.get('lockedPartners', []).size() == 0) &&
         validPlayerSubset(data.get('sittingOut', [])) &&
         validDoublesEngine(data.get('doublesEngineState', null), players) &&
         validSinglesEngine(data.get('singlesEngineState', null), players) &&
         (data.gameMode == 'doubles' || data.get('doublesEngineState', null) == null) &&
         (data.gameMode == 'singles' || data.get('singlesEngineState', null) == null) &&
         data.createdAt is timestamp && data.updatedAt is timestamp && data.lastActiveAt is timestamp;
+    }
+
+    function validSessionUpdate(data) {
+      let players = data.players;
+      let courts = data.get('courtSlots', []);
+      let changed = data.diff(resource.data).affectedKeys();
+      return data.keys().hasAll([
+          'hostUid', 'revision', 'gameMode', 'queueMode', 'elimType',
+          'players', 'queue', 'playAllRel', 'tournamentMatches',
+          'tournamentActive', 'tournamentWinner',
+          'createdAt', 'updatedAt', 'lastActiveAt'
+        ]) &&
+        data.keys().hasOnly([
+          'hostUid', 'revision', 'gameMode', 'queueMode', 'elimType',
+          'players', 'queue', 'playAllRel', 'tournamentMatches',
+          'tournamentActive', 'tournamentWinner', 'liveScore', 'isLive',
+          'accessPin', 'courtName', 'doublesEngineState', 'singlesEngineState',
+          'courtSlots', 'lockedPartners', 'sittingOut',
+          'createdAt', 'updatedAt', 'lastActiveAt'
+        ]) &&
+        data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128 &&
+        data.revision is int && data.revision >= 0 && data.revision <= 1000000 &&
+        data.gameMode in ['singles', 'doubles'] &&
+        data.queueMode == 'default' && data.elimType == 'single' &&
+        players is list && players.size() >= 5 && validPlayerRoster(players) &&
+        data.playAllRel is map && data.playAllRel.size() == 0 &&
+        data.tournamentMatches is list && data.tournamentMatches.size() == 0 &&
+        data.tournamentActive == false && data.tournamentWinner == null &&
+        data.get('isLive', false) is bool && data.get('accessPin', null) == null &&
+        data.get('courtName', '') is string && data.get('courtName', '').size() <= 60 &&
+        (!changed.hasAny(['queue']) || validPlayerSubset(data.queue)) &&
+        (!changed.hasAny(['liveScore']) || validLiveScore(data.get('liveScore', null))) &&
+        (!changed.hasAny(['courtSlots', 'gameMode']) || validCourts(courts, data.gameMode)) &&
+        (!changed.hasAny(['lockedPartners', 'players', 'gameMode']) ||
+          (validLockedPairs(data.get('lockedPartners', []), players.size()) &&
+           (data.gameMode == 'doubles' || data.get('lockedPartners', []).size() == 0))) &&
+        (!changed.hasAny(['sittingOut']) || validPlayerSubset(data.get('sittingOut', []))) &&
+        (!changed.hasAny(['doublesEngineState', 'players']) ||
+          validDoublesEngineUpdate(data.get('doublesEngineState', null))) &&
+        (!changed.hasAny(['singlesEngineState', 'players']) ||
+          validSinglesEngineUpdate(data.get('singlesEngineState', null))) &&
+        (data.gameMode == 'doubles' || data.get('doublesEngineState', null) == null) &&
+        (data.gameMode == 'singles' || data.get('singlesEngineState', null) == null) &&
+        data.createdAt is timestamp && data.updatedAt is timestamp && data.lastActiveAt is timestamp;
+    }
+
+    function validRevisionedStateUpdate(data) {
+      let changed = data.diff(resource.data).affectedKeys();
+      let courts = data.get('courtSlots', []);
+      return data.revision == resource.data.revision + 1 &&
+        changed.hasOnly([
+          'queue', 'courtSlots', 'doublesEngineState', 'singlesEngineState',
+          'revision', 'updatedAt', 'lastActiveAt'
+        ]) &&
+        (!changed.hasAny(['queue']) || validPlayerSubset(data.queue)) &&
+        (!changed.hasAny(['courtSlots']) || validCourts(courts, data.gameMode)) &&
+        (!changed.hasAny(['doublesEngineState']) ||
+          (data.get('doublesEngineState', null) == null ||
+           (data.get('doublesEngineState', null) is map &&
+            data.get('doublesEngineState', null).size() <= 12))) &&
+        (!changed.hasAny(['singlesEngineState']) ||
+          (data.get('singlesEngineState', null) == null ||
+           (data.get('singlesEngineState', null) is map &&
+            data.get('singlesEngineState', null).size() <= 7)));
     }
 
     function validHistory(data, entryId) {
@@ -234,7 +319,9 @@ service cloud.firestore {
         request.resource.data.revision <= resource.data.revision + 1 &&
         request.resource.data.updatedAt == request.time &&
         request.resource.data.lastActiveAt == request.time &&
-        validSession(request.resource.data);
+        (validRevisionedStateUpdate(request.resource.data)
+          ? true
+          : validSessionUpdate(request.resource.data));
 
       allow delete: if isDocOwner();
 
@@ -249,7 +336,9 @@ service cloud.firestore {
         }
 
         allow get, list: if isAuthenticated() && exists(parentPath());
-        allow create: if parentOwned() && validHistory(request.resource.data, entryId) &&
+        allow create: if isAuthenticated() &&
+          getAfter(parentPath()).data.hostUid == request.auth.uid &&
+          validHistory(request.resource.data, entryId) &&
           getAfter(parentPath()).data.revision == request.resource.data.revision;
         allow update: if false;
         allow delete: if parentOwned();

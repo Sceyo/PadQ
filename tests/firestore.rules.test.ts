@@ -177,7 +177,10 @@ suite('Firestore V1 production rules', () => {
       queue: players.slice(12),
       courtName: '3 Courts',
       courtSlots: courts,
-      lockedPartners: [{ a: 'Player 1', b: 'Player 2' }],
+      lockedPartners: Array.from({ length: 15 }, (_, i) => ({
+        a: players[i * 2],
+        b: players[i * 2 + 1],
+      })),
     })));
   });
 
@@ -208,16 +211,17 @@ suite('Firestore V1 production rules', () => {
     await assertFails(setDoc(doc(host, 'sessions', 'F6MISS'), invalid));
   });
 
-  it('rejects malformed court, partner, score and engine payloads', async () => {
+  it('rejects malformed court, partner limits, score and engine payloads', async () => {
     const host = env.authenticatedContext('host-7').firestore();
     await assertFails(setDoc(doc(host, 'sessions', 'G7CRT7'), sessionData('host-7', {
       courtSlots: [{ id: 'court-0', name: 'Court 1', onCourt: ['A', 'B', 'C'] }],
     })));
     await assertFails(setDoc(doc(host, 'sessions', 'G7PAR7'), sessionData('host-7', {
-      lockedPartners: Array.from({ length: 2 }, (_, i) => ({ a: `A${i}`, b: `B${i}` })),
+      lockedPartners: Array.from({ length: 4 }, (_, i) => ({ a: `A${i}`, b: `B${i}` })),
     })));
-    await assertFails(setDoc(doc(host, 'sessions', 'G7BIGP'), sessionData('host-7', {
-      lockedPartners: [{ a: 'A'.repeat(101), b: 'B' }],
+    await assertFails(setDoc(doc(host, 'sessions', 'G7SNGL'), sessionData('host-7', {
+      gameMode: 'singles',
+      lockedPartners: [{ a: 'A', b: 'B' }],
     })));
     await assertFails(setDoc(doc(host, 'sessions', 'G7SCR7'), sessionData('host-7', {
       liveScore: { scoreA: 999, scoreB: 0, labelA: 'A', labelB: 'B', limit: 11, baseLimit: 11, deuce: false, active: true },
@@ -225,6 +229,54 @@ suite('Firestore V1 production rules', () => {
     await assertFails(setDoc(doc(host, 'sessions', 'G7ENGN'), sessionData('host-7', {
       doublesEngineState: { phase: 'HACKED' },
     })));
+  });
+
+  it('commits a result for three populated courts with an active partner pair', async () => {
+    const host = env.authenticatedContext('host-7b').firestore();
+    const ref = doc(host, 'sessions', 'G7MTCH');
+    const players = Array.from({ length: 12 }, (_, i) => `P${i + 1}`);
+    const courts = [0, 1, 2].map(i => ({
+      id: `court-${i}`,
+      name: `Court ${i + 1}`,
+      onCourt: players.slice(i * 4, i * 4 + 4),
+    }));
+    const doublesEngineState = {
+      phase: 'INIT',
+      matchIndexInPhase: 0,
+      matchCount: 0,
+      w1: [],
+      l1: [],
+      waitingQueue: [],
+      playedThisCycle: [],
+      recentPairs: [],
+      recentMatches: [],
+      lastPlayedMap: {},
+      winnersPool: [],
+      losersPool: [],
+    };
+    await assertSucceeds(setDoc(ref, sessionData('host-7b', {
+      players,
+      queue: [],
+      courtName: '3 Courts',
+      courtSlots: courts,
+      lockedPartners: [{ a: 'P1', b: 'P2' }],
+    })));
+
+    await assertSucceeds(runTransaction(host, async tx => {
+      await tx.get(ref);
+      tx.update(ref, {
+        queue: [],
+        courtSlots: courts,
+        doublesEngineState,
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      });
+      tx.set(
+        doc(host, 'sessions', 'G7MTCH', 'history', UUID_A),
+        historyData(UUID_A, 1),
+      );
+    }));
   });
 
   it('requires an atomic revision increment for an immutable history entry', async () => {
