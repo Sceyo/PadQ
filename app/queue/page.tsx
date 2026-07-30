@@ -1615,6 +1615,7 @@ function QueueSystemContent() {
             {/* Multi-court singles: shared queue, one player per court */}
             {gameMode === 'singles' && courtSlots.length > 0 && (
               <div className="multicourt-section">
+                <h3 className="match-section-title"><Users size={14} /> Live Court Status</h3>
                 <div className="courts-grid">
                   {courtSlots.map(slot => (
                     <SinglesCourtCard
@@ -1674,6 +1675,7 @@ function QueueSystemContent() {
             {/* Multi-court shared-queue view */}
             {gameMode === 'doubles' && courtSlots.length > 0 ? (
               <div className="multicourt-section">
+                <h3 className="match-section-title"><Users size={14} /> Live Court Status</h3>
                 <div className="courts-grid">
                   {courtSlots.map(slot => (
                     <CourtCard

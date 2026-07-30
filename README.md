@@ -84,7 +84,10 @@ The host can enable point-by-point scoring, select a target score, update either
 
 ![PAD-Q spectator view showing a live score and waiting queue](public/screenshots/live.jpg)
 
-Spectators can follow the live score, current format, room status, active courts, and waiting queue without receiving host controls.
+For a single court, spectators can follow the optional live score. In
+multi-court sessions, **Live Court Status** shows who is currently playing on
+each court, together with the waiting queue and upcoming assignments, without
+requiring the host to enter every point.
 
 ### Multi-court management
 

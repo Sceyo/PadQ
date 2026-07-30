@@ -587,7 +587,7 @@ function WatchPageContent() {
             ══════════════════════════════════════════════════ */}
         {!isTournament && !isSkilled && isMultiCourt && gameMode === 'doubles' && (
           <div className="w-section">
-            <h2 className="w-section-title"><Users size={16} /> Courts</h2>
+            <h2 className="w-section-title"><Users size={16} /> Live Court Status</h2>
             <div className="w-courts-grid">
               {courtSlots.map(slot => {
                 const teamA = slot.onCourt.slice(0, 2);

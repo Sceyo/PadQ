@@ -32,7 +32,7 @@ passing build alone is not a release approval.
       release window.
 - [ ] Smoke-test host and viewer access against the deployed rules.
 
-## Gate 1.5 — Selective three-court spectator view
+## Gate 1.5 — Live Court Status spectator view
 
 **Status: Pending — V1 launch blocker**
 
@@ -48,6 +48,8 @@ result so court operations remain practical and Firestore usage stays low.
 - [ ] Show a viewer Court 1–3 selector with lightweight summaries for all courts.
 - [ ] Show the selected court's current players and match status without a
       point-by-point scoreboard.
+- [x] Label multi-court host and viewer surfaces **Live Court Status**; reserve
+      **Live Score** for the optional single-court scoreboard.
 - [ ] Keep one shared room listener for court assignments, the queue,
       next-player order, and completed results.
 - [ ] Store compact performance summaries with the room and load detailed match
