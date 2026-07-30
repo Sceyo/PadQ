@@ -101,6 +101,9 @@ suite('Firestore V1 production rules', () => {
     await assertSucceeds(setDoc(ref, sessionData('host-3')));
 
     await assertFails(updateDoc(doc(attacker, 'sessions', 'C3LCK7'), { isLive: true }));
+    await assertFails(updateDoc(doc(attacker, 'sessions', 'C3LCK7'), {
+      courtSlots: [{ id: 'court-0', name: 'Court 1', onCourt: ['A', 'B', 'C', 'D'] }],
+    }));
     await assertFails(updateDoc(ref, {
       hostUid: 'attacker', updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
     }));
@@ -145,6 +148,18 @@ suite('Firestore V1 production rules', () => {
       courtName: '3 Courts',
       courtSlots: courts,
       lockedPartners: [{ a: 'Player 1', b: 'Player 2' }],
+    })));
+  });
+
+  it('rejects assigning one player to two courts', async () => {
+    const host = env.authenticatedContext('host-5b').firestore();
+    await assertFails(setDoc(doc(host, 'sessions', 'E5DUPL'), sessionData('host-5b', {
+      players: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'],
+      queue: [],
+      courtSlots: [
+        { id: 'court-0', name: 'Court 1', onCourt: ['A', 'B', 'C', 'D'] },
+        { id: 'court-1', name: 'Court 2', onCourt: ['A', 'E', 'F', 'G'] },
+      ],
     })));
   });
 

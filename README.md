@@ -14,7 +14,7 @@ PAD-Q is an independently developed product in **active development**. The `main
 
 - Deployed on Vercel
 - Backed by Firebase Cloud Firestore
-- 151 application tests and 11 Firestore rules tests currently passing
+- 154 application tests passing; 12 Firestore rules tests are maintained for the emulator
 - Designed for browser-based host and spectator experiences
 
 The project is functional, but it should still be treated as a testing build rather than a production-secure service. Current limitations are documented below.
@@ -85,9 +85,9 @@ The host can enable point-by-point scoring, select a target score, update either
 ![PAD-Q spectator view showing a live score and waiting queue](public/screenshots/live.jpg)
 
 For a single court, spectators can follow the optional live score. In
-multi-court sessions, **Live Court Status** shows who is currently playing on
-each court, together with the waiting queue and upcoming assignments, without
-requiring the host to enter every point.
+multi-court sessions, **Live Court Status** lets a viewer choose Court 1, 2, or
+3 and see its current players, together with the shared next-player queue,
+without requiring the host to enter every point.
 
 ### Multi-court management
 
@@ -172,8 +172,8 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 The current Vitest suite reports:
 
 ```text
-Test Files  8 passed | 1 skipped (9)
-Tests       151 passed | 11 skipped (162)
+Test Files  9 passed | 1 skipped (10)
+Tests       154 passed | 12 skipped (166)
 ```
 
 The suite focuses on deterministic domain logic and verifies:
@@ -186,7 +186,7 @@ The suite focuses on deterministic domain logic and verifies:
 
 The simulations check important invariants, including preventing a player from occupying two courts, keeping every player accounted for, bounding player-pool sizes, and ensuring waiting players eventually receive matches.
 
-The repository includes Firestore Emulator rule tests, but does not yet include React component tests, full browser end-to-end tests, or a CI quality gate. ESLint also has unresolved warnings; these are tracked as development limitations rather than hidden behind the passing domain suite.
+The repository includes Firestore Emulator rule tests and focused React component tests for Live Court Status. It does not yet include full browser end-to-end tests or a CI quality gate. ESLint has no errors, with existing warnings tracked as development limitations.
 
 ## Local setup
 
@@ -292,7 +292,7 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 1. Add optional permanent account linking for safe cross-device host recovery.
 2. Separate public spectator data into a dedicated projection if stronger viewer privacy is required.
 3. Implement an explicit `expireAt` strategy and enable a verified Firestore TTL policy.
-4. Add React component and browser end-to-end tests for host, spectator, scoring, recovery, and multi-court workflows.
+4. Add browser end-to-end tests for host, spectator, scoring, recovery, and multi-court workflows.
 5. Add continuous integration for tests, TypeScript, linting, and production builds.
 6. Improve offline behavior and visible connection recovery.
 7. Complete skilled-mode undo behavior and further separate page orchestration into focused controllers.

@@ -23,8 +23,8 @@ import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
-  Wifi, WifiOff, Check,
-  BarChart2, TrendingUp, Activity, Clock, AlertCircle,
+  Wifi, Check,
+  BarChart2, TrendingUp, Activity, AlertCircle,
   Loader2,
 } from 'lucide-react';
 import {
@@ -39,9 +39,9 @@ import { useSessionAccess } from '@/hooks/useSessionAccess';
 import AccessCodeModal from '@/app/queue/components/atoms/AccessCodeModal';
 import { RankBadge } from '@/app/queue/components/atoms/RankBadge';
 import { StreakBadge } from '@/app/queue/components/atoms/StreakBadge';
-import type { RankTier, PlayerStat } from '@/app/queue/lib/types';
 import { buildPlayerStats } from '@/app/queue/lib/playerUtils';
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
+import { LiveCourtStatus } from './LiveCourtStatus';
 import './watch.css';
 
 // ═══════════════════════════════════════════════════════════
@@ -130,8 +130,9 @@ function WatchPageContent() {
   const [history,         setHistory]         = useState<MatchHistoryEntry[]>([]);
   const [status,          setStatus]          = useState<'loading' | 'live' | 'reconnecting' | 'error' | 'ended' | 'expired'>(validSessionId ? 'loading' : 'error');
   const [errorMsg,        setErrorMsg]        = useState(validSessionId ? '' : 'Invalid room code.');
-  const [showHistory,     setShowHistory]     = useState(true);
+  const [showHistory,     setShowHistory]     = useState(false);
   const [showAllHistory,  setShowAllHistory]  = useState(false);
+  const [selectedCourtId, setSelectedCourtId] = useState('');
 
   // ── Match announcement (Task 12) ────────────────────────
   const [announcement,   setAnnouncement]    = useState<string | null>(null);
@@ -142,11 +143,12 @@ function WatchPageContent() {
   useEffect(() => {
     if (!validSessionId) return;
 
-    let unsubSession: (() => void) | null  = null;
-    let unsubHistory: (() => void) | null  = null;
+    let unsubSession: (() => void) | null = null;
+    let cancelled = false;
 
     // First do a one-time read to confirm existence
     loadSession(sessionId).then(data => {
+      if (cancelled) return;
       if (!data) {
         setStatus('error');
         setErrorMsg(`Session "${sessionId}" not found. It may have expired or the code is wrong.`);
@@ -177,21 +179,20 @@ function WatchPageContent() {
         },
       );
 
-      // Real-time listener for history subcollection.
-      // OPTIMIZATION: Only subscribe when viewer opens the history panel.
-      // Saves Firestore reads for viewers who only watch the queue/bracket.
-      if (showHistory) {
-        unsubHistory = subscribeToHistory(sessionId, (entries) => {
-          setHistory(entries);
-        });
-      }
     });
 
     return () => {
+      cancelled = true;
       unsubSession?.();
-      unsubHistory?.();
     };
-  }, [sessionId, showHistory, validSessionId]);
+  }, [sessionId, validSessionId]);
+
+  // Performance and history are intentionally opt-in. Most viewers only need
+  // live court status, so this avoids a second Firestore listener/read.
+  useEffect(() => {
+    if (!showHistory || !validSessionId || status !== 'live') return;
+    return subscribeToHistory(sessionId, setHistory);
+  }, [sessionId, showHistory, status, validSessionId]);
 
   // ── Match change detection — fires announcement ──────────
   useEffect(() => {
@@ -435,7 +436,7 @@ function WatchPageContent() {
             LIVE SCORE — shown at the TOP as the hero element
             when the host has scoring active
             ══════════════════════════════════════════════════ */}
-        {session.liveScore?.active && (() => {
+        {!isMultiCourt && session.liveScore?.active && (() => {
           const ls = session.liveScore!;
           const aWon = ls.scoreA >= ls.limit;
           const bWon = ls.scoreB >= ls.limit;
@@ -585,46 +586,16 @@ function WatchPageContent() {
         {/* ══════════════════════════════════════════════════
             MULTI-COURT DOUBLES VIEW
             ══════════════════════════════════════════════════ */}
-        {!isTournament && !isSkilled && isMultiCourt && gameMode === 'doubles' && (
+        {!isTournament && !isSkilled && isMultiCourt && (
           <div className="w-section">
             <h2 className="w-section-title"><Users size={16} /> Live Court Status</h2>
-            <div className="w-courts-grid">
-              {courtSlots.map(slot => {
-                const teamA = slot.onCourt.slice(0, 2);
-                const teamB = slot.onCourt.slice(2, 4);
-                const hasMatch = slot.onCourt.length >= 4;
-                return (
-                  <div key={slot.id} className="w-court-card">
-                    <div className="w-court-name">{slot.name}</div>
-                    {hasMatch ? (
-                      <div className="w-vs-row">
-                        <span className="w-player-chip w-player-chip--team">{teamA.join(' & ')}</span>
-                        <span className="w-vs">VS</span>
-                        <span className="w-player-chip w-player-chip--team">{teamB.join(' & ')}</span>
-                      </div>
-                    ) : (
-                      <p className="w-muted">Waiting for players…</p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            {(() => {
-              const onCourtSet = new Set(courtSlots.flatMap(c => c.onCourt));
-              const waitingOnly = queue.filter(p => !onCourtSet.has(p));
-              return waitingOnly.length > 0 ? (
-                <div className="w-waiting-queue">
-                  <h3 className="w-subsection-title">Waiting Queue</h3>
-                  <div className="w-queue-chips">
-                    {waitingOnly.map((p, i) => (
-                      <span key={`wq-${i}-${p}`} className="w-queue-chip">
-                        <span className="w-queue-num">#{i + 1}</span> {p}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ) : null;
-            })()}
+            <LiveCourtStatus
+              courtSlots={courtSlots}
+              gameMode={gameMode}
+              queue={queue}
+              selectedCourtId={selectedCourtId}
+              onSelectCourt={setSelectedCourtId}
+            />
           </div>
         )}
 
@@ -740,9 +711,9 @@ function WatchPageContent() {
         {/* ══════════════════════════════════════════════════
             STATS — always visible
             ══════════════════════════════════════════════════ */}
-        {stats.length > 0 && (
+        {showHistory && stats.length > 0 && (
           <div className="w-section">
-            <h2 className="w-section-title"><BarChart2 size={15} /> Player Stats</h2>
+            <h2 className="w-section-title"><BarChart2 size={15} /> Player Performance</h2>
             <div className="w-stats-table-wrap">
               <table className="w-stats-table">
                 <thead>
@@ -784,7 +755,7 @@ function WatchPageContent() {
             className="w-history-toggle"
             onClick={() => setShowHistory(h => !h)}
           >
-            <History size={14} /> {showHistory ? 'Hide' : 'Show'} Match History
+            <History size={14} /> {showHistory ? 'Hide Performance & History' : 'View Performance & History'}
             {history.length > 0 && <span className="w-history-count">{history.length}</span>}
           </button>
 

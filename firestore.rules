@@ -98,7 +98,12 @@ service cloud.firestore {
       return courts is list && courts.size() <= 3 &&
         validCourtAt(courts, gameMode, 0) &&
         validCourtAt(courts, gameMode, 1) &&
-        validCourtAt(courts, gameMode, 2);
+        validCourtAt(courts, gameMode, 2) &&
+        (courts.size() < 2 || !courts[0].onCourt.hasAny(courts[1].onCourt)) &&
+        (courts.size() < 3 || (
+          !courts[0].onCourt.hasAny(courts[2].onCourt) &&
+          !courts[1].onCourt.hasAny(courts[2].onCourt)
+        ));
     }
 
     function validLockedPairAt(pairs, players, index) {

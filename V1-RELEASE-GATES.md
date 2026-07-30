@@ -34,7 +34,7 @@ passing build alone is not a release approval.
 
 ## Gate 1.5 — Live Court Status spectator view
 
-**Status: Pending — V1 launch blocker**
+**Status: Implementation complete; emulator and browser verification pending**
 
 PADQ's central V1 promise is that players can see who is currently playing on
 every court, choose the court they want to focus on, see who plays next, see the
@@ -45,23 +45,25 @@ result so court operations remain practical and Firestore usage stays low.
 - [x] Keep Court 1, Court 2, and Court 3 assignments in the shared room state.
 - [x] Let the host see all three court cards and record a winner independently
       for each completed court.
-- [ ] Show a viewer Court 1–3 selector with lightweight summaries for all courts.
-- [ ] Show the selected court's current players and match status without a
+- [x] Show a viewer Court 1–3 selector with lightweight summaries for all courts.
+- [x] Show the selected court's current players and match status without a
       point-by-point scoreboard.
 - [x] Label multi-court host and viewer surfaces **Live Court Status**; reserve
       **Live Score** for the optional single-court scoreboard.
-- [ ] Keep one shared room listener for court assignments, the queue,
-      next-player order, and completed results.
-- [ ] Store compact performance summaries with the room and load detailed match
-      history only when the viewer opens it.
-- [ ] Commit a finished result atomically to durable match history and the next
+- [x] Keep one shared room listener for court assignments, the queue, and
+      next-player order; use a separate opt-in listener for completed results.
+- [x] Keep the performance/history listener closed by default; load detailed
+      history only when the viewer requests it and calculate performance locally.
+- [x] Commit a finished result atomically to durable match history and the next
       queue/court assignment.
-- [ ] Extend Firestore rules and tests for the final multi-court assignment and
-      performance-summary shape.
-- [ ] Add emulator tests for cross-room access, unauthorized assignment updates,
+- [x] Extend Firestore rules and tests so a player cannot occupy two courts and
+      only the host can change assignments; the Firebase rules dry run passes.
+- [ ] Run the emulator tests for cross-room access, unauthorized assignment updates,
       court switching, concurrent results, and atomic match completion.
-- [ ] Add UI tests for joining a room, choosing each court, switching courts,
-      reconnecting, and viewing next-player and performance information.
+- [x] Add component tests for selecting Court 1–3, focused current players, safe
+      fallback selection, and next-player group size.
+- [ ] Add browser tests for joining, reconnecting, and switching courts against
+      the local Firestore emulator.
 
 ### Gate 1.5 acceptance criteria
 
@@ -105,9 +107,9 @@ result so court operations remain practical and Firestore usage stays low.
 - [x] Maximum 30 players and 3 courts.
 - [x] Room-code and QR spectator access.
 - [x] Partner queueing.
-- [ ] Selective Court 1–3 current-match viewing from Gate 1.5.
-- [ ] Shared next-player and court-assignment view.
-- [ ] Quota-efficient session performance summaries and match history.
+- [x] Selective Court 1–3 current-match viewing from Gate 1.5.
+- [x] Shared next-player and court-assignment view.
+- [x] Quota-efficient opt-in performance and match history.
 - [x] Host-only control and read-only viewers.
 
 ### Keep sealed after V1

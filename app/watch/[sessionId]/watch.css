@@ -828,6 +828,90 @@ body.dark-mode .share-end-row { border-top-color:rgba(255,255,255,.07); }
   color: var(--txt-3, #6b7280);
 }
 
+/* V1 multi-court viewer: one focused court, backed by the shared room stream. */
+.w-court-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.w-court-tab {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--border, #2d3348);
+  border-radius: 10px;
+  color: var(--txt-2, #9ca3af);
+  background: var(--surface-2, #252a3d);
+  cursor: pointer;
+}
+.w-court-tab small {
+  font-size: .62rem;
+  color: var(--txt-3, #6b7280);
+}
+.w-court-tab--active {
+  color: #fff;
+  border-color: #6366f1;
+  background: rgba(99, 102, 241, .18);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, .12);
+}
+.w-court-tab--active small { color: #a5b4fc; }
+.w-court-focus {
+  padding: 16px;
+  border: 1px solid var(--border, #2d3348);
+  border-radius: 12px;
+  background: var(--card, #1e2233);
+}
+.w-court-focus-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.w-court-focus-header h3 { margin: 2px 0 0; font-size: 1rem; }
+.w-court-focus-kicker {
+  display: block;
+  color: var(--txt-3, #6b7280);
+  font-size: .64rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.w-court-state {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(107, 114, 128, .16);
+  color: var(--txt-2, #9ca3af);
+  font-size: .68rem;
+  white-space: nowrap;
+}
+.w-court-state--playing {
+  color: #86efac;
+  background: rgba(34, 197, 94, .15);
+}
+.w-next-up {
+  display: grid;
+  grid-template-columns: minmax(150px, .7fr) 1.3fr;
+  gap: 14px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 13px 14px;
+  border: 1px dashed var(--border, #2d3348);
+  border-radius: 10px;
+}
+.w-next-up p { margin: 3px 0 0; color: var(--txt-2, #9ca3af); font-size: .72rem; }
+.w-queue-more { align-self: center; color: var(--txt-3, #6b7280); font-size: .7rem; }
+
+@media (max-width: 560px) {
+  .w-court-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .w-court-tab { flex-direction: column; justify-content: center; gap: 2px; padding-inline: 5px; }
+  .w-next-up { grid-template-columns: 1fr; }
+}
+
 /* ── Winners / losers cycle watch view ──────────────────── */
 .w-cycle-pools {
   display: flex;

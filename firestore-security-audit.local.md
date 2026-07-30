@@ -23,7 +23,8 @@ harden `firestore.rules` and the client service layer.
   `doublesEngineState`, `singlesEngineState`, `courtSlots`, `lockedPartners`,
   `sittingOut`.
 - V1 invariants: Default queue only, 30 players maximum, three courts maximum,
-  PIN disabled, tournament state empty/inactive, Play-All relationships empty.
+  no player assigned to two courts, PIN disabled, tournament state
+  empty/inactive, Play-All relationships empty.
 
 Operations:
 
@@ -81,6 +82,8 @@ abuse, and Firestore's document-size ceiling provides the final payload bound.
 | Public/anonymous session list | Denied; authenticated collection list also denied |
 | Unknown-room or unauthenticated read | Unauthenticated read denied; known-room authenticated get intentionally allowed |
 | Unauthorized session update/delete | Denied by immutable `hostUid` ownership |
+| Viewer changes a court assignment | Denied; only the immutable room owner may update the session |
+| Same player assigned to two courts | Denied by pairwise court-roster validation |
 | Update bypass / unknown field | Denied by the shared `validSession` validator on create and update |
 | Ownership hijack on create | Denied; `hostUid` must equal `request.auth.uid` |
 | Ownership hijack on update | Denied; `hostUid` is immutable |
@@ -98,5 +101,6 @@ abuse, and Firestore's document-size ceiling provides the final payload bound.
 | Query mismatch | Known-room session get and bounded known-parent history queries pass |
 | Validator pattern | Both session create and update call `validSession`; history is immutable |
 
-Emulator outcome: 11/11 adversarial rules tests passed after adapting the
-validator to Firestore's 1,000-expression ceiling.
+Current suite: 12 adversarial rules tests. Firebase dry-run compilation passes.
+The updated suite still needs an emulator rerun on a machine with Java; this
+workstation cannot start the Firestore emulator because Java is not installed.
