@@ -109,9 +109,9 @@ document-size ceiling provides the final payload bound.
 
 Emulator outcome: 16/16 adversarial rules tests passed, including separate
 30-player roster, three populated court, combined real-life room, missing-field,
-duplicate-court-player, ownership and atomic-history cases. Firebase dry-run
-compilation passed for the preceding candidate. The exact final rules compile
-in the local emulator; repeat the remote compile-only dry run before deployment.
+duplicate-court-player, ownership and atomic-history cases. The exact final
+rules also passed the Firebase CLI compile-only dry run against `padq-ccb6a`;
+no production deployment occurred.
 
 Application outcome: automated multi-court simulations pass with 30 players,
 three courts, all 15 possible partner pairs, and 150 staggered rotations. The

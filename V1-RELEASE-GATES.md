@@ -29,9 +29,8 @@ passing build alone is not a release approval.
       queue state, scores, and atomic match history in Firestore rules.
 - [x] Reject deferred modes and fields at the database boundary.
 - [x] Pass adversarial Firestore emulator tests.
-- [ ] Repeat the Firebase CLI rules dry run for the exact final candidate
-      (the local emulator compiler passes; this environment blocked the final
-      remote compile-only check).
+- [x] Pass the Firebase CLI rules dry run for the exact final candidate against
+      `padq-ccb6a`; compilation completed successfully without deploying.
 - [ ] Deploy the reviewed Firestore rules to `padq-ccb6a` during the controlled
       release window.
 - [ ] Smoke-test host and viewer access against the deployed rules.
