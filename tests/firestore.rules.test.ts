@@ -161,6 +161,24 @@ suite('Firestore V1 production rules', () => {
     })));
   });
 
+  it('accepts a valid custom single-court score target', async () => {
+    const host = env.authenticatedContext('host-score').firestore();
+    await assertSucceeds(setDoc(doc(host, 'sessions', 'S3C2RE'), sessionData('host-score', {
+      gameMode: 'singles',
+      lockedPartners: [],
+      liveScore: {
+        scoreA: 2,
+        scoreB: 1,
+        labelA: 'A',
+        labelB: 'B',
+        limit: 3,
+        baseLimit: 3,
+        deuce: false,
+        active: true,
+      },
+    })));
+  });
+
   it('accepts a valid 30-player, three-court session with locked partners', async () => {
     const host = env.authenticatedContext('host-5').firestore();
     const players = Array.from({ length: 30 }, (_, i) => `Player ${i + 1}`);
@@ -232,6 +250,14 @@ suite('Firestore V1 production rules', () => {
     await assertFails(setDoc(doc(host, 'sessions', 'G7ENGN'), sessionData('host-7', {
       doublesEngineState: { phase: 'HACKED' },
     })));
+    const singlesRef = doc(host, 'sessions', 'G7M2DE');
+    await assertSucceeds(setDoc(singlesRef, sessionData('host-7', {
+      gameMode: 'singles', lockedPartners: [],
+    })));
+    await assertFails(updateDoc(singlesRef, {
+      doublesEngineState: {}, revision: 1,
+      updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
+    }));
   });
 
   it('commits a result for three populated courts with an active partner pair', async () => {
@@ -279,6 +305,38 @@ suite('Firestore V1 production rules', () => {
         doc(host, 'sessions', 'G7MTCH', 'history', UUID_A),
         historyData(UUID_A, 1),
       );
+    }));
+  });
+
+  it('accepts live-score completion and reset around a singles result', async () => {
+    const host = env.authenticatedContext('host-score-flow').firestore();
+    const ref = doc(host, 'sessions', 'S3F2W7');
+    const players = Array.from({ length: 8 }, (_, i) => `Score Player ${i + 1}`);
+    const score = {
+      scoreA: 3, scoreB: 1, labelA: players[0], labelB: players[1],
+      limit: 3, baseLimit: 3, deuce: false, active: false,
+    };
+    await assertSucceeds(setDoc(ref, sessionData('host-score-flow', {
+      gameMode: 'singles', players, queue: players, lockedPartners: [], liveScore: score,
+    })));
+    await assertSucceeds(updateDoc(ref, {
+      liveScore: score, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(ref, {
+      queue: [players[0], ...players.slice(2), players[1]],
+      singlesEngineState: {
+        queue: [...players.slice(2), players[1]], king: players[0], matchIndex: 1,
+        lastPlayedMap: { [players[0]]: 0, [players[1]]: 0 },
+        winStreak: { [players[0]]: 1 }, playedThisCycle: players.slice(0, 2), waitingQueue: [],
+      },
+      revision: 1, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
+    }));
+    await assertSucceeds(updateDoc(ref, {
+      liveScore: {
+        scoreA: 0, scoreB: 0, labelA: players[0], labelB: players[2],
+        limit: 3, baseLimit: 3, deuce: false, active: true,
+      },
+      updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
     }));
   });
 

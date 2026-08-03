@@ -145,6 +145,9 @@ export function useSession(): SessionState & SessionActions {
   // without stale closures
   const sessionIdRef        = useRef<string | null>(null);
   const revisionRef         = useRef(0);
+  // Queue host writes so rapid UI actions (for example, finishing a scored
+  // match and immediately editing the roster) cannot race or reuse a revision.
+  const revisionWriteChainRef = useRef<Promise<void>>(Promise.resolve());
   const unsubSessionRef     = useRef<(() => void) | null>(null);
   const unsubHistoryRef     = useRef<(() => void) | null>(null);
 
@@ -367,11 +370,13 @@ export function useSession(): SessionState & SessionActions {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return null;
     const commandId = crypto.randomUUID();
-    const expectedRevision = revisionRef.current;
-
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      const result = await batchMatchResult(sessionId, expectedRevision, commandId, patch, entry);
+      const write = revisionWriteChainRef.current.then(() =>
+        batchMatchResult(sessionId, revisionRef.current, commandId, patch, entry),
+      );
+      revisionWriteChainRef.current = write.then(() => undefined, () => undefined);
+      const result = await write;
       revisionRef.current = result.revision;
       setState(prev => ({ ...prev, revision: result.revision }));
       return result;
@@ -390,7 +395,11 @@ export function useSession(): SessionState & SessionActions {
 
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      const result = await commitMultiCourtResult(sessionId, crypto.randomUUID(), command);
+      const write = revisionWriteChainRef.current.then(() =>
+        commitMultiCourtResult(sessionId, crypto.randomUUID(), command),
+      );
+      revisionWriteChainRef.current = write.then(() => undefined, () => undefined);
+      const result = await write;
       revisionRef.current = Math.max(revisionRef.current, result.revision);
       setState(prev => ({
         ...prev,
@@ -418,9 +427,13 @@ export function useSession(): SessionState & SessionActions {
 
     setState(prev => ({ ...prev, isSaving: true }));
     try {
-      const revision = await updateQueueSafely(sessionId, revisionRef.current, () => patch);
-      revisionRef.current = revision;
-      await deleteLatestHistoryEntry(sessionId);
+      const write = revisionWriteChainRef.current.then(async () => {
+        const revision = await updateQueueSafely(sessionId, revisionRef.current, () => patch);
+        revisionRef.current = revision;
+        await deleteLatestHistoryEntry(sessionId);
+      });
+      revisionWriteChainRef.current = write.catch(() => undefined);
+      await write;
     } catch (err) {
       console.error('[useSession] undoLastMatch error:', err);
     } finally {
@@ -448,15 +461,19 @@ export function useSession(): SessionState & SessionActions {
         'lockedPartners', 'sittingOut',
       ]);
       const needsRevision = Object.keys(patch).some(key => revisionSensitive.has(key as keyof SessionDoc));
-      if (needsRevision) {
-        const revision = await updateSessionSafely(sessionId, revisionRef.current, patch);
-        revisionRef.current = revision;
-        setState(prev => ({ ...prev, revision }));
-      } else {
-        await updateSession(sessionId, patch);
-      }
+      const write = revisionWriteChainRef.current.then(async () => {
+        if (needsRevision) {
+          const revision = await updateSessionSafely(sessionId, revisionRef.current, patch);
+          revisionRef.current = revision;
+          setState(prev => ({ ...prev, revision }));
+        } else {
+          await updateSession(sessionId, patch);
+        }
+      });
+      revisionWriteChainRef.current = write.catch(() => undefined);
+      await write;
     } catch (err) {
-      console.error('[useSession] syncField error:', err);
+      console.error(`[useSession] syncField error (${Object.keys(patch).join(', ')}):`, err);
     }
   }, [state.isHost]);
 

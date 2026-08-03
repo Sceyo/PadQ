@@ -307,6 +307,7 @@ export interface CourtResultCommand {
   courtId: string;
   expectedPlayers: string[];
   winningSide: 'A' | 'B';
+  gameMode: 'singles' | 'doubles';
   id: number;
   timestamp: string;
 }
@@ -399,6 +400,7 @@ export async function commitMultiCourtResult(
       command.courtId,
       command.expectedPlayers,
       command.winningSide,
+      command.gameMode,
     );
     if (!planned) {
       return {
@@ -419,7 +421,7 @@ export async function commitMultiCourtResult(
     });
     tx.set(hRef, {
       id: command.id,
-      mode: `Doubles (${planned.courtName})`,
+      mode: `${command.gameMode === 'singles' ? 'Singles' : 'Doubles'} (${planned.courtName})`,
       players: planned.players,
       winner: planned.winner,
       timestamp: command.timestamp,
@@ -531,7 +533,7 @@ export function subscribeToSession(
     (snap) => {
       if (snap.exists()) {
         onChange(snap.data() as SessionDoc);
-      } else {
+      } else if (!snap.metadata.fromCache) {
         // Document gone — either TTL deleted it or hard reset
         onDeleted?.();
       }

@@ -51,6 +51,7 @@ import {
 import type { SinglesState, SerializableSinglesState } from './lib/singleEngine';
 import { freshSinglesState, advanceSinglesState, addPlayerToSinglesWaiting, serializeSinglesState, deserializeSinglesState } from './lib/singleEngine';
 import { V1_RELEASE } from './lib/releaseConfig';
+import { planMultiCourtResult } from './lib/multiCourtResult';
 
 // ── Components ───────────────────────────────────────────────
 import { PlayerLabel } from './components/atoms/PlayerLabel';
@@ -675,8 +676,9 @@ function QueueSystemContent() {
       session.undoLastMatch({
         queue: snap.queue,
         ...(snap.courtSlots ? { courtSlots: snap.courtSlots } : {}),
-        doublesEngineState: serializePaddleState(snap.paddleState) as unknown as Record<string, unknown>,
-        singlesEngineState: serializeSinglesState(snap.singlesState) as unknown as Record<string, unknown>,
+        ...(gameMode === 'doubles'
+          ? { doublesEngineState: serializePaddleState(snap.paddleState) as unknown as Record<string, unknown> }
+          : { singlesEngineState: serializeSinglesState(snap.singlesState) as unknown as Record<string, unknown> }),
       });
     }
     undoSnapshotRef.current = null;
@@ -765,6 +767,74 @@ function QueueSystemContent() {
   };
 
   const handleSinglesMatch = (winner: string, score?: string, courtId?: string) => {
+    const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
+    if (gameMode === 'singles' && courtId && currentSlots.length > 0) {
+      if (processingCourtIdsRef.current.has(courtId)) return;
+      processingCourtIdsRef.current.add(courtId);
+      const slot = currentSlots.find(court => court.id === courtId);
+      if (!slot || slot.onCourt.length !== 2 || !slot.onCourt.includes(winner)) {
+        processingCourtIdsRef.current.delete(courtId);
+        return;
+      }
+
+      const winningSide: 'A' | 'B' = winner === slot.onCourt[0] ? 'A' : 'B';
+      const entry: MatchHistoryEntry = {
+        id: Date.now(),
+        mode: `Singles (${slot.name})`,
+        players: `${slot.onCourt[0]} vs ${slot.onCourt[1]}`,
+        winner,
+        score,
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      const planned = planMultiCourtResult(
+        { queue: queueRef.current, courtSlots: currentSlots, sittingOut: activeSittingOut },
+        courtId,
+        [...slot.onCourt],
+        winningSide,
+        'singles',
+      );
+      if (!planned) {
+        processingCourtIdsRef.current.delete(courtId);
+        return;
+      }
+
+      setQueue(planned.queue);
+      queueRef.current = planned.queue;
+      setLocalCourtSlots(planned.courtSlots);
+      courtSlotsRef.current = planned.courtSlots;
+      setLocalHistory(previous => [entry, ...previous]);
+      recordCareerResult(entry.players, entry.winner);
+      setCareerStats(loadCareerStats());
+
+      if (session.sessionId) {
+        void session.commitCourtResult({
+          courtId,
+          expectedPlayers: [...slot.onCourt],
+          winningSide,
+          gameMode: 'singles',
+          id: entry.id,
+          timestamp: entry.timestamp,
+        }).then(result => {
+          if (!result || result.status === 'stale') {
+            setLocalHistory(previous => previous.filter(item => item.id !== entry.id));
+            showToast('This court already changed. Its latest assignment has been restored.');
+            return;
+          }
+          setQueue(result.queue);
+          queueRef.current = result.queue;
+          setLocalCourtSlots(result.courtSlots);
+          courtSlotsRef.current = result.courtSlots;
+        }).finally(() => processingCourtIdsRef.current.delete(courtId));
+      } else {
+        processingCourtIdsRef.current.delete(courtId);
+      }
+
+      setModalWinner(`${winner} wins!`);
+      setModalScore(score);
+      setModalOpen(true);
+      return;
+    }
+
     if (isProcessingMatchRef.current) return;
     isProcessingMatchRef.current = true;
     const [p1, p2] = [queue[0], queue[1]];
@@ -774,47 +844,9 @@ function QueueSystemContent() {
       singlesState: cloneSinglesState(singlesStateRef.current),
     };
     setHasUndo(true);
-    // Only call playSingles in single-court mode — it validates winner
-    // against queue[0]/queue[1] which is wrong for multi-court.
-    if (!(gameMode === 'singles' && courtId && courtSlots.length > 0)) {
-      playSingles(winner);
-    }
+    playSingles(winner);
     if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
     let newQueue: string[];
-
-    if (gameMode === 'singles' && courtId && courtSlots.length > 0) {
-      const slot = courtSlots.find(c => c.id === courtId);
-      if (slot) {
-        const [cp1, cp2] = slot.onCourt;
-        const loser = winner === cp1 ? cp2 : cp1;
-        // Use queueRef.current instead of queue to always get the latest value
-        const currentQueue = queueRef.current;
-        const currentWaiting = queueRef.current.filter(
-          p => !courtSlots.flatMap(c => c.onCourt).includes(p)
-        );
-        const nextChallenger = currentWaiting[0] ?? null;
-        const newQueue_ = nextChallenger
-          ? queueRef.current.filter(p => p !== nextChallenger)
-          : [...queueRef.current];
-        const newOnCourt = nextChallenger ? [winner, nextChallenger] : [winner];
-        const updatedQueue = [...newQueue_, loser];
-        queueRef.current = updatedQueue;
-        // Update the ref immediately so the next court reads fresh data
-        queueRef.current = updatedQueue;
-        const updatedSlots = courtSlots.map(c =>
-          c.id === courtId ? { ...c, onCourt: newOnCourt } : c
-        );
-        setLocalCourtSlots(updatedSlots);
-        if (session.sessionId) session.syncField({ courtSlots: updatedSlots });
-        newQueue = updatedQueue;
-        addHistory({ id: Date.now(), mode: 'Singles', players: `[${slot.name}] ${cp1} vs ${cp2}`, winner, score, timestamp: new Date().toLocaleTimeString() }, newQueue);
-        setModalWinner(`${winner} wins!`); setModalScore(score); setModalOpen(true);
-        setQueue(newQueue);
-        if (session.sessionId) session.syncField({ queue: newQueue });
-        isProcessingMatchRef.current = false;
-        return;
-      }
-    }
 
     if (activeQueueMode === 'default' && gameMode === 'singles') {
       const activePlayers = players.filter(p => !activeSittingOut.includes(p));
@@ -935,6 +967,7 @@ function QueueSystemContent() {
         courtId,
         expectedPlayers: [...slot.onCourt],
         winningSide: side,
+        gameMode: 'doubles',
         id: entry.id,
         timestamp: entry.timestamp,
       }).then(result => {

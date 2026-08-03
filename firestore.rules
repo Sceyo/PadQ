@@ -125,7 +125,7 @@ service cloud.firestore {
          score.labelA is string && score.labelA.size() <= 130 &&
          score.labelB is string && score.labelB.size() <= 130 &&
          score.limit is int && score.limit >= 1 && score.limit <= 100 &&
-         score.baseLimit is int && score.baseLimit in [11, 21] &&
+         score.baseLimit is int && score.baseLimit >= 2 && score.baseLimit <= 100 &&
          score.deuce is bool && score.active is bool);
     }
 
@@ -285,7 +285,9 @@ service cloud.firestore {
         (!changed.hasAny(['singlesEngineState']) ||
           (data.get('singlesEngineState', null) == null ||
            (data.get('singlesEngineState', null) is map &&
-            data.get('singlesEngineState', null).size() <= 7)));
+            data.get('singlesEngineState', null).size() <= 7))) &&
+        (data.gameMode == 'doubles' || data.get('doublesEngineState', null) == null) &&
+        (data.gameMode == 'singles' || data.get('singlesEngineState', null) == null);
     }
 
     function validHistory(data, entryId) {

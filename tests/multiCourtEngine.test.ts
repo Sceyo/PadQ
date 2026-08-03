@@ -139,6 +139,54 @@ describe('partner-aware multi-court doubles', () => {
     )).toBeNull();
   });
 
+  it('rotates 30 singles players across three courts without losing or duplicating anyone', () => {
+    const players = Array.from({ length: 30 }, (_, index) => `S${index + 1}`);
+    let courtSlots = [0, 1, 2].map(index => ({
+      id: `court-${index}`,
+      name: `Court ${index + 1}`,
+      onCourt: players.slice(index * 2, index * 2 + 2),
+    }));
+    let queue = players.slice(6);
+    const seen = new Set(courtSlots.flatMap(court => court.onCourt));
+
+    for (let round = 0; round < 150; round += 1) {
+      const court = courtSlots[round % 3];
+      const result = planMultiCourtResult(
+        { queue, courtSlots, sittingOut: [] },
+        court.id,
+        [...court.onCourt],
+        round % 2 === 0 ? 'A' : 'B',
+        'singles',
+      );
+      expect(result).not.toBeNull();
+      queue = result!.queue;
+      courtSlots = result!.courtSlots;
+      courtSlots.flatMap(slot => slot.onCourt).forEach(player => seen.add(player));
+      expectValidPartition(players, courtSlots.map(slot => slot.onCourt), queue, []);
+      expect(courtSlots.every(slot => slot.onCourt.length === 2)).toBe(true);
+    }
+
+    expect(seen).toEqual(new Set(players));
+  });
+
+  it('keeps a valid singles rematch when no challenger is waiting', () => {
+    const result = planMultiCourtResult(
+      {
+        queue: [],
+        courtSlots: [{ id: 'court-0', name: 'Court 1', onCourt: ['A', 'B'] }],
+      },
+      'court-0',
+      ['A', 'B'],
+      'B',
+      'singles',
+    );
+    expect(result).toMatchObject({
+      queue: [],
+      courtSlots: [{ onCourt: ['B', 'A'] }],
+      winner: 'B',
+    });
+  });
+
   it('handles late arrivals, a sit-out, a substitution, and one unavailable court', () => {
     const originalPlayers = Array.from({ length: 28 }, (_, i) => `P${i + 1}`);
     const seeded = seedMultiCourtDoubles(originalPlayers, 3, []);
