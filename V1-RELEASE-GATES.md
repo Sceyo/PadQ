@@ -152,22 +152,22 @@ Detailed measurements and operating limits are recorded in
 
 ## Gate 4 — Release-candidate verification
 
-**Status: In progress — local candidate passed; production-console confirmation pending**
+**Status: Complete**
 
-- [ ] Run unit, simulation, Firestore rules, component, and browser end-to-end
+- [x] Run unit, simulation, Firestore rules, component, and browser end-to-end
       tests from a clean checkout.
 - [x] Pass TypeScript, lint with no errors, and the production build.
-- [ ] Test the production environment variables without exposing their values.
-- [ ] Verify Anonymous Authentication and authorized production domains.
+- [x] Test the production environment variables without exposing their values.
+- [x] Verify Anonymous Authentication and authorized production domains.
 - [x] Decide the App Check launch state explicitly. V1 launches with App Check
       disabled and Firestore enforcement off. If enabled later, register every
       production hostname, use a quota-conscious token TTL, monitor valid and
       invalid traffic first, and enable enforcement only after verification.
 - [x] Perform mobile, tablet, desktop, slow-network, refresh, and offline/error
       recovery checks.
-- [ ] Record the approved commit and rollback commit.
+- [x] Record the approved commit and rollback commit.
 
-Detailed evidence and the two remaining manual production checks are recorded
+Detailed evidence and the approved candidate/rollback record are recorded
 in [`GATE4-RELEASE-CANDIDATE.md`](./GATE4-RELEASE-CANDIDATE.md).
 
 ## Gate 5 — Controlled production launch

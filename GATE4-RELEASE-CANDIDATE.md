@@ -4,8 +4,7 @@
 
 **Date:** 2026-08-03
 
-**Status:** In progress — local candidate verification passed; production
-console confirmation remains.
+**Status:** Complete — approved for the controlled Gate 5 launch.
 
 ## Automated verification
 
@@ -33,9 +32,9 @@ consume Spark quota.
   were not printed or recorded.
 - The production build succeeds with the candidate environment.
 - Emulator variables are not set in the normal local environment.
-- The repository is not linked to a local Vercel project, so the six variable
-  names must still be confirmed in Vercel Production settings before Gate 4 is
-  closed.
+- The six required Firebase variables were visually confirmed in Vercel with
+  non-empty masked values and availability in all environments, including
+  Production. No values were exposed or recorded.
 
 Required Vercel Production variable names:
 
@@ -49,16 +48,11 @@ Required Vercel Production variable names:
 ## Firebase Authentication confirmation
 
 The Firebase CLI is authenticated as the expected project account and the
-active project is `padq-ccb6a`. The Firebase Console could not be inspected
-from the controlled browser because access is disabled by its saved privacy
-preference.
+active project is `padq-ccb6a`. Firebase Console screenshots confirmed:
 
-Before approving the release candidate, manually confirm:
-
-- Firebase Console → Authentication → Sign-in method: **Anonymous** is enabled.
-- Firebase Console → Authentication → Settings → Authorized domains includes
-  the production Vercel hostname, currently `pad-q.vercel.app`, plus every
-  custom production hostname that will serve PADQ.
+- Authentication → Sign-in method: **Anonymous** is enabled.
+- Authentication → Settings → Authorized domains includes `pad-q.vercel.app`,
+  along with the project's default Firebase domains and localhost.
 
 ## V1 App Check decision
 
@@ -72,7 +66,11 @@ registered and valid/invalid request metrics have been observed.
 
 ## Candidate and rollback record
 
-The release-candidate commit and its immediate rollback commit will be recorded
-after the remaining Firebase and Vercel production-console checks are confirmed.
-Gate 5 must deploy that exact approved candidate; later commits require Gate 4
-verification again.
+- Approved release-candidate commit:
+  `b6ff86a3926b751db6cce7ca158f19a48254d69d`
+- Approved candidate tag: `v1.0.0-rc1`
+- Rollback commit:
+  `caf728d9095231647fe0a3e9f37e6e0bd2169b2d`
+
+Gate 5 must deploy the exact approved candidate or tag. Later application-code
+commits require Gate 4 verification again.
