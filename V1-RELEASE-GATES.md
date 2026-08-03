@@ -168,7 +168,9 @@ Detailed measurements and operating limits are recorded in
 - [x] Record the approved commit and rollback commit.
 
 Detailed evidence and the approved candidate/rollback record are recorded
-in [`GATE4-RELEASE-CANDIDATE.md`](./GATE4-RELEASE-CANDIDATE.md).
+in [`GATE4-RELEASE-CANDIDATE.md`](./GATE4-RELEASE-CANDIDATE.md). The expanded
+all-feature and real-life scenario results are in
+[`V1-FULL-STRESS-REPORT.md`](./V1-FULL-STRESS-REPORT.md).
 
 ## Gate 5 — Controlled production launch
 

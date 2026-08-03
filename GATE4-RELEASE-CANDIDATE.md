@@ -10,17 +10,20 @@
 
 | Check | Result |
 |---|---|
-| Application unit, simulation, and component tests | 164 passed |
-| Firestore Emulator rules and concurrency tests | 17 passed |
-| Browser end-to-end scenarios | 5 passed |
+| Application unit, simulation, and component tests | 166 passed |
+| Firestore Emulator rules and concurrency tests | 19 passed |
+| Browser end-to-end scenarios | 7 passed |
 | TypeScript and production build | Passed |
-| ESLint | 0 errors; 28 tracked warnings in deferred/existing code |
+| ESLint | 0 errors; 27 tracked warnings in deferred/existing code |
 | Diff whitespace validation | Passed |
 
-The browser suite covers the three-court host/viewer journey, 30 simultaneous
-viewer contexts, V1 scope sealing, mobile and tablet layouts, a delayed initial
-document load, offline state retention, reconnection to live updates, refresh,
-and invalid-room recovery.
+The browser suite covers three-court doubles and singles, the host/viewer
+journey, 30 simultaneous viewer contexts, custom single-court live scoring,
+statistics, history, late-player management, sit-out/return, undo, V1 scope
+sealing, mobile and tablet layouts, a delayed initial document load, offline
+state retention, reconnection to live updates, refresh, and invalid-room
+recovery. Full evidence is recorded in
+[`V1-FULL-STRESS-REPORT.md`](./V1-FULL-STRESS-REPORT.md).
 
 All Firebase browser and rules tests use `firebase.e2e.json`, Authentication on
 port 9199, and Firestore on port 8180. They do not access production data or
@@ -67,10 +70,14 @@ registered and valid/invalid request metrics have been observed.
 ## Candidate and rollback record
 
 - Approved release-candidate commit:
-  `b6ff86a3926b751db6cce7ca158f19a48254d69d`
-- Approved candidate tag: `v1.0.0-rc1`
+  `677343441bb983c84a63c0b58d4f83dd685afade`
+- Approved candidate tag: `v1.0.0-rc2`
 - Rollback commit:
   `caf728d9095231647fe0a3e9f37e6e0bd2169b2d`
+
+`v1.0.0-rc1` is superseded by `v1.0.0-rc2` after full-feature stress testing
+found and corrected multi-court singles, score synchronization, cache-startup,
+rapid-write, and undo-state defects.
 
 Gate 5 must deploy the exact approved candidate or tag. Later application-code
 commits require Gate 4 verification again.
