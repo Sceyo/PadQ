@@ -10,7 +10,7 @@
 
 ## Project status
 
-PAD-Q is an independently developed product in **active development**. The `main` branch is the focused V1 launch build; the complete experimental feature set is preserved on `codex/all-features-v1-archive`.
+PAD-Q is an independently developed product in **active development**. The `main` branch is the focused V1 launch build; the complete experimental feature set is preserved on `all-features-archive`.
 
 - Deployed on Vercel
 - Backed by Firebase Cloud Firestore
@@ -162,7 +162,7 @@ There is no separate REST or GraphQL backend in this repository. The browser use
 
 ### Deferred modes
 
-Tournament, Play-All, skill-based matchmaking, viewer PIN setup, and the legacy independent-court coordinator are hidden from the V1 production interface. Their implementations and documentation remain available on `codex/all-features-v1-archive` for later hardening and release.
+Tournament, Play-All, skill-based matchmaking, viewer PIN setup, and the legacy independent-court coordinator are hidden from the V1 production interface. Their implementations and documentation remain available on `all-features-archive` for later hardening and release.
 
 The deferred skill engine groups players as Beginner, Intermediate, or Advanced. Court filling follows a priority cascade:
 

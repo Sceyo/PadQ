@@ -47,5 +47,5 @@ The V1 boundary is enforced at several layers:
    that attempts to activate deferred features through URL parameters.
 
 The complete implementation remains preserved on
-`codex/all-features-v1-archive`. Sealing means unavailable in V1.0; it does not
+`all-features-archive`. Sealing means unavailable in V1.0; it does not
 mean the underlying work has been deleted.

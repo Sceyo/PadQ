@@ -13,7 +13,7 @@ passing build alone is not a release approval.
 
 **Status: Complete**
 
-- [x] Preserve the full feature set on `codex/all-features-v1-archive`.
+- [x] Preserve the full feature set on `all-features-archive`.
 - [x] Continue production hardening on `v1-prod-hardening`.
 - [x] Do not delete deferred modes while preparing V1.
 
