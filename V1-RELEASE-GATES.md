@@ -19,7 +19,7 @@ passing build alone is not a release approval.
 
 ## Gate 1 — Firebase security and room integrity
 
-**Status: Implementation complete; production deployment pending**
+**Status: Complete**
 
 - [x] Use authenticated Firebase clients.
 - [x] Bind room ownership to the original host identity.
@@ -31,13 +31,13 @@ passing build alone is not a release approval.
 - [x] Pass adversarial Firestore emulator tests.
 - [x] Pass the Firebase CLI rules dry run for the exact final candidate against
       `padq-ccb6a`; compilation completed successfully without deploying.
-- [ ] Deploy the reviewed Firestore rules to `padq-ccb6a` during the controlled
+- [x] Deploy the reviewed Firestore rules to `padq-ccb6a` during the controlled
       release window.
-- [ ] Smoke-test host and viewer access against the deployed rules.
+- [x] Smoke-test host and viewer access against the deployed rules.
 
 ## Gate 1.5 — Live Court Status spectator view
 
-**Status: Implementation and emulator verification complete; browser verification pending**
+**Status: Complete**
 
 PADQ's central V1 promise is that players can see who is currently playing on
 every court, choose the court they want to focus on, see who plays next, see the
@@ -65,7 +65,7 @@ result so court operations remain practical and Firestore usage stays low.
       court switching, concurrent results, and atomic match completion.
 - [x] Add component tests for selecting Court 1–3, focused current players, safe
       fallback selection, and next-player group size.
-- [ ] Add browser tests for joining, reconnecting, and switching courts against
+- [x] Add browser tests for joining, reconnecting, and switching courts against
       the local Firestore emulator.
 
 ### Gate 1.5 acceptance criteria
@@ -81,9 +81,9 @@ result so court operations remain practical and Firestore usage stays low.
 
 ## Gate 2 — Free-tier capacity and real-life reliability
 
-**Status: Automated partner verification complete; capacity test pending**
+**Status: Complete; production-plan recheck remains in Gate 5**
 
-- [ ] Stress-test 30 players, 3 courts, and 30 viewer devices/tabs.
+- [x] Stress-test 30 players, 3 courts, and 30 viewer devices/tabs.
 - [x] Verify partner requests keep both players together through waiting,
       assignment, completion, and requeueing.
 - [x] Stress-test all 15 possible pairs across 30 players, 3 courts, 150
@@ -91,23 +91,27 @@ result so court operations remain practical and Firestore usage stays low.
 - [x] Move partner setup into the active multi-court host controls, cap pairs
       at `floor(players / 2)`, and save the complete configuration in one
       Firestore write.
-- [ ] Test simultaneous court completions, rapid result actions, duplicate taps,
+- [x] Test simultaneous court completions, rapid result actions, duplicate taps,
       host refresh, viewer reconnect, court switching, late arrivals, sit-outs,
       substitutions, and one unavailable court.
-- [ ] Measure Firestore reads, writes, deletes, storage, and transfer rather than
+- [x] Measure Firestore reads, writes, deletes, storage, and transfer rather than
       relying only on functional assertions.
-- [ ] Keep a normal full event below 35,000 Firestore reads per day and 10,000
+- [x] Keep a normal full event below 35,000 Firestore reads per day and 10,000
       writes per day, leaving headroom below Spark's hard quotas.
-- [ ] Run a two-room concurrency test for headroom; V1 only promises one full
+- [x] Run a two-room concurrency test for headroom; V1 only promises one full
       30-player, 3-court event at a time while it remains on free tiers.
-- [ ] Confirm the production build does not introduce unnecessary Vercel
+- [x] Confirm the production build does not introduce unnecessary Vercel
       Functions, server actions, cron jobs, or image transformations.
-- [ ] Confirm Firebase remains on Spark and Vercel remains on Hobby after the
-      release candidate is deployed.
+- [x] Confirm the current Firebase project is on Spark and the current Vercel
+      project is on Hobby. Reconfirm both after the release candidate is deployed
+      as part of Gate 5.
+
+Detailed measurements and operating limits are recorded in
+[`GATE2-CAPACITY-REPORT.md`](./GATE2-CAPACITY-REPORT.md).
 
 ## Gate 3 — V1 scope seal
 
-**Status: Partially complete**
+**Status: Complete**
 
 ### Keep in V1
 
@@ -133,22 +137,38 @@ result so court operations remain practical and Firestore usage stays low.
 - [x] Cross-room public leaderboards and deep live historical analytics.
 - [x] Point-by-point scoring for multi-court sessions.
 - [x] Delegated scorekeeper access from separate devices.
+- [x] Multi-host sessions and shared session management; planned first for V1.1
+      as one owner plus up to two authenticated co-hosts.
+
+### Gate 3 verification
+
+- [x] Confirm injected URL parameters cannot enable tournament, Play-All,
+      skilled mode, PIN setup, extra courts, or other deferred controls.
+- [x] Confirm the user guide and README distinguish single-court scoring from
+      multi-court Live Court Status.
+- [x] Serve the static PADQ logo without consuming Vercel image transformations.
+- [x] Record the included and deferred boundaries in
+      [`V1-SCOPE-SEAL.md`](./V1-SCOPE-SEAL.md).
 
 ## Gate 4 — Release-candidate verification
 
-**Status: Pending**
+**Status: In progress — local candidate passed; production-console confirmation pending**
 
 - [ ] Run unit, simulation, Firestore rules, component, and browser end-to-end
       tests from a clean checkout.
 - [x] Pass TypeScript, lint with no errors, and the production build.
 - [ ] Test the production environment variables without exposing their values.
 - [ ] Verify Anonymous Authentication and authorized production domains.
-- [ ] Decide the App Check launch state explicitly. If enabled, register every
+- [x] Decide the App Check launch state explicitly. V1 launches with App Check
+      disabled and Firestore enforcement off. If enabled later, register every
       production hostname, use a quota-conscious token TTL, monitor valid and
       invalid traffic first, and enable enforcement only after verification.
-- [ ] Perform mobile, tablet, desktop, slow-network, refresh, and offline/error
+- [x] Perform mobile, tablet, desktop, slow-network, refresh, and offline/error
       recovery checks.
 - [ ] Record the approved commit and rollback commit.
+
+Detailed evidence and the two remaining manual production checks are recorded
+in [`GATE4-RELEASE-CANDIDATE.md`](./GATE4-RELEASE-CANDIDATE.md).
 
 ## Gate 5 — Controlled production launch
 

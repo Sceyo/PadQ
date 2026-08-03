@@ -185,6 +185,7 @@ export default function HomePage() {
             height={520}
             loading="eager"
             priority
+            unoptimized
             className="hp-logo-img"
             style={{ width: "100%", height: "auto" }}
           />

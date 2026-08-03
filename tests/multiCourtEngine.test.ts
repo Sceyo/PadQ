@@ -5,6 +5,7 @@ import {
   selectPartnerAwareMatch,
   type LockedPartnerPair,
 } from '@/app/queue/lib/doublesEngine';
+import { planMultiCourtResult } from '@/app/queue/lib/multiCourtResult';
 
 function expectValidPartition(
   players: string[],
@@ -103,6 +104,97 @@ describe('partner-aware multi-court doubles', () => {
     }
 
     expect(seen).toEqual(new Set(players));
+  });
+
+  it('serializes different court results from the latest shared queue and rejects a duplicate tap', () => {
+    const players = Array.from({ length: 30 }, (_, i) => `P${i + 1}`);
+    const seeded = seedMultiCourtDoubles(players, 3, []);
+    const initial = {
+      queue: seeded.waiting,
+      courtSlots: seeded.courts.map((onCourt, index) => ({
+        id: `court-${index}`,
+        name: `Court ${index + 1}`,
+        onCourt,
+      })),
+      lockedPartners: [],
+      sittingOut: [],
+    };
+    const courtOnePlayers = [...initial.courtSlots[0].onCourt];
+    const courtTwoPlayers = [...initial.courtSlots[1].onCourt];
+    const first = planMultiCourtResult(initial, 'court-0', courtOnePlayers, 'A');
+    expect(first).not.toBeNull();
+    const second = planMultiCourtResult(
+      { ...initial, queue: first!.queue, courtSlots: first!.courtSlots },
+      'court-1',
+      courtTwoPlayers,
+      'B',
+    );
+    expect(second).not.toBeNull();
+    expectValidPartition(players, second!.courtSlots.map(court => court.onCourt), second!.queue, []);
+    expect(planMultiCourtResult(
+      { ...initial, queue: second!.queue, courtSlots: second!.courtSlots },
+      'court-0',
+      courtOnePlayers,
+      'A',
+    )).toBeNull();
+  });
+
+  it('handles late arrivals, a sit-out, a substitution, and one unavailable court', () => {
+    const originalPlayers = Array.from({ length: 28 }, (_, i) => `P${i + 1}`);
+    const seeded = seedMultiCourtDoubles(originalPlayers, 3, []);
+    let queue = [...seeded.waiting, 'Late 29', 'Late 30'];
+    let courts = seeded.courts.map((onCourt, index) => ({
+      id: `court-${index}`,
+      name: `Court ${index + 1}`,
+      onCourt,
+    }));
+    const allPlayers = [...originalPlayers, 'Late 29', 'Late 30'];
+
+    const sittingOut = queue.shift()!;
+    const substitute = queue.at(-1)!;
+    const absent = queue[2];
+    queue = queue.filter(player => player !== substitute && player !== absent);
+    queue.splice(2, 0, substitute);
+    const inactiveCourt = [...courts[2].onCourt];
+    const activePlayers = allPlayers.filter(player => player !== sittingOut && player !== absent);
+
+    for (let round = 0; round < 100; round += 1) {
+      const courtIndex = round % 2;
+      const expectedPlayers = [...courts[courtIndex].onCourt];
+      const next = planMultiCourtResult(
+        { queue, courtSlots: courts, lockedPartners: [], sittingOut: [sittingOut, absent] },
+        `court-${courtIndex}`,
+        expectedPlayers,
+        round % 2 === 0 ? 'A' : 'B',
+      );
+      expect(next).not.toBeNull();
+      queue = next!.queue;
+      courts = next!.courtSlots;
+      expect(courts[2].onCourt).toEqual(inactiveCourt);
+      expectValidPartition(activePlayers, courts.map(court => court.onCourt), queue, []);
+    }
+
+    queue.push(sittingOut, absent);
+    expectValidPartition(allPlayers, courts.map(court => court.onCourt), queue, []);
+    expect(new Set([...courts.flatMap(court => court.onCourt), ...queue]).size).toBe(30);
+  });
+
+  it('runs two independent 30-player rooms through 150 interleaved results each', () => {
+    const rooms = ['A', 'B'].map(prefix => {
+      const players = Array.from({ length: 30 }, (_, index) => `${prefix}${index + 1}`);
+      const seeded = seedMultiCourtDoubles(players, 3, []);
+      return { players, courts: seeded.courts.map(onCourt => [...onCourt]), waiting: [...seeded.waiting] };
+    });
+
+    for (let round = 0; round < 150; round += 1) {
+      for (const room of rooms) {
+        const courtIndex = round % 3;
+        const next = rotateMultiCourtDoubles(room.waiting, room.courts[courtIndex], []);
+        room.courts[courtIndex] = next.onCourt;
+        room.waiting = next.waiting;
+        expectValidPartition(room.players, room.courts, room.waiting, []);
+      }
+    }
   });
 
 });

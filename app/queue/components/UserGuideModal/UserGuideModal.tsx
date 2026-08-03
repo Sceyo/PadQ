@@ -18,11 +18,11 @@ const GUIDE_SECTIONS = [
   },
   {
     title: '🏆 Scoring',
-    body: "Tap + / − next to each team's score. Deuce rule applies: game extends by +2 until one team leads by 2 past the limit. Score auto-resets when the next match begins.",
+    body: "Single-court sessions can use + / − point-by-point scoring. Deuce extends the game until one team leads by 2 past the target. In multi-court V1, record only the winning team on each court so all courts remain quick to manage.",
   },
   {
     title: '📡 Go Live & Sharing',
-    body: 'Tap Go Live to allow spectators. Share via QR code, copy link, or native share sheet (WhatsApp/SMS). Viewers see the queue, active courts, and score in real time — no account needed.',
+    body: 'Tap Go Live to allow spectators. Share via QR code, copy link, or native share sheet (WhatsApp/SMS). Viewers see the queue and Live Court Status in real time. Single-court viewers also see the score when scoring is enabled; multi-court viewers see current players and completed results.',
   },
   {
     title: '📊 Stats & Suggestions',

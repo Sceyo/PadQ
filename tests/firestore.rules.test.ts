@@ -15,9 +15,12 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  onSnapshot,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { planMultiCourtResult } from '@/app/queue/lib/multiCourtResult';
 
 const emulatorAvailable = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 const suite = emulatorAvailable ? describe : describe.skip;
@@ -332,6 +335,110 @@ suite('Firestore V1 production rules', () => {
     expect(outcomes.filter(result => result.status === 'rejected')).toHaveLength(1);
     expect((await getDoc(ref)).data()?.revision).toBe(1);
     expect((await getDocs(collection(host, 'sessions', 'KARTCE', 'history'))).size).toBe(1);
+  });
+
+  it('delivers two concurrent court completions to 30 viewers without double-booking', async () => {
+    const players = Array.from({ length: 30 }, (_, index) => `P${index + 1}`);
+    const courtSlots = Array.from({ length: 3 }, (_, index) => ({
+      id: `court-${index}`,
+      name: `Court ${index + 1}`,
+      onCourt: players.slice(index * 4, index * 4 + 4),
+    }));
+    const host = env.authenticatedContext('host-load').firestore();
+    const ref = doc(host, 'sessions', 'M3LAD7');
+    await assertSucceeds(setDoc(ref, sessionData('host-load', {
+      players,
+      queue: players.slice(12),
+      courtSlots,
+      isLive: true,
+    })));
+
+    const revisions = Array.from({ length: 30 }, () => -1);
+    const viewerUnsubscribes: Unsubscribe[] = [];
+    const initialSnapshots = Array.from({ length: 30 }, (_, index) =>
+      new Promise<void>((resolveInitial, rejectInitial) => {
+        const viewer = env.authenticatedContext(`viewer-load-${index}`).firestore();
+        let initialResolved = false;
+        const unsubscribe = onSnapshot(
+          doc(viewer, 'sessions', 'M3LAD7'),
+          snapshot => {
+            revisions[index] = Number(snapshot.data()?.revision ?? -1);
+            if (!initialResolved) {
+              initialResolved = true;
+              resolveInitial();
+            }
+          },
+          rejectInitial,
+        );
+        viewerUnsubscribes.push(unsubscribe);
+      }),
+    );
+
+    try {
+      await Promise.all(initialSnapshots);
+
+      const commit = (
+        commandId: string,
+        courtId: string,
+        expectedPlayers: string[],
+        winningSide: 'A' | 'B',
+        id: number,
+      ) => runTransaction(host, async tx => {
+        const sessionSnapshot = await tx.get(ref);
+        const historyRef = doc(host, 'sessions', 'M3LAD7', 'history', commandId);
+        const historySnapshot = await tx.get(historyRef);
+        const current = sessionSnapshot.data()!;
+        if (historySnapshot.exists()) return;
+        const planned = planMultiCourtResult(
+          {
+            queue: current.queue,
+            courtSlots: current.courtSlots,
+            lockedPartners: current.lockedPartners,
+            sittingOut: current.sittingOut,
+          },
+          courtId,
+          expectedPlayers,
+          winningSide,
+        );
+        if (!planned) throw new Error('stale-court');
+        const revision = current.revision + 1;
+        tx.update(ref, {
+          queue: planned.queue,
+          courtSlots: planned.courtSlots,
+          revision,
+          updatedAt: serverTimestamp(),
+          lastActiveAt: serverTimestamp(),
+        });
+        tx.set(historyRef, {
+          id,
+          mode: `Doubles (${planned.courtName})`,
+          players: planned.players,
+          winner: planned.winner,
+          timestamp: '8:30 PM',
+          commandId,
+          revision,
+        });
+      });
+
+      await Promise.all([
+        commit('33333333-3333-4333-8333-333333333333', 'court-0', courtSlots[0].onCourt, 'A', 1),
+        commit('44444444-4444-4444-8444-444444444444', 'court-1', courtSlots[1].onCourt, 'B', 2),
+      ]);
+
+      const deadline = Date.now() + 10_000;
+      while (revisions.some(revision => revision < 2) && Date.now() < deadline) {
+        await new Promise(resolveWait => setTimeout(resolveWait, 20));
+      }
+      expect(revisions.every(revision => revision === 2)).toBe(true);
+
+      const finalSession = (await getDoc(ref)).data()!;
+      const assigned = [...finalSession.courtSlots.flatMap((court: { onCourt: string[] }) => court.onCourt), ...finalSession.queue];
+      expect(assigned).toHaveLength(30);
+      expect(new Set(assigned).size).toBe(30);
+      expect((await getDocs(collection(host, 'sessions', 'M3LAD7', 'history'))).size).toBe(2);
+    } finally {
+      viewerUnsubscribes.forEach(unsubscribe => unsubscribe());
+    }
   });
 
   it('allows only the host to delete history or the session', async () => {

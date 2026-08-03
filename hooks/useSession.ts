@@ -21,6 +21,7 @@ import {
   updateSessionSafely,
   updateQueueSafely,
   batchMatchResult,
+  commitMultiCourtResult,
   clearHistory,
   deleteLatestHistoryEntry,
   touchSession,
@@ -37,6 +38,8 @@ import {
   CourtSlot,
   StaleSessionRevisionError,
   type CommitMatchResult,
+  type CourtResultCommand,
+  type CourtResultCommit,
 } from '@/lib/sessionService';
 
 // ── Types ──────────────────────────────────────────────────
@@ -73,13 +76,35 @@ export interface SessionState {
 }
 
 export interface SessionActions {
-  startSession:      (data: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  startSession:      (data: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt'>) => Promise<StartSessionResult>;
   joinSession:       (sessionId: string) => Promise<boolean>;
   endSession:        () => void;
   commitMatchResult: (patch: Partial<SessionDoc>, entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>) => Promise<CommitMatchResult | null>;
+  commitCourtResult: (command: CourtResultCommand) => Promise<CourtResultCommit | null>;
   undoLastMatch:     (patch: Partial<SessionDoc>) => Promise<void>;
   syncField:         (patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>) => Promise<void>;
   clearMatchHistory: () => Promise<void>;
+}
+
+export type StartSessionResult =
+  | { ok: true; sessionId: string }
+  | { ok: false; message: string };
+
+function startSessionErrorMessage(error: unknown): string {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code)
+    : '';
+
+  if (code === 'auth/admin-restricted-operation' || code === 'auth/operation-not-allowed') {
+    return 'PADQ could not start the room because Anonymous Authentication is disabled in Firebase.';
+  }
+  if (code === 'permission-denied' || code === 'firestore/permission-denied') {
+    return 'Firebase blocked room creation. Confirm the deployed Firestore rules and try again.';
+  }
+  if (code === 'unavailable' || code === 'firestore/unavailable') {
+    return 'Firebase is temporarily unavailable. Check your connection and try again.';
+  }
+  return 'PADQ could not create the live room. No queue was started; please try again.';
 }
 
 // ── Initial state ──────────────────────────────────────────
@@ -252,7 +277,7 @@ export function useSession(): SessionState & SessionActions {
    */
   const startSession = useCallback(async (
     initialData: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt'>,
-  ) => {
+  ): Promise<StartSessionResult> => {
     setState(prev => ({ ...prev, isSaving: true }));
     try {
       const { sessionId } = await createSession(initialData);
@@ -272,9 +297,11 @@ export function useSession(): SessionState & SessionActions {
       }));
 
       attachListeners(sessionId);
+      return { ok: true, sessionId };
     } catch (err) {
       console.error('[useSession] startSession error:', err);
       setState(prev => ({ ...prev, isSaving: false }));
+      return { ok: false, message: startSessionErrorMessage(err) };
     }
   }, [attachListeners]);
 
@@ -351,6 +378,29 @@ export function useSession(): SessionState & SessionActions {
     } catch (err) {
       console.error('[useSession] commitMatchResult error:', err);
       if (err instanceof StaleSessionRevisionError) return null;
+      return null;
+    } finally {
+      setState(prev => ({ ...prev, isSaving: false }));
+    }
+  }, []);
+
+  const commitCourtResult = useCallback(async (command: CourtResultCommand) => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId) return null;
+
+    setState(prev => ({ ...prev, isSaving: true }));
+    try {
+      const result = await commitMultiCourtResult(sessionId, crypto.randomUUID(), command);
+      revisionRef.current = Math.max(revisionRef.current, result.revision);
+      setState(prev => ({
+        ...prev,
+        revision: Math.max(prev.revision, result.revision),
+        queue: result.queue,
+        courtSlots: result.courtSlots,
+      }));
+      return result;
+    } catch (err) {
+      console.error('[useSession] commitCourtResult error:', err);
       return null;
     } finally {
       setState(prev => ({ ...prev, isSaving: false }));
@@ -438,6 +488,7 @@ export function useSession(): SessionState & SessionActions {
     joinSession,
     endSession,
     commitMatchResult,
+    commitCourtResult,
     undoLastMatch,
     syncField,
     clearMatchHistory,

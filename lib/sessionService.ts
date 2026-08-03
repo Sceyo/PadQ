@@ -29,6 +29,7 @@ import {
 } from 'firebase/firestore';
 import { db, ensureAuthenticated } from './firebase';
 import { generateRoomCode } from './roomCode';
+import { planMultiCourtResult } from '@/app/queue/lib/multiCourtResult';
 
 // ── Types ─────────────────────────────────────────────────
 
@@ -302,6 +303,21 @@ export class StaleSessionRevisionError extends Error {
 
 export type CommitMatchResult = { status: 'committed' | 'duplicate'; revision: number };
 
+export interface CourtResultCommand {
+  courtId: string;
+  expectedPlayers: string[];
+  winningSide: 'A' | 'B';
+  id: number;
+  timestamp: string;
+}
+
+export type CourtResultCommit = {
+  status: 'committed' | 'duplicate' | 'stale';
+  revision: number;
+  queue: string[];
+  courtSlots: CourtSlot[];
+};
+
 export async function batchMatchResult(
   sessionId: string,
   expectedRevision: number,
@@ -339,6 +355,84 @@ export async function batchMatchResult(
     if (entry.score !== undefined) clean.score = entry.score;
     tx.set(hRef, clean);
     return { status: 'committed', revision: nextRevision };
+  });
+}
+
+/**
+ * Commits one multi-court result from the latest server state. Firestore may
+ * retry this transaction when two courts finish together; recalculating inside
+ * the retry prevents a player from being assigned to both courts.
+ */
+export async function commitMultiCourtResult(
+  sessionId: string,
+  commandId: string,
+  command: CourtResultCommand,
+): Promise<CourtResultCommit> {
+  const user = await ensureAuthenticated();
+  const sRef = sessionRef(sessionId);
+  const hRef = doc(db, 'sessions', sessionId, 'history', commandId);
+
+  return runTransaction(db, async tx => {
+    const sessionSnap = await tx.get(sRef);
+    const historySnap = await tx.get(hRef);
+    if (!sessionSnap.exists()) throw new Error('Session not found');
+
+    const current = sessionSnap.data() as SessionDoc;
+    if (current.hostUid !== user.uid) throw new Error('Not the host');
+    const currentSlots = current.courtSlots ?? [];
+    if (historySnap.exists()) {
+      return {
+        status: 'duplicate',
+        revision: current.revision,
+        queue: current.queue,
+        courtSlots: currentSlots,
+      };
+    }
+
+    const planned = planMultiCourtResult(
+      {
+        queue: current.queue,
+        courtSlots: currentSlots,
+        lockedPartners: current.lockedPartners,
+        sittingOut: current.sittingOut,
+      },
+      command.courtId,
+      command.expectedPlayers,
+      command.winningSide,
+    );
+    if (!planned) {
+      return {
+        status: 'stale',
+        revision: current.revision,
+        queue: current.queue,
+        courtSlots: currentSlots,
+      };
+    }
+
+    const nextRevision = current.revision + 1;
+    tx.update(sRef, {
+      queue: planned.queue,
+      courtSlots: planned.courtSlots,
+      revision: nextRevision,
+      updatedAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
+    });
+    tx.set(hRef, {
+      id: command.id,
+      mode: `Doubles (${planned.courtName})`,
+      players: planned.players,
+      winner: planned.winner,
+      timestamp: command.timestamp,
+      commandId,
+      revision: nextRevision,
+    });
+
+    return {
+      status: 'committed',
+      revision: nextRevision,
+      queue: planned.queue,
+      courtSlots: planned.courtSlots,
+    };
   });
 }
 

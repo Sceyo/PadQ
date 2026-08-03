@@ -40,6 +40,8 @@ const firebaseConfig = {
 // Prevent re-initializing on hot-reload in Next.js dev mode
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 const useFirebaseEmulators = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === 'true';
+const authEmulatorPort = Number(process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_PORT ?? 9099);
+const firestoreEmulatorPort = Number(process.env.NEXT_PUBLIC_FIREBASE_FIRESTORE_EMULATOR_PORT ?? 8080);
 
 // Enable only after the production web app is registered in Firebase App Check.
 // Monitor verified requests before turning on Firestore enforcement.
@@ -54,15 +56,13 @@ if (typeof window !== 'undefined' && !useFirebaseEmulators && appCheckEnabled &&
 
 export const auth = getAuth(app);
 
-// Use experimentalForceLongPolling to suppress "WebChannelConnection
-// RPC 'Listen' stream transport errored" in dev and on some networks.
-// Long polling is slightly less efficient than WebSockets but is far
-// more reliable behind proxies, VPNs, and corporate firewalls.
-// In production on Vercel this makes no measurable difference.
+// Prefer Firestore's normal streaming transport and let the SDK fall back to
+// long polling only when it detects a proxy/VPN that requires it. Forcing long
+// polling for every spectator multiplies open requests in 30-viewer sessions.
 export const db = getApps().length > 1
   ? getFirestore(app)
   : initializeFirestore(app, {
-      experimentalForceLongPolling: true,
+      experimentalAutoDetectLongPolling: true,
       cacheSizeBytes: CACHE_SIZE_UNLIMITED,
     });
 
@@ -72,8 +72,8 @@ const emulatorGlobal = globalThis as typeof globalThis & {
   __padqFirebaseEmulatorsConnected?: boolean;
 };
 if (typeof window !== 'undefined' && useFirebaseEmulators && !emulatorGlobal.__padqFirebaseEmulatorsConnected) {
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  connectFirestoreEmulator(db, '127.0.0.1', 8080);
+  connectAuthEmulator(auth, `http://127.0.0.1:${authEmulatorPort}`, { disableWarnings: true });
+  connectFirestoreEmulator(db, '127.0.0.1', firestoreEmulatorPort);
   emulatorGlobal.__padqFirebaseEmulatorsConnected = true;
 }
 

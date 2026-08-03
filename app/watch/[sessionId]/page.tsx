@@ -130,9 +130,26 @@ function WatchPageContent() {
   const [history,         setHistory]         = useState<MatchHistoryEntry[]>([]);
   const [status,          setStatus]          = useState<'loading' | 'live' | 'reconnecting' | 'error' | 'ended' | 'expired'>(validSessionId ? 'loading' : 'error');
   const [errorMsg,        setErrorMsg]        = useState(validSessionId ? '' : 'Invalid room code.');
+  const selectedCourtStorageKey = `padq_watch_selected_court_${sessionId}`;
   const [showHistory,     setShowHistory]     = useState(false);
   const [showAllHistory,  setShowAllHistory]  = useState(false);
-  const [selectedCourtId, setSelectedCourtId] = useState('');
+  const [selectedCourtId, setSelectedCourtId] = useState(() => {
+    if (typeof window === 'undefined') return '';
+    try {
+      return window.sessionStorage.getItem(selectedCourtStorageKey) ?? '';
+    } catch {
+      return '';
+    }
+  });
+
+  const selectCourt = (courtId: string) => {
+    setSelectedCourtId(courtId);
+    try {
+      sessionStorage.setItem(selectedCourtStorageKey, courtId);
+    } catch {
+      // The current selection still works when browser storage is unavailable.
+    }
+  };
 
   // ── Match announcement (Task 12) ────────────────────────
   const [announcement,   setAnnouncement]    = useState<string | null>(null);
@@ -594,7 +611,7 @@ function WatchPageContent() {
               gameMode={gameMode}
               queue={queue}
               selectedCourtId={selectedCourtId}
-              onSelectCourt={setSelectedCourtId}
+              onSelectCourt={selectCourt}
             />
           </div>
         )}

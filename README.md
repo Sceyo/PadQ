@@ -14,10 +14,10 @@ PAD-Q is an independently developed product in **active development**. The `main
 
 - Deployed on Vercel
 - Backed by Firebase Cloud Firestore
-- 159 application tests and 16 Firestore emulator rules tests passing
+- 164 application tests, 17 Firestore emulator rules tests, and browser end-to-end coverage passing
 - Designed for browser-based host and spectator experiences
 
-The project is functional, but it should still be treated as a testing build rather than a production-secure service. Current limitations are documented below.
+The project is a V1 release candidate. Security and capacity hardening are complete; clean-checkout verification and the controlled production launch remain before the official V1 release. Current limitations are documented below.
 
 ## The problem
 
@@ -30,7 +30,7 @@ Running a club night or casual sports session becomes difficult when one person 
 - which players are sitting out or temporarily absent; and
 - how to keep waiting players and spectators informed.
 
-PAD-Q turns those decisions into a shared, real-time workflow. The host manages the session from one browser, while viewers follow the current match, queue, score, history, and statistics through a room code or shared link.
+PAD-Q turns those decisions into a shared, real-time workflow. The host manages the session from one browser, while viewers follow current court assignments, the queue, completed results, history, and statistics through a room code or shared link. Single-court sessions can also share a live score.
 
 ## Key features
 
@@ -47,7 +47,7 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 - Default singles and doubles queue rotation
 - Shared multi-court assignment for one to three courts
 - Shared FIFO multi-court rotation with optional permanent partner pairs
-- Point-by-point live scoring with configurable 11- or 21-point targets and deuce handling
+- Optional point-by-point live scoring for single-court sessions; winner-only results for multi-court sessions
 - Player sit-out, return, substitution, and “sit next” controls
 - Single-step undo for supported match flows
 - Saved club roster for faster future setup
@@ -56,7 +56,7 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 
 - Timestamped match results and optional scores
 - Session win/loss records, win rates, streaks, and rank tiers
-- Skill-bracket leaderboards
+- Session leaderboards and performance statistics
 - Device-local career statistics
 - Spectator match history and next-match announcements
 
@@ -78,7 +78,7 @@ The V1 launch flow prioritizes a clear shared waiting queue, fair court assignme
 
 ![PAD-Q host scoreboard with configurable scoring](public/screenshots/scoreboard.jpg)
 
-The host can enable point-by-point scoring, select a target score, update either team, and record the winner from the same match view.
+In a single-court session, the host can enable point-by-point scoring, select a target score, update either team, and record the winner from the same match view. Multi-court V1 uses winner-only results so one host can manage up to three courts efficiently.
 
 ### Live spectator view
 
@@ -125,7 +125,7 @@ flowchart LR
     Session --> Viewer["Spectator browser"]
     History --> Host
     History --> Viewer
-    UI --> Storage["Browser-local roster, recovery, skills, and career data"]
+    UI --> Storage["Browser-local roster, recovery, and career data"]
 ```
 
 ### Data flow
@@ -175,12 +175,11 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 
 ## Testing and quality assurance
 
-The current Vitest suite reports:
+The current automated suite includes:
 
-```text
-Test Files  10 passed | 1 skipped (11)
-Tests       159 passed | 16 skipped (175)
-```
+- 164 passing application unit, simulation, and component tests;
+- 17 passing Firestore Emulator security and concurrency tests; and
+- browser end-to-end scenarios for live court status, free-tier capacity, and the sealed V1 scope.
 
 The suite focuses on deterministic domain logic and verifies:
 
@@ -192,7 +191,7 @@ The suite focuses on deterministic domain logic and verifies:
 
 The simulations check important invariants, including preventing a player from occupying two courts, keeping every player accounted for, bounding player-pool sizes, and ensuring waiting players eventually receive matches.
 
-The repository includes Firestore Emulator rule tests and focused React component tests for Live Court Status. It does not yet include full browser end-to-end tests or a CI quality gate. ESLint has no errors, with existing warnings tracked as development limitations.
+The repository includes Firestore Emulator rule tests, focused React component tests for Live Court Status, and browser end-to-end tests against local Authentication and Firestore emulators. It does not yet include a CI quality gate. ESLint has no errors, with existing warnings tracked as development limitations.
 
 ## Local setup
 
@@ -293,6 +292,8 @@ The authoritative go-live sequence and acceptance criteria are maintained in
 [`V1-RELEASE-GATES.md`](V1-RELEASE-GATES.md). Gate 1.5 (selective spectator
 viewing of the current players on Courts 1–3) and Gate 2 (free-tier capacity and
 real-life reliability) are blocking requirements for the official V1 release.
+The planned scope after launch, including V1.1 multi-host sessions, is maintained
+in [`PADQ-RELEASE-ROADMAP.md`](PADQ-RELEASE-ROADMAP.md).
 
 The live application is hosted on Vercel at [pad-q.vercel.app](https://pad-q.vercel.app). A deployment requires the same six Firebase environment variables listed above to be configured in the hosting environment.
 
@@ -310,8 +311,8 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 - **No guaranteed 30-minute expiry:** activity timestamps exist, but an appropriate expiration timestamp and confirmed deployed TTL policy do not.
 - **Browser-local data:** saved rosters, skill assignments, court groups, recovery data, and career statistics are device-specific.
 - **Online-first behavior:** explicit offline persistence and conflict recovery are not implemented.
-- **Multi-court navigation:** switching between independently stored court sessions can require a page reload.
-- **Partial test boundary:** the matchmaking engines and Firestore rules have automated coverage, but UI components and complete user journeys remain incomplete.
+- **Multi-court scoring:** V1 shares current players and completed results, but intentionally does not synchronize point-by-point scores for multiple courts.
+- **Partial test boundary:** automated browser coverage includes core host, viewer, capacity, reconnect, and scope-seal journeys, but mobile devices, offline recovery, and every secondary control still require manual release-candidate checks.
 - **Open quality findings:** the test suite and build pass; linting still reports warnings.
 - **Large controllers:** the main host and spectator pages still contain substantial orchestration logic and would benefit from further decomposition.
 
@@ -320,7 +321,7 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 1. Add optional permanent account linking for safe cross-device host recovery.
 2. Separate public spectator data into a dedicated projection if stronger viewer privacy is required.
 3. Implement an explicit `expireAt` strategy and enable a verified Firestore TTL policy.
-4. Add browser end-to-end tests for host, spectator, scoring, recovery, and multi-court workflows.
+4. Expand browser end-to-end coverage for single-court scoring, error recovery, and secondary host controls.
 5. Add continuous integration for tests, TypeScript, linting, and production builds.
 6. Improve offline behavior and visible connection recovery.
 7. Complete skilled-mode undo behavior and further separate page orchestration into focused controllers.

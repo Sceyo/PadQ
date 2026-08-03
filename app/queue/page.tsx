@@ -169,6 +169,7 @@ function QueueSystemContent() {
   // ── Host key banner (one-time, shown after startSession) ──
   const queueRef = useRef<string[]>([]);
   const courtSlotsRef = useRef<CourtSlot[]>([]);
+  const processingCourtIdsRef = useRef(new Set<string>());
 
   // ── Roster (setup screen) ──────────────────────────────────
   const [roster,         setRoster]         = useState<RosterEntry[]>([]);
@@ -476,13 +477,8 @@ function QueueSystemContent() {
         ? Math.max(5, courtCount * 2 + 1)
         : 5;
     if (tempPlayers.length < minPlayers) return;
+    setSetupErrorMsg(null);
     const orderedPlayers = [...tempPlayers];
-    resetPaddleState();
-    resetSinglesState(tempPlayers);
-    setPlayers(tempPlayers); setTempPlayers([]); setLocalHistory([]);
-    setLocalTournamentActive(false); setLocalTournamentWinner(null); setLocalTournamentM([]);
-    setLockedPartners([]);
-    lockedPartnersRef.current = [];
 
     // Build initial court slots for multi-court doubles mode
     let initialCourtSlots: CourtSlot[] | undefined;
@@ -496,8 +492,6 @@ function QueueSystemContent() {
         onCourt: seeded.courts[i],
       }));
       initialQueue = seeded.waiting;
-      setLocalCourtSlots(initialCourtSlots);
-      courtSlotsRef.current = initialCourtSlots;
     } else if (gameMode === 'singles' && courtCount > 1) {
       // Singles multi-court: seed 2 players per court, rest go to shared queue
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
@@ -506,15 +500,10 @@ function QueueSystemContent() {
         onCourt: orderedPlayers.slice(i * 2, (i + 1) * 2),
       }));
       initialQueue = orderedPlayers.slice(courtCount * 2);
-      setLocalCourtSlots(initialCourtSlots);
-      courtSlotsRef.current = initialCourtSlots;
     } else {
       initialCourtSlots = undefined;
       initialQueue = orderedPlayers;
     }
-    setQueue(initialQueue);
-    queueRef.current = initialQueue;
-
     let initialBracket: TournamentMatch[] = [];
     if (localQueueMode === 'tournament') {
       const shuffled = shuffleArray(orderedPlayers);
@@ -526,12 +515,10 @@ function QueueSystemContent() {
           }, [])
         : shuffled;
       initialBracket = localElimType === 'single' ? buildSingleElim(bracketEntrants) : buildDoubleElim(bracketEntrants);
-      setLocalTournamentM(initialBracket); setLocalTournamentActive(true);
     }
     const pin = V1_RELEASE.showAccessPinSetup ? (setupPin.trim().toUpperCase().slice(0, 4) || null) : null;
     const courtName = courtCount > 1 ? `${courtCount} Courts` : (setupCourtName.trim() || 'Court 1');
-    setIsLiveLocal(true); // go live automatically — no manual step needed
-    await session.startSession({
+    const startResult = await session.startSession({
       gameMode: gameMode ?? 'singles', queueMode: V1_RELEASE.queueMode, elimType: localElimType,
       players: tempPlayers, queue: initialQueue, playAllRel: {},
       tournamentMatches: initialBracket, tournamentActive: false,
@@ -541,6 +528,28 @@ function QueueSystemContent() {
       lockedPartners: [],
       ...(initialCourtSlots ? { courtSlots: initialCourtSlots } : {}),
     });
+    if (!startResult.ok) {
+      setIsLiveLocal(false);
+      setSetupErrorMsg(startResult.message);
+      return;
+    }
+
+    // Enter the host UI only after Firebase has created and authenticated the room.
+    resetPaddleState();
+    resetSinglesState(orderedPlayers);
+    setPlayers(orderedPlayers);
+    setTempPlayers([]);
+    setLocalHistory([]);
+    setLocalTournamentActive(localQueueMode === 'tournament');
+    setLocalTournamentWinner(null);
+    setLocalTournamentM(initialBracket);
+    setLockedPartners([]);
+    lockedPartnersRef.current = [];
+    setLocalCourtSlots(initialCourtSlots ?? []);
+    courtSlotsRef.current = initialCourtSlots ?? [];
+    setQueue(initialQueue);
+    queueRef.current = initialQueue;
+    setIsLiveLocal(true);
   };
 
   const initTournament = useCallback((playerList: string[], type: EliminationType) => {
@@ -864,11 +873,11 @@ function QueueSystemContent() {
   };
 
   const handleCourtMatch = (courtId: string, side: 'A' | 'B') => {
-    if (isProcessingMatchRef.current) return;
-    isProcessingMatchRef.current = true;
+    if (processingCourtIdsRef.current.has(courtId)) return;
+    processingCourtIdsRef.current.add(courtId);
     const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
     const slot = currentSlots.find(c => c.id === courtId);
-    if (!slot || slot.onCourt.length < 4) { isProcessingMatchRef.current = false; return; }
+    if (!slot || slot.onCourt.length < 4) { processingCourtIdsRef.current.delete(courtId); return; }
 
     // Save undo snapshot (includes courtSlots so multi-court undo works correctly)
     undoSnapshotRef.current = {
@@ -922,18 +931,30 @@ function QueueSystemContent() {
     setCareerStats(loadCareerStats());
 
     if (session.sessionId) {
-      void session.commitMatchResult(
-        { queue: newQueue, courtSlots: updatedSlots, doublesEngineState: serializePaddleState(paddleStateRef.current) as unknown as Record<string, unknown> },
-        entry
-      ).then(result => {
-        if (!result) showToast('Another court saved first. This result was not applied; please confirm it again.');
-      });
+      void session.commitCourtResult({
+        courtId,
+        expectedPlayers: [...slot.onCourt],
+        winningSide: side,
+        id: entry.id,
+        timestamp: entry.timestamp,
+      }).then(result => {
+        if (!result || result.status === 'stale') {
+          setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
+          showToast('This court already changed. Its latest assignment has been restored.');
+          return;
+        }
+        setQueue(result.queue);
+        queueRef.current = result.queue;
+        setLocalCourtSlots(result.courtSlots);
+        courtSlotsRef.current = result.courtSlots;
+      }).finally(() => processingCourtIdsRef.current.delete(courtId));
+    } else {
+      processingCourtIdsRef.current.delete(courtId);
     }
 
     setModalWinner(`${winnerNames} win!`);
     setModalScore(undefined);
     setModalOpen(true);
-    isProcessingMatchRef.current = false;
   };
 
   // ── Mid-session player position swap ──────────────────────
@@ -1194,7 +1215,7 @@ function QueueSystemContent() {
 
   // ── Shared fragments ──────────────────────────────────────
   const canControl = !session.sessionId || session.isHost;
-  const canUndo = session.isHost && hasUndo && courtSlots.length === 0;
+  const canUndo = canControl && hasUndo && courtSlots.length === 0;
 
   const modeSelector = V1_RELEASE.showQueueModeSelector ? (
     <div className="mode-selector">
@@ -1465,7 +1486,7 @@ function QueueSystemContent() {
               )}
             </div>
 
-            {session.isHost && (
+            {canControl && (
               <div className="live-tools-row">
                 <AddPlayerPanel onAdd={handleAddPlayerLive} />
                 {!isSkilled && (
@@ -1485,7 +1506,7 @@ function QueueSystemContent() {
               </div>
             )}
 
-            {session.isHost && !isSkilled && (
+            {canControl && !isSkilled && (
               <SitOutPanel players={players} sittingOut={activeSittingOut} onToggle={handleToggleSitOut} />
             )}
 
@@ -1650,7 +1671,7 @@ function QueueSystemContent() {
                         king:    slot.onCourt[0] ?? null,
                       }}
                       statsMap={statsMap}
-                      isHost={session.isHost}
+                      isHost={canControl}
                       onWin={(courtId, winner) => handleSinglesMatch(winner, undefined, courtId)}
                     />
                   ))}
@@ -1680,19 +1701,19 @@ function QueueSystemContent() {
                 <div className="current-match-players">
                   <div className="player-with-absent">
                     <PlayerLabel name={queue[0]} statsMap={statsMap} />
-                    {session.isHost && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[0])} title="Mark absent" type="button"><UserX size={11} /></button>}
+                    {canControl && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[0])} title="Mark absent" type="button"><UserX size={11} /></button>}
                   </div>
                   <span className="vs-sep">vs</span>
                   <div className="player-with-absent">
                     <PlayerLabel name={queue[1]} statsMap={statsMap} />
-                    {session.isHost && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[1])} title="Mark absent" type="button"><UserX size={11} /></button>}
+                    {canControl && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[1])} title="Mark absent" type="button"><UserX size={11} /></button>}
                   </div>
                 </div>
-                <ScoreBoard labelA={queue[0]} labelB={queue[1]} disabled={!session.isHost}
-                  onScoreChange={session.isHost ? handleScoreChange : undefined}
-                  viewerScore={!session.isHost ? (session.liveScore ?? null) : null}
-                  onWin={(side, sA, sB) => { if (!session.isHost) return; handleSinglesMatch(side === 'A' ? queue[0] : queue[1], `${sA} – ${sB}`); }} />
-                {session.isHost && (<div className="match-buttons" style={{ marginTop: 14 }}><button onClick={() => handleSinglesMatch(queue[0])}><Trophy size={12} /> <PlayerLabel name={queue[0]} statsMap={statsMap} /> wins</button><button onClick={() => handleSinglesMatch(queue[1])}><Trophy size={12} /> <PlayerLabel name={queue[1]} statsMap={statsMap} /> wins</button></div>)}
+                <ScoreBoard labelA={queue[0]} labelB={queue[1]} disabled={!canControl}
+                  onScoreChange={canControl ? handleScoreChange : undefined}
+                  viewerScore={!canControl ? (session.liveScore ?? null) : null}
+                  onWin={(side, sA, sB) => { if (!canControl) return; handleSinglesMatch(side === 'A' ? queue[0] : queue[1], `${sA} – ${sB}`); }} />
+                {canControl && (<div className="match-buttons" style={{ marginTop: 14 }}><button onClick={() => handleSinglesMatch(queue[0])}><Trophy size={12} /> <PlayerLabel name={queue[0]} statsMap={statsMap} /> wins</button><button onClick={() => handleSinglesMatch(queue[1])}><Trophy size={12} /> <PlayerLabel name={queue[1]} statsMap={statsMap} /> wins</button></div>)}
               </div>
             )}
             {/* Multi-court shared-queue view */}
@@ -1705,9 +1726,9 @@ function QueueSystemContent() {
                       key={slot.id}
                       slot={slot}
                       statsMap={statsMap}
-                      isHost={session.isHost}
+                      isHost={canControl}
                       onWin={handleCourtMatch}
-                      onEdit={session.isHost ? (id) => setSwapCourtId(id) : undefined}
+                      onEdit={canControl ? (id) => setSwapCourtId(id) : undefined}
                     />
                   ))}
                 </div>
@@ -1738,17 +1759,17 @@ function QueueSystemContent() {
                     suggestedTeamB={playAllSuggestion?.suggestedTeamB ?? null}
                     playAllScore={playAllSuggestion?.score ?? null}
                     statsMap={statsMap}
-                    isHost={session.isHost}
+                    isHost={canControl}
                     onMatch={handleDoublesMatch}
-                    onScoreChange={session.isHost ? handleScoreChange : undefined}
-                    viewerScore={!session.isHost ? (session.liveScore ?? null) : null}
-                    onMarkAbsent={session.isHost ? handleMarkAbsent : undefined}
+                    onScoreChange={canControl ? handleScoreChange : undefined}
+                    viewerScore={!canControl ? (session.liveScore ?? null) : null}
+                    onMarkAbsent={canControl ? handleMarkAbsent : undefined}
                   />
                 )}
                 {gameMode === 'doubles' && queue.length < 4 && <p className="muted-hint">Not enough players for a match.</p>}
 
                 {/* Substitute picker — appears when host marks a player absent */}
-                {session.isHost && substituteFor !== null && (
+                {canControl && substituteFor !== null && (
                   <div className="sub-picker-panel">
                     <div className="sub-picker-header">
                       <span className="sub-picker-label">Replace <strong>{substituteFor}</strong> with:</span>
@@ -1773,7 +1794,7 @@ function QueueSystemContent() {
                   {gameMode === 'doubles' && <DoublesTable queue={queue} statsMap={statsMap} />}
 
                   {/* Sit Next — host can bump a waiting player to the front */}
-                  {session.isHost && waitingForNext.length >= 2 && (
+                  {canControl && waitingForNext.length >= 2 && (
                     <div className="sit-next-section">
                       <span className="sit-next-title">Waiting — tap ▲ to move a player up next</span>
                       {waitingForNext.map((p, i) => (
