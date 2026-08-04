@@ -174,12 +174,13 @@ all-feature and real-life scenario results are in
 
 ## Gate 5 — Controlled production launch
 
-**Status: Pending**
+**Status: In progress — production smoke test passed; first live event pending**
 
-- [ ] Deploy the approved Firestore rules and indexes.
-- [ ] Deploy the exact approved commit to Vercel production.
-- [ ] Run a host-to-viewer smoke test for all three courts.
-- [ ] Verify queue, partner, current-court players, next assignment, completed
+- [x] Deploy the approved Firestore rules. No composite indexes are required.
+- [x] Deploy the approved V1 code to Vercel production through `main` at
+      `9c47c93` (RC2 application commit `6773434`).
+- [x] Run a host-to-viewer smoke test for all three courts.
+- [x] Verify queue, partner, current-court players, next assignment, completed
       results, history, and performance.
 - [ ] Monitor Firebase and Vercel usage during the first live event.
 - [ ] Roll back immediately if ownership, result integrity, player assignment, or
