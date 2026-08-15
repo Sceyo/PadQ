@@ -1,40 +1,48 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useState } from 'react';
 import { Plus, Minus, Check, RotateCcw, Target, Settings } from 'lucide-react';
 import type { LiveScoreState } from '@/lib/sessionService';
 
 const SCORE_PRESETS = [11, 21] as const;
 
-export const ScoreBoard: React.FC<{
+type ScoreBoardProps = {
   labelA:         string;
   labelB:         string;
   onWin:          (side: 'A' | 'B', sA: number, sB: number) => void;
   disabled?:      boolean;
   onScoreChange?: (score: LiveScoreState | null) => void;
   viewerScore?:   LiveScoreState | null;
-}> = ({ labelA, labelB, onWin, disabled = false, onScoreChange, viewerScore }) => {
+  persistedScore?: LiveScoreState | null;
+  scoreReady?:    boolean;
+};
+
+const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, disabled = false, onScoreChange, viewerScore, persistedScore }) => {
+
+  const savedScore = persistedScore?.labelA === labelA && persistedScore?.labelB === labelB
+    ? persistedScore
+    : null;
 
   const [active,      setActive]      = useState(true);
-  const [scoreA,      setScoreA]      = useState(0);
-  const [scoreB,      setScoreB]      = useState(0);
-  const [baseLimit,   setBaseLimit]   = useState(11);
-  const [limit,       setLimit]       = useState(11);
+  const [scoreA,      setScoreA]      = useState(savedScore?.scoreA ?? 0);
+  const [scoreB,      setScoreB]      = useState(savedScore?.scoreB ?? 0);
+  const [baseLimit,   setBaseLimit]   = useState(savedScore?.baseLimit ?? 11);
+  const [limit,       setLimit]       = useState(savedScore?.limit ?? 11);
   const [customLimit, setCustomLimit] = useState('');
   const [showCustom,  setShowCustom]  = useState(false);
-  const [finished,    setFinished]    = useState(false);
-  const [inDeuce,     setInDeuce]     = useState(false);
-
-  useEffect(() => {
-    setScoreA(0); setScoreB(0); setFinished(false); setInDeuce(false); setLimit(baseLimit);
-    if (active) onScoreChange?.({ scoreA: 0, scoreB: 0, limit: baseLimit, baseLimit, labelA, labelB, deuce: false, active: true });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [labelA, labelB]);
+  const [finished,    setFinished]    = useState(
+    Boolean(savedScore && (savedScore.scoreA >= savedScore.limit || savedScore.scoreB >= savedScore.limit))
+  );
+  const [inDeuce,     setInDeuce]     = useState(savedScore?.deuce ?? false);
+  const [submittingResult, setSubmittingResult] = useState(false);
+  const submittingResultRef = useRef(false);
 
   const reset = (newBase?: number) => {
     const b = newBase ?? baseLimit;
     setScoreA(0); setScoreB(0); setFinished(false); setInDeuce(false); setLimit(b);
     if (newBase !== undefined) setBaseLimit(b);
+    submittingResultRef.current = false;
+    setSubmittingResult(false);
     onScoreChange?.({ scoreA: 0, scoreB: 0, limit: b, baseLimit: b, labelA, labelB, deuce: false, active });
   };
 
@@ -48,23 +56,41 @@ export const ScoreBoard: React.FC<{
     let nextA = scoreA, nextB = scoreB;
     if (side === 'A') nextA++; else nextB++;
     let nextLimit = limit, nextDeuce = inDeuce;
-    if (!inDeuce && nextA === baseLimit - 1 && nextB === baseLimit - 1) { nextLimit = baseLimit + 2; nextDeuce = true; setLimit(nextLimit); setInDeuce(true); }
-    else if (inDeuce && nextA === nextLimit - 1 && nextB === nextLimit - 1) { nextLimit = nextLimit + 2; setLimit(nextLimit); }
+    // At deuce, the temporary target is always one above the tied score.
+    // Example: game to 11 -> 10-10 plays to 12; 11-11 then plays to 13.
+    if (!inDeuce && nextA === baseLimit - 1 && nextB === baseLimit - 1) { nextLimit = baseLimit + 1; nextDeuce = true; setLimit(nextLimit); setInDeuce(true); }
+    else if (inDeuce && nextA === nextLimit - 1 && nextB === nextLimit - 1) { nextLimit = nextLimit + 1; setLimit(nextLimit); }
     setScoreA(nextA); setScoreB(nextB);
     const state: LiveScoreState = { scoreA: nextA, scoreB: nextB, limit: nextLimit, baseLimit, labelA, labelB, deuce: nextDeuce, active: true };
     onScoreChange?.(state);
-    if (nextA >= nextLimit) { setFinished(true); onScoreChange?.({ ...state, active: false }); onWin('A', nextA, nextB); }
-    else if (nextB >= nextLimit) { setFinished(true); onScoreChange?.({ ...state, active: false }); onWin('B', nextA, nextB); }
+    if (nextA >= nextLimit || nextB >= nextLimit) setFinished(true);
   };
 
   const decrement = (side: 'A' | 'B') => {
-    if (finished || disabled) return;
+    if (disabled) return;
     let nextA = scoreA, nextB = scoreB;
     if (side === 'A' && nextA > 0) nextA--;
     if (side === 'B' && nextB > 0) nextB--;
+    let nextLimit = limit;
+    let nextDeuce = inDeuce;
+    if (inDeuce && !(nextA >= baseLimit - 1 && nextB >= baseLimit - 1)) {
+      nextDeuce = false;
+      nextLimit = baseLimit;
+    }
     setScoreA(nextA); setScoreB(nextB);
-    if (inDeuce && !(nextA >= baseLimit - 1 && nextB >= baseLimit - 1)) { setInDeuce(false); setLimit(baseLimit); }
-    onScoreChange?.({ scoreA: nextA, scoreB: nextB, limit, baseLimit, labelA, labelB, deuce: inDeuce, active: true });
+    setInDeuce(nextDeuce);
+    setLimit(nextLimit);
+    setFinished(nextA >= nextLimit || nextB >= nextLimit);
+    submittingResultRef.current = false;
+    setSubmittingResult(false);
+    onScoreChange?.({ scoreA: nextA, scoreB: nextB, limit: nextLimit, baseLimit, labelA, labelB, deuce: nextDeuce, active: true });
+  };
+
+  const confirmResult = () => {
+    if (!finished || disabled || submittingResultRef.current) return;
+    submittingResultRef.current = true;
+    setSubmittingResult(true);
+    onWin(scoreA >= limit ? 'A' : 'B', scoreA, scoreB);
   };
 
   const applyCustomLimit = () => {
@@ -118,7 +144,7 @@ export const ScoreBoard: React.FC<{
             <div className="score-display">{scoreA}</div>
             <div className="score-btns">
               <button onClick={() => increment('A')} disabled={finished} className="score-btn score-btn--plus"><Plus size={16} /></button>
-              <button onClick={() => decrement('A')} disabled={finished || scoreA === 0} className="score-btn score-btn--minus"><Minus size={14} /></button>
+              <button onClick={() => decrement('A')} disabled={scoreA === 0} className="score-btn score-btn--minus" aria-label={`Remove point from ${labelA}`}><Minus size={14} /></button>
             </div>
           </div>
           <div className="score-centre">
@@ -132,11 +158,29 @@ export const ScoreBoard: React.FC<{
             <div className="score-display">{scoreB}</div>
             <div className="score-btns">
               <button onClick={() => increment('B')} disabled={finished} className="score-btn score-btn--plus"><Plus size={16} /></button>
-              <button onClick={() => decrement('B')} disabled={finished || scoreB === 0} className="score-btn score-btn--minus"><Minus size={14} /></button>
+              <button onClick={() => decrement('B')} disabled={scoreB === 0} className="score-btn score-btn--minus" aria-label={`Remove point from ${labelB}`}><Minus size={14} /></button>
             </div>
           </div>
         </div>
       )}
+      {active && finished && (
+        <div className="score-confirm-row">
+          <span>Check the score. You can still use − to correct a misclick.</span>
+          <button type="button" className="score-confirm-btn" onClick={confirmResult} disabled={submittingResult}>
+            <Check size={14} /> {submittingResult ? 'Applying result…' : `Confirm ${scoreA >= limit ? labelA : labelB} won, ${scoreA}–${scoreB}`}
+          </button>
+        </div>
+      )}
     </div>
   );
+};
+
+export const ScoreBoard: React.FC<ScoreBoardProps> = (props) => {
+  if (props.scoreReady === false) {
+    return <div className="scoreboard-wrap scoreboard-loading">Restoring saved score…</div>;
+  }
+
+  // A new pairing gets a fresh local scorer, while a remounted pairing starts
+  // from its persisted Firebase score when one exists.
+  return <ScoreBoardReady key={`${props.labelA}\u0000${props.labelB}`} {...props} />;
 };

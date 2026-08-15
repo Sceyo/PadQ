@@ -407,6 +407,30 @@ body.dark-mode {
   letter-spacing: .08em; color: var(--success); text-align: center;
   animation: pulseLabel 1.2s ease-in-out infinite;
 }
+.score-confirm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--txt-2);
+  font-size: .74rem;
+}
+.score-confirm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: var(--r-sm);
+  padding: 9px 14px;
+  background: var(--success);
+  color: #fff;
+  cursor: pointer;
+  font: 700 .76rem inherit;
+  white-space: nowrap;
+}
+.score-confirm-btn:hover { filter: brightness(.94); }
 @keyframes pulseLabel { 0%,100%{opacity:1;} 50%{opacity:.4;} }
 
 .dark-mode .scoreboard-wrap { background: var(--card-alt); }
@@ -424,6 +448,7 @@ body.dark-mode {
   .pairing-table th,.pairing-table td{padding:7px 8px;font-size:.78rem;}
   .modal-content{width:92%;padding:24px;}
   .modal-controls{flex-direction:column;gap:12px;}
+  .score-confirm-row{align-items:stretch;flex-direction:column;}
   .queue-title{font-size:1.5rem;} .app-name{font-size:2rem;}
   .live-tools-row{flex-direction:column;}
   .score-display{font-size:2.6rem;}

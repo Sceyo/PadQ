@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Swords, Sparkles, Trophy, Play, UserX } from 'lucide-react';
 import type { PlayerStat } from '../../lib/types';
 import type { LiveScoreState } from '@/lib/sessionService';
@@ -17,8 +17,10 @@ export const DoublesMatch: React.FC<{
   onMatch:          (a: string[], b: string[], w: 'A' | 'B', score?: string) => void;
   onScoreChange?:   (score: LiveScoreState | null) => void;
   viewerScore?:     LiveScoreState | null;
+  persistedScore?:  LiveScoreState | null;
+  scoreReady?:      boolean;
   onMarkAbsent?:    (player: string) => void;
-}> = ({ firstFour, suggestedTeamA, suggestedTeamB, playAllScore, statsMap, isHost, onMatch, onScoreChange, viewerScore, onMarkAbsent }) => {
+}> = ({ firstFour, suggestedTeamA, suggestedTeamB, playAllScore, statsMap, isHost, onMatch, onScoreChange, viewerScore, persistedScore, scoreReady, onMarkAbsent }) => {
   const [teamA, setTeamA] = useState<string[]>(() =>
     firstFour.length === 4
       ? (suggestedTeamA ? [...suggestedTeamA] : [firstFour[0], firstFour[1]])
@@ -31,6 +33,8 @@ export const DoublesMatch: React.FC<{
   );
   const [winner, setWinner] = useState<'A' | 'B' | null>(null);
   const [pendingScore, setPendingScore] = useState<string | undefined>(undefined);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const toggle = (p: string) => {
     if (!isHost) return;
@@ -42,10 +46,24 @@ export const DoublesMatch: React.FC<{
   };
 
   const submit = () => {
-    if (!isHost) return;
+    if (!isHost || submittingRef.current) return;
     if (teamA.length !== 2 || teamB.length !== 2) { alert('Assign all 4 players first'); return; }
     if (!winner) { alert('Select the winning team'); return; }
+    // Lock synchronously. State alone would not stop a second click dispatched
+    // before React replaces this match card with the next pairing.
+    submittingRef.current = true;
+    setSubmitting(true);
     onMatch(teamA, teamB, winner, pendingScore);
+  };
+
+  const handleScoreChange = (score: LiveScoreState | null) => {
+    // If the host corrects a score after selecting its winner, require the
+    // corrected result to be reviewed again before the match is submitted.
+    if (pendingScore) {
+      setWinner(null);
+      setPendingScore(undefined);
+    }
+    onScoreChange?.(score);
   };
 
   return (
@@ -88,8 +106,10 @@ export const DoublesMatch: React.FC<{
         labelB={teamB.length ? teamB.join(' & ') : 'Team B'}
         onWin={(side, sA, sB) => { setWinner(side); setPendingScore(`${sA} – ${sB}`); }}
         disabled={!isHost}
-        onScoreChange={isHost ? onScoreChange : undefined}
+        onScoreChange={isHost ? handleScoreChange : undefined}
         viewerScore={!isHost ? viewerScore : null}
+        persistedScore={isHost ? persistedScore : null}
+        scoreReady={scoreReady}
       />
       <div className="winning-team">
         <span className="winning-label">Winner:</span>
@@ -100,7 +120,7 @@ export const DoublesMatch: React.FC<{
           <Trophy size={12} /> Team B {winner === 'B' && pendingScore && `(${pendingScore})`}
         </button>
       </div>
-      {isHost && <button onClick={submit} className="match-action-btn"><Play size={13} /> Confirm Match</button>}
+      {isHost && <button onClick={submit} className="match-action-btn" disabled={submitting}><Play size={13} /> {submitting ? 'Saving Match…' : 'Confirm Match'}</button>}
     </div>
   );
 };

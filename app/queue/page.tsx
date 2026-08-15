@@ -159,7 +159,6 @@ function QueueSystemContent() {
   const [showHistory,  setShowHistory]  = useState(true);
   const [darkMode,     setDarkMode]     = useState(true);
   const [activeTab,    setActiveTab]    = useState<GameTab>('queue');
-  const [liveScore,    setLiveScore]    = useState<LiveScoreState | null>(null);
   const [isLiveLocal,  setIsLiveLocal]  = useState(false);
   const [showGuide,       setShowGuide]       = useState(false);
   const [showCoordinator, setShowCoordinator] = useState(false);
@@ -225,14 +224,27 @@ function QueueSystemContent() {
       const s = deserializePaddleState(session.doublesEngineState as unknown as SerializablePaddleState);
       paddleStateRef.current = s;
       setPaddleStateUI(s);
+    } else if (gameMode === 'doubles') {
+      // Compatibility for rooms created before V1 persisted their initial
+      // engine snapshot. The doubles engine can safely resume from INIT.
+      const s = freshPaddleState();
+      paddleStateRef.current = s;
+      setPaddleStateUI(s);
     }
     if (session.singlesEngineState) {
       const s = deserializeSinglesState(session.singlesEngineState as unknown as SerializableSinglesState);
       singlesStateRef.current = s;
       setSinglesStateUI(s);
+    } else if (gameMode === 'singles') {
+      // Older rooms may have a queue but no initial engine document. Seed the
+      // engine from that persisted order so the first result after reload has
+      // real players instead of empty placeholders.
+      const s = freshSinglesState(session.queue.length ? session.queue : session.players);
+      singlesStateRef.current = s;
+      setSinglesStateUI(s);
     }
 
-  }, [session.isHost, session.doublesEngineState, session.singlesEngineState]);
+  }, [session.isHost, session.doublesEngineState, session.singlesEngineState, session.queue, session.players, gameMode]);
 
   // ── Undo snapshot ──────────────────────────────────────────
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
@@ -324,13 +336,11 @@ function QueueSystemContent() {
     if (session.sessionId) session.syncField({ isLive: live });
   };
 
-  // Debounced score writes
-  const scoreWriteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Save each accepted point immediately. The former debounce left the last
+  // point vulnerable if the host refreshed before its timer fired.
   const handleScoreChange = (score: LiveScoreState | null) => {
-    setLiveScore(score);
     if (!session.sessionId) return;
-    if (scoreWriteTimer.current) clearTimeout(scoreWriteTimer.current);
-    scoreWriteTimer.current = setTimeout(() => { session.syncField({ liveScore: score }); }, 300);
+    void session.syncField({ liveScore: score });
   };
 
   // Persisted state
@@ -359,7 +369,7 @@ function QueueSystemContent() {
           ? { singlesEngineState: serializeSinglesState(singlesStateRef.current) as unknown as Record<string, unknown> }
           : {};
       void session.commitMatchResult(
-        { queue: queueToCommit, ...enginePatch },
+        { queue: queueToCommit, liveScore: null, ...enginePatch },
         { id: entry.id, mode: entry.mode, players: entry.players, winner: entry.winner, score: entry.score, timestamp: entry.timestamp }
       ).then(result => {
         if (!result) showToast('Result was not saved because the session changed. Please confirm the court again.');
@@ -1745,6 +1755,8 @@ function QueueSystemContent() {
                 <ScoreBoard labelA={queue[0]} labelB={queue[1]} disabled={!canControl}
                   onScoreChange={canControl ? handleScoreChange : undefined}
                   viewerScore={!canControl ? (session.liveScore ?? null) : null}
+                  persistedScore={canControl ? (session.liveScore ?? null) : null}
+                  scoreReady={!session.sessionId || session.isConnected}
                   onWin={(side, sA, sB) => { if (!canControl) return; handleSinglesMatch(side === 'A' ? queue[0] : queue[1], `${sA} – ${sB}`); }} />
                 {canControl && (<div className="match-buttons" style={{ marginTop: 14 }}><button onClick={() => handleSinglesMatch(queue[0])}><Trophy size={12} /> <PlayerLabel name={queue[0]} statsMap={statsMap} /> wins</button><button onClick={() => handleSinglesMatch(queue[1])}><Trophy size={12} /> <PlayerLabel name={queue[1]} statsMap={statsMap} /> wins</button></div>)}
               </div>
@@ -1796,6 +1808,8 @@ function QueueSystemContent() {
                     onMatch={handleDoublesMatch}
                     onScoreChange={canControl ? handleScoreChange : undefined}
                     viewerScore={!canControl ? (session.liveScore ?? null) : null}
+                    persistedScore={canControl ? (session.liveScore ?? null) : null}
+                    scoreReady={!session.sessionId || session.isConnected}
                     onMarkAbsent={canControl ? handleMarkAbsent : undefined}
                   />
                 )}

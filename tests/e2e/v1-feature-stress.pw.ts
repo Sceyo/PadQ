@@ -113,7 +113,32 @@ test('single-court live scoring, management, stats, history, and undo stay consi
     await expect(viewer.locator('.w-live-side').filter({ hasText: 'Team B' }).locator('.w-live-score-num'))
       .toHaveText('1');
 
-    await scoreAPlus.click();
+    // A host refresh must restore the last Firebase score instead of replacing
+    // it with a new 0-0 scoreboard.
+    await host.reload();
+    await expect(host.getByRole('button', { name: 'Scoring ON' })).toBeVisible({ timeout: 30_000 });
+    await expect(host.locator('.score-side--a .score-display')).toHaveText('2');
+    await expect(host.locator('.score-side--b .score-display')).toHaveText('1');
+
+    const restoredScoreAPlus = host.locator('.score-side--a .score-btn--plus');
+    const restoredScoreAMinus = host.locator('.score-side--a .score-btn--minus');
+    await restoredScoreAPlus.click();
+    await expect(host.getByText('Game Over!', { exact: true })).toBeVisible();
+    await expect(host.getByRole('heading', { name: 'Match Result' })).not.toBeVisible();
+
+    // Reaching the limit is reviewable: a mistaken winning point can be
+    // removed before the result is explicitly confirmed.
+    await restoredScoreAMinus.click();
+    await expect(host.locator('.score-side--a .score-display')).toHaveText('2');
+    await expect(host.getByText('Game Over!', { exact: true })).not.toBeVisible();
+    await expect(viewer.locator('.w-live-side').filter({ hasText: 'Team A' }).locator('.w-live-score-num'))
+      .toHaveText('2');
+
+    await restoredScoreAPlus.click();
+    await host.getByRole('button', { name: /Confirm Score Player 01 won, 3/ }).evaluate((button: HTMLButtonElement) => {
+      button.click();
+      button.click();
+    });
     await expect(host.getByRole('heading', { name: 'Match Result' })).toBeVisible();
     const resultModal = host.locator('.modal-content').filter({ hasText: 'Match Result' });
     await expect(resultModal.getByText(/3.*1/, { exact: true })).toBeVisible();
@@ -144,8 +169,8 @@ test('single-court live scoring, management, stats, history, and undo stay consi
     await host.getByTitle('Settings').click();
     await host.getByRole('menuitem', { name: 'Undo Last Match' }).click();
     await expect(viewer.locator('.w-history-item')).toHaveCount(0, { timeout: 20_000 });
-    // Allow the deliberately debounced live-score sync to settle before
-    // checking that no background Firebase write was rejected.
+    // Allow any final queued Firebase work to settle before checking that no
+    // background synchronization write was rejected.
     await host.waitForTimeout(500);
     expect(synchronizationErrors).toEqual([]);
   } finally {
