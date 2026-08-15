@@ -24,12 +24,12 @@ Official references:
 
 ## Phase A — register without enforcement
 
-- [ ] In Firebase Console, open **Security → App Check → Apps** for project `padq-ccb6a`.
-- [ ] Select web app **padq-web** (`1:969698713558:web:ec0670512f73c091974e77`) and register the reCAPTCHA Enterprise provider. The Firebase CLI audit found exactly one registered web app in `padq-ccb6a`.
-- [ ] Register the production hostname `pad-q.vercel.app`.
+- [x] In Firebase Console, open **Security → App Check → Apps** for project `padq-ccb6a`.
+- [x] Select web app **padq-web** (`1:969698713558:web:ec0670512f73c091974e77`) and register the reCAPTCHA Enterprise provider. The Firebase CLI audit found exactly one registered web app in `padq-ccb6a`.
+- [x] Register the production hostname `pad-q.vercel.app`.
 - [ ] If PADQ later receives a custom domain, register it before routing users to it.
-- [ ] Keep Vercel Preview and Development environments disabled unless their exact hostnames are intentionally registered. Local emulator tests do not need a production token.
-- [ ] Copy only the public site key. Never place a secret key in a `NEXT_PUBLIC_` variable.
+- [x] Keep Vercel Preview and Development environments disabled unless their exact hostnames are intentionally registered. Local emulator tests do not need a production token.
+- [x] Copy only the public site key. Never place a secret key in a `NEXT_PUBLIC_` variable.
 
 ## Phase B — deploy in monitoring mode
 
@@ -39,6 +39,8 @@ Add these Vercel variables to **Production** only:
 NEXT_PUBLIC_FIREBASE_APP_CHECK_ENABLED=true
 NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY=<public site key>
 ```
+
+- [x] Save both variables in Vercel with **Production** scope only. Values remain hidden in release evidence.
 
 - [ ] Redeploy the exact release-candidate commit after the variables are saved.
 - [ ] Do **not** enable Firestore enforcement yet.

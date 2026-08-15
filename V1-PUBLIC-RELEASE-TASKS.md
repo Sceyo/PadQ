@@ -65,11 +65,11 @@
 ## 6. Firebase App Check and free-tier abuse controls
 
 - [ ] Follow the no-billing rollout recorded in `FIREBASE-APP-CHECK-ROLLOUT.md`.
-- [ ] Register every production hostname with Firebase App Check using reCAPTCHA Enterprise.
-- [ ] Add the App Check site key and enable flag to Vercel production configuration.
+- [x] Register every production hostname with Firebase App Check using reCAPTCHA Enterprise.
+- [x] Add the App Check site key and enable flag to Vercel production configuration.
 - [ ] Deploy in monitoring mode first and confirm valid host/viewer requests.
 - [ ] Enforce App Check for Firestore only after monitoring shows legitimate traffic is accepted.
-- [ ] Reconfirm Firebase Spark and Vercel Hobby status and document quota response steps.
+- [x] Reconfirm Firebase Spark and Vercel Hobby status and document quota response steps.
 - [ ] Confirm no billing account, paid Vercel plan, or paid marketplace/add-on has been attached before deployment.
 
 **Verification:** Firebase App Check metrics show verified production traffic, invalid test traffic is rejected after enforcement, and normal host/viewer flows still pass.
@@ -115,3 +115,10 @@ This task intentionally remains last because automated and console verification 
 - `https://pad-q.vercel.app/` responded successfully but did not include the candidate's CSP, `X-Frame-Options`, `X-Content-Type-Options`, or `Referrer-Policy` headers.
 - `https://pad-q.vercel.app/privacy` returned 404 and the homepage did not expose the candidate's Privacy link.
 - Therefore the current Vercel production deployment is an older build and cannot satisfy the V1 public-release checklist. Do not reuse the prior RC2 smoke-test result as evidence for the current candidate.
+
+### 2026-08-15 — App Check registration prepared
+
+- Firebase App Check shows `padq-web` registered with reCAPTCHA Enterprise for the production hostname.
+- Vercel shows both App Check variables saved with **Production** scope; Preview and Development remain excluded.
+- The accidental Vercel redeployment used old `main` commit `eb6235183133eafff5b0c400a6a07110547cb9b0`, which is the direct ancestor of the candidate. It did not deploy the release candidate, privacy page, or security headers and requires no rollback.
+- Firestore enforcement remains intentionally off until the tagged candidate produces verified production traffic.
