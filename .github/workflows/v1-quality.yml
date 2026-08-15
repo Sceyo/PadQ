@@ -3,7 +3,9 @@ name: V1 quality gate
 on:
   pull_request:
   push:
-    branches: [main]
+    branches:
+      - main
+      - "codex/v1-*"
 
 permissions:
   contents: read
