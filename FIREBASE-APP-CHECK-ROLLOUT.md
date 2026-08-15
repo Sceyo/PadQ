@@ -7,9 +7,12 @@
 ## Free-plan boundary
 
 - Firebase lists App Check as no-cost, subject to the selected attestation provider's quota.
+- A new reCAPTCHA key in a project without billing uses the free **Essentials** tier automatically.
 - Google's current no-billing reCAPTCHA allowance is 10,000 assessments per month. A project without billing does not begin charging after the allowance; new assessments fail until the allowance resets.
 - Do not attach a billing account for V1 merely to enable App Check.
+- Treat 7,500 assessments in a month as the V1 warning threshold. Review traffic and pause promotion before consuming the remaining safety margin.
 - Token reuse means one page action is not necessarily one assessment, but the App Check metrics and reCAPTCHA usage page must still be reviewed after launch.
+- Keep the default one-hour token TTL initially. Lengthening it reduces assessments but increases the lifetime of a stolen token, so change it only after reviewing measured usage and security impact.
 
 Official references:
 
@@ -64,3 +67,5 @@ Immediately turn Firestore enforcement back off while investigating if any of th
 - the site key is missing from the Vercel Production environment.
 
 Disabling enforcement is the availability rollback. It does not replace Firestore Security Rules; ownership and schema rules remain the primary authorization boundary.
+
+Because V1 has a zero-spend requirement, quota exhaustion is accepted as an availability limit. Never resolve it by attaching billing without a separate explicit product decision.

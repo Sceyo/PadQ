@@ -4,6 +4,8 @@
 
 **Release rule:** a task is complete only when its implementation, automated verification, and any required production-console check are recorded. The supervised real pickleball event must remain the final task.
 
+**Hard cost boundary:** V1 must remain at **₱0 / $0** infrastructure spend. Do not attach a billing account, upgrade Firebase to Blaze, upgrade Vercel from Hobby, or enable a paid add-on. Reaching a free quota must pause or degrade the service rather than create a charge.
+
 ## Status key
 
 - `[ ]` Not started or blocked
@@ -68,6 +70,7 @@
 - [ ] Deploy in monitoring mode first and confirm valid host/viewer requests.
 - [ ] Enforce App Check for Firestore only after monitoring shows legitimate traffic is accepted.
 - [ ] Reconfirm Firebase Spark and Vercel Hobby status and document quota response steps.
+- [ ] Confirm no billing account, paid Vercel plan, or paid marketplace/add-on has been attached before deployment.
 
 **Verification:** Firebase App Check metrics show verified production traffic, invalid test traffic is rejected after enforcement, and normal host/viewer flows still pass.
 
