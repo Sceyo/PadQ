@@ -75,6 +75,7 @@
 
 - [x] Run lint, unit/scenario tests, Firestore rules tests, full browser stress tests, production build, and production dependency audit.
 - [x] Verify 30 players, 3 courts, locked partners, score correction, 30 viewers, reconnect, history, and deletion.
+- [x] Repeat the complete quality gate in GitHub Actions on a clean Ubuntu/Node 22 runner.
 - [ ] Create and push a clean `v1.0.0-rc3` or later tag from the verified commit.
 - [ ] Deploy exactly that commit to Vercel and deploy exactly its Firestore rules.
 - [ ] Recheck live security headers, App Check, mobile behavior, and Firebase/Vercel usage.
@@ -103,3 +104,4 @@ This task intentionally remains last because automated and console verification 
 - Firebase project dry run: `padq-ccb6a` rules compiled successfully; no deployment was performed.
 - Production dependency audit: 0 known vulnerabilities reported.
 - Full browser/stress suite against the recorded candidate: 15/15 passed in 1.7 minutes, including 30 simultaneous viewer tabs.
+- Remote clean-run verification: GitHub Actions **V1 quality gate** run [#1](https://github.com/Sceyo/PadQ/actions/runs/31889805963) passed every stage for commit `bda088dce0e1e709d97b85ba20c792a78b15e36b` on Ubuntu/Node 22.
