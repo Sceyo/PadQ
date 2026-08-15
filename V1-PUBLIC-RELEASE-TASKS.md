@@ -106,3 +106,9 @@ This task intentionally remains last because automated and console verification 
 - Production dependency audit: 0 known vulnerabilities reported.
 - Full browser/stress suite against the recorded candidate: 15/15 passed in 1.7 minutes, including 30 simultaneous viewer tabs.
 - Remote clean-run verification: GitHub Actions **V1 quality gate** run [#1](https://github.com/Sceyo/PadQ/actions/runs/31889805963) passed every stage for commit `bda088dce0e1e709d97b85ba20c792a78b15e36b` on Ubuntu/Node 22.
+
+### 2026-08-15 — current production gap confirmation
+
+- `https://pad-q.vercel.app/` responded successfully but did not include the candidate's CSP, `X-Frame-Options`, `X-Content-Type-Options`, or `Referrer-Policy` headers.
+- `https://pad-q.vercel.app/privacy` returned 404 and the homepage did not expose the candidate's Privacy link.
+- Therefore the current Vercel production deployment is an older build and cannot satisfy the V1 public-release checklist. Do not reuse the prior RC2 smoke-test result as evidence for the current candidate.
