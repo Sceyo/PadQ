@@ -22,7 +22,7 @@ Official references:
 ## Phase A — register without enforcement
 
 - [ ] In Firebase Console, open **Security → App Check → Apps** for project `padq-ccb6a`.
-- [ ] Select the PADQ web app and register the reCAPTCHA Enterprise provider.
+- [ ] Select web app **padq-web** (`1:969698713558:web:ec0670512f73c091974e77`) and register the reCAPTCHA Enterprise provider. The Firebase CLI audit found exactly one registered web app in `padq-ccb6a`.
 - [ ] Register the production hostname `pad-q.vercel.app`.
 - [ ] If PADQ later receives a custom domain, register it before routing users to it.
 - [ ] Keep Vercel Preview and Development environments disabled unless their exact hostnames are intentionally registered. Local emulator tests do not need a production token.
