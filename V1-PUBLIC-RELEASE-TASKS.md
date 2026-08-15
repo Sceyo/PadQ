@@ -13,8 +13,9 @@
 ## 1. Establish the release register and clean baseline
 
 - [x] Record every public-release blocker and its evidence requirement in this file.
-- [ ] Separate PADQ release changes from unrelated working-tree files.
-- [ ] Produce one clean release-candidate commit and tag after all automated work passes.
+- [x] Separate PADQ release changes from unrelated working-tree files.
+- [x] Produce one clean release-candidate commit after all automated work passes.
+- [ ] Tag the candidate only after the App Check configuration is ready for production verification.
 
 **Verification:** clean intended diff, exact commit recorded, no unrelated files in the release commit, production dependencies audited.
 
@@ -93,6 +94,7 @@ This task intentionally remains last because automated and console verification 
 
 ### 2026-08-15 — local public-hardening pass
 
+- Verified release-candidate code commit: `f7e8e8d9e00782836a42dc85d65378f0fcd8ea35` on `codex/v1-public-rc`; unrelated local documents were excluded.
 - Production build: passed with Next.js 16.3.1.
 - Lint: passed with no errors.
 - Unit/scenario suite: 171 passed; 20 intentionally skipped emulator-only cases.
@@ -100,4 +102,4 @@ This task intentionally remains last because automated and console verification 
 - Public-release browser suite: 5/5 passed, covering QR consent, device-data deletion, event/history deletion, offline match rollback, reconnect, and response headers.
 - Firebase project dry run: `padq-ccb6a` rules compiled successfully; no deployment was performed.
 - Production dependency audit: 0 known vulnerabilities reported.
-- Full browser/stress suite: 15/15 passed in 1.6 minutes, including 30 simultaneous viewer tabs.
+- Full browser/stress suite against the recorded candidate: 15/15 passed in 1.7 minutes, including 30 simultaneous viewer tabs.
