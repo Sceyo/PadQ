@@ -2597,6 +2597,7 @@ body.dark-mode .gear-divider { background: rgba(255,255,255,.08); }
   color: var(--txt-1, #1e293b); font-size: 0.82rem; font-weight: 500;
   cursor: pointer; font-family: inherit; text-align: left;
   transition: background 0.12s;
+  text-decoration: none;
 }
 .gear-menu-item:hover { background: var(--btn, #f1f5f9); }
 body.dark-mode .gear-menu-item { color: #e2e8f0; }

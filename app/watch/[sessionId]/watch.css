@@ -3,8 +3,6 @@
    Place at: app/watch/[sessionId]/watch.css
    ═══════════════════════════════════════════════════════════ */
 
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
-
 /* ── Shell ────────────────────────────────────────────────── */
 .watch-shell {
   min-height: 100vh;
@@ -44,6 +42,7 @@
   background: rgba(255,255,255,.04);
   color: #9ca3af; font-size: .78rem; font-weight: 500;
   cursor: pointer; font-family: inherit; transition: background .15s, color .15s;
+  text-decoration: none;
 }
 .w-back-btn:hover { background: rgba(255,255,255,.08); color: #f0f4ff; }
 

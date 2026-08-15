@@ -10,6 +10,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 import {
   Swords, Users, ChevronRight,
   Zap, Shield, Star, Eye, Camera, Hash,
@@ -25,32 +26,43 @@ type WatchTab = 'scan' | 'code';
 
 const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const router                = useRouter();
-  const [tab, setTab]         = useState<WatchTab>('scan');
+  const [tab, setTab]         = useState<WatchTab>('code');
   const [code, setCode]       = useState('');
   const [error, setError]     = useState('');
   const [loading, setLoading] = useState(false);
 
   const videoRef          = useRef<HTMLVideoElement>(null);
+  const modalRef          = useRef<HTMLDivElement>(null);
   const streamRef         = useRef<MediaStream | null>(null);
   const scanIntervalRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const cameraReadyRef    = useRef(false);
   const [cameraReady, setCameraReady] = useState(false);
+  const [cameraStarted, setCameraStarted] = useState(false);
   const [cameraError, setCameraError] = useState('');
 
   const stopCamera = () => {
     if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
     streamRef.current?.getTracks().forEach(t => t.stop());
     streamRef.current = null;
+    cameraReadyRef.current = false;
     setCameraReady(false);
+    setCameraStarted(false);
   };
 
   const startCamera = async () => {
     setCameraError('');
+    if (!('BarcodeDetector' in window)) {
+      setCameraError('QR scanning is not supported in this browser. Enter the room code or scan the host QR with your phone camera app.');
+      return;
+    }
+    setCameraStarted(true);
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
+        cameraReadyRef.current = true;
         setCameraReady(true);
         startQrScanning();
       }
@@ -67,7 +79,7 @@ const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     // @ts-expect-error BarcodeDetector is not yet included in every TypeScript DOM lib.
     const detector = new BarcodeDetector({ formats: ['qr_code'] });
     scanIntervalRef.current = setInterval(async () => {
-      if (!videoRef.current || !cameraReady) return;
+      if (!videoRef.current || !cameraReadyRef.current) return;
       try {
         const barcodes = await detector.detect(videoRef.current);
         if (barcodes.length > 0) {
@@ -80,15 +92,26 @@ const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   };
 
   useEffect(() => {
-    if (tab === 'scan') startCamera(); else stopCamera();
-    return stopCamera;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab]);
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') { stopCamera(); onClose(); } };
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    modalRef.current?.querySelector<HTMLElement>('button, input, [tabindex]:not([tabindex="-1"])')?.focus();
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { stopCamera(); onClose(); return; }
+      if (e.key !== 'Tab' || !modalRef.current) return;
+      const focusable = [...modalRef.current.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), [tabindex]:not([tabindex="-1"])')];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    return () => {
+      window.removeEventListener('keydown', handler);
+      stopCamera();
+      previouslyFocused?.focus();
+    };
+    // stopCamera intentionally belongs to this mounted dialog instance.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClose]);
 
   const handleJoin = async (rawCode?: string) => {
@@ -108,14 +131,14 @@ const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   return (
     <div className="watch-overlay" onClick={e => { if (e.target === e.currentTarget) { stopCamera(); onClose(); } }}>
-      <div className="watch-modal">
+      <div className="watch-modal" ref={modalRef} role="dialog" aria-modal="true" aria-labelledby="watch-modal-title">
         <div className="watch-modal-header">
-          <div className="watch-modal-title"><Eye size={18} /> Watch a Session</div>
-          <button className="watch-modal-close" onClick={() => { stopCamera(); onClose(); }}><X size={18} /></button>
+          <div className="watch-modal-title" id="watch-modal-title"><Eye size={18} /> Watch a Session</div>
+          <button className="watch-modal-close" aria-label="Close watch dialog" onClick={() => { stopCamera(); onClose(); }}><X size={18} /></button>
         </div>
         <div className="watch-tabs">
-          <button className={`watch-tab ${tab === 'scan' ? 'active' : ''}`} onClick={() => setTab('scan')}><Camera size={14} /> Scan QR</button>
-          <button className={`watch-tab ${tab === 'code' ? 'active' : ''}`} onClick={() => setTab('code')}><Hash size={14} /> Enter Code</button>
+          <button className={`watch-tab ${tab === 'scan' ? 'active' : ''}`} onClick={() => setTab('scan')} aria-pressed={tab === 'scan'}><Camera size={14} /> Scan QR</button>
+          <button className={`watch-tab ${tab === 'code' ? 'active' : ''}`} onClick={() => { stopCamera(); setTab('code'); }} aria-pressed={tab === 'code'}><Hash size={14} /> Enter Code</button>
         </div>
 
         {tab === 'scan' && (
@@ -125,6 +148,14 @@ const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 <Camera size={32} className="watch-camera-error-icon" />
                 <p>{cameraError}</p>
                 <button className="watch-tab-switch-btn" onClick={() => setTab('code')}><Hash size={13} /> Enter code instead</button>
+              </div>
+            ) : !cameraStarted ? (
+              <div className="watch-camera-consent">
+                <Camera size={32} className="watch-camera-error-icon" />
+                <p>PADQ will use your camera only while this scanner is open.</p>
+                <button className="watch-camera-start-btn" onClick={() => void startCamera()}>
+                  <Camera size={14} /> Start QR scanner
+                </button>
               </div>
             ) : (
               <>
@@ -148,7 +179,7 @@ const WatchModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                 onChange={e => { setCode(e.target.value.toUpperCase()); setError(''); }}
                 placeholder="e.g. 7K3MQR" maxLength={ROOM_CODE_LENGTH}
                 onKeyDown={e => e.key === 'Enter' && handleJoin()} autoFocus />
-              <button className="watch-join-btn" onClick={() => handleJoin()} disabled={loading || !code.trim()}>
+              <button className="watch-join-btn" aria-label="Join room" onClick={() => handleJoin()} disabled={loading || !code.trim()}>
                 {loading ? <Loader2 size={16} className="spin" /> : <ArrowRight size={16} />}
               </button>
             </div>
@@ -190,6 +221,8 @@ export default function HomePage() {
             style={{ width: "100%", height: "auto" }}
           />
         </div>
+
+        <h1 className="hp-sr-only">PADQ fair live pickleball and padel queues</h1>
 
         {/* Description */}
         <p className="hp-desc">
@@ -239,6 +272,10 @@ export default function HomePage() {
           ].map(({ icon, label }) => (
             <span key={label} className="hp-pill">{icon}{label}</span>
           ))}
+        </div>
+
+        <div className="hp-footer-links">
+          <Link href="/privacy">Privacy &amp; Data Retention</Link>
         </div>
       </div>
 

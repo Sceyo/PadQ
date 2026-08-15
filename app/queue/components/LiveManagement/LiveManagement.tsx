@@ -69,7 +69,14 @@ export const ManualQueuePanel: React.FC<{
 export type LockedPartnerPair = [string, string];
 
 export function getMaxPartnerPairs(playerCount: number): number {
-  return Math.floor(Math.max(0, playerCount) / 2);
+  const count = Math.max(0, playerCount);
+  const pairedLimit = Math.floor(count / 2);
+
+  // If an odd roster locks every possible pair, the lone unpaired player can
+  // never be selected for a four-player doubles match: every legal selection
+  // would otherwise have to split a pair. Leave three singles available so a
+  // locked pair can still rotate with two of them.
+  return count % 2 === 0 ? pairedLimit : Math.max(0, pairedLimit - 1);
 }
 
 export function getAvailablePartnerPlayers(

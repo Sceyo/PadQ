@@ -10,7 +10,9 @@ import {
 describe('live partner controls', () => {
   it('sets the pair limit from the number of players', () => {
     expect(getMaxPartnerPairs(0)).toBe(0);
-    expect(getMaxPartnerPairs(5)).toBe(2);
+    expect(getMaxPartnerPairs(5)).toBe(1);
+    expect(getMaxPartnerPairs(7)).toBe(2);
+    expect(getMaxPartnerPairs(8)).toBe(4);
     expect(getMaxPartnerPairs(30)).toBe(15);
   });
 
@@ -28,8 +30,9 @@ describe('live partner controls', () => {
     expect(addPartnerPair(players, firstPair, 'C', 'Missing')).toBe(firstPair);
     expect(addPartnerPair(players, firstPair, 'C', 'C')).toBe(firstPair);
     expect(addPartnerPair(players, full, 'E', 'D')).toBe(full);
-    expect(addPartnerPair(players, firstPair, 'C', 'D')).toEqual([['A', 'B'], ['C', 'D']]);
-  });
+    expect(addPartnerPair(players, firstPair, 'C', 'D')).toBe(firstPair);
+    expect(addPartnerPair([...players, 'F'], firstPair, 'C', 'D')).toEqual([['A', 'B'], ['C', 'D']]);
+  }, 30_000);
 
   it('only offers partners from the same court or waiting group', () => {
     const available = ['A', 'B', 'C', 'D', 'E', 'F'];

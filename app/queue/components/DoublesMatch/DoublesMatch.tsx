@@ -14,7 +14,7 @@ export const DoublesMatch: React.FC<{
   playAllScore?:    number | null;
   statsMap:         Record<string, PlayerStat>;
   isHost:           boolean;
-  onMatch:          (a: string[], b: string[], w: 'A' | 'B', score?: string) => void;
+  onMatch:          (a: string[], b: string[], w: 'A' | 'B', score?: string) => Promise<boolean>;
   onScoreChange?:   (score: LiveScoreState | null) => void;
   viewerScore?:     LiveScoreState | null;
   persistedScore?:  LiveScoreState | null;
@@ -45,7 +45,7 @@ export const DoublesMatch: React.FC<{
     alert('Teams are full (2 each)');
   };
 
-  const submit = () => {
+  const submit = async () => {
     if (!isHost || submittingRef.current) return;
     if (teamA.length !== 2 || teamB.length !== 2) { alert('Assign all 4 players first'); return; }
     if (!winner) { alert('Select the winning team'); return; }
@@ -53,7 +53,12 @@ export const DoublesMatch: React.FC<{
     // before React replaces this match card with the next pairing.
     submittingRef.current = true;
     setSubmitting(true);
-    onMatch(teamA, teamB, winner, pendingScore);
+    try {
+      await onMatch(teamA, teamB, winner, pendingScore);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
+    }
   };
 
   const handleScoreChange = (score: LiveScoreState | null) => {

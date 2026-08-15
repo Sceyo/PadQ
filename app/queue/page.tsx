@@ -16,14 +16,14 @@ import useQueue, {
   suggestNextSinglesMatch,
   PlayAllSuggestion,
 } from '@/hooks/useQueue';
-import { useSession } from '@/hooks/useSession';
+import { useSession, type MatchResultOutcome } from '@/hooks/useSession';
 import type { LiveScoreState } from '@/lib/sessionService';
 import {
   loadCourtGroup, addCourtToGroup,
-  removeCourtFromGroup, clearCourtGroup, saveHostToStorage, clearHostFromStorage,
+  removeCourtFromGroup, clearCourtGroup, saveHostToStorage,
   loadRoster, mergeIntoRoster, removeFromRoster, setRosterEntrySkill,
   loadCareerStats, recordCareerResult,
-  loadSkilledBrackets, saveSkilledBrackets, clearSkilledBrackets,
+  loadSkilledBrackets, saveSkilledBrackets,
   type CourtEntry, type CourtSlot, type SessionDoc, type CareerStatsMap,
   type RosterEntry, type SkillBracket,
 } from '@/lib/sessionService';
@@ -64,7 +64,12 @@ import { UserGuide } from './components/UserGuideModal/UserGuideModal';
 import { PaddleStatusPanel } from './components/PaddleStatusPanel/PaddleStatusPanel';
 import { SinglesStatusPanel } from './components/SinglesStatusPanel/SinglesStatusPanel';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard/AnalyticsDashboard';
-import { AddPlayerPanel, ManualQueuePanel, PartnerPanel } from './components/LiveManagement/LiveManagement';
+import {
+  AddPlayerPanel,
+  getMaxPartnerPairs,
+  ManualQueuePanel,
+  PartnerPanel,
+} from './components/LiveManagement/LiveManagement';
 import { SmartSuggestions } from './components/SmartSuggestions/SmartSuggestions';
 import { SessionBar } from './components/SessionBar/SessionBar';
 import { CourtTabs } from './components/CourtTabs/CourtTabs';
@@ -112,6 +117,20 @@ function cloneSinglesState(s: SinglesState): SinglesState {
   };
 }
 
+function matchResultFailureMessage(result: MatchResultOutcome | null): string | null {
+  if (!result || result.status === 'stale') {
+    return 'This match was not saved because the session changed. The previous match has been restored.';
+  }
+  if (result.status !== 'failed') return null;
+  if (result.reason === 'permission') {
+    return 'Firebase rejected the result. Host access may have expired; the previous match has been restored.';
+  }
+  if (result.reason === 'unavailable') {
+    return 'The result could not reach Firebase. Check the connection and try again; the previous match has been restored.';
+  }
+  return 'The result could not be saved. The previous match has been restored.';
+}
+
 // ═══════════════════════════════════════════════════════════
 // § 13  MAIN ORCHESTRATOR
 // ═══════════════════════════════════════════════════════════
@@ -124,7 +143,7 @@ function QueueSystemContent() {
 
   const {
     gameMode, players, queue, playAllRel,
-    setGameMode, setPlayers, playSingles, playDoubles,
+    setGameMode, setPlayers,
     randomizeQueue, setQueue, recordPlayAllDoubles,
     recordPlayAllSingles, resetPlayAllRelationships,
   } = useQueue(gameModeFromUrl);
@@ -298,6 +317,7 @@ function QueueSystemContent() {
 
   // ── Setup-phase validation error (replaces alert() in setup)
   const [setupErrorMsg, setSetupErrorMsg] = useState<string | null>(null);
+  const [isDeletingSession, setIsDeletingSession] = useState(false);
 
   // ── Double-click guard for match result handlers ───────────
   const isProcessingMatchRef = useRef(false);
@@ -372,7 +392,8 @@ function QueueSystemContent() {
         { queue: queueToCommit, liveScore: null, ...enginePatch },
         { id: entry.id, mode: entry.mode, players: entry.players, winner: entry.winner, score: entry.score, timestamp: entry.timestamp }
       ).then(result => {
-        if (!result) showToast('Result was not saved because the session changed. Please confirm the court again.');
+        const message = matchResultFailureMessage(result);
+        if (message) showToast(message);
       });
     }
   };
@@ -807,14 +828,14 @@ function QueueSystemContent() {
         processingCourtIdsRef.current.delete(courtId);
         return;
       }
+      const previousQueue = [...queueRef.current];
+      const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
 
       setQueue(planned.queue);
       queueRef.current = planned.queue;
       setLocalCourtSlots(planned.courtSlots);
       courtSlotsRef.current = planned.courtSlots;
       setLocalHistory(previous => [entry, ...previous]);
-      recordCareerResult(entry.players, entry.winner);
-      setCareerStats(loadCareerStats());
 
       if (session.sessionId) {
         void session.commitCourtResult({
@@ -825,36 +846,56 @@ function QueueSystemContent() {
           id: entry.id,
           timestamp: entry.timestamp,
         }).then(result => {
-          if (!result || result.status === 'stale') {
+          if (!result || result.status === 'failed') {
             setLocalHistory(previous => previous.filter(item => item.id !== entry.id));
-            showToast('This court already changed. Its latest assignment has been restored.');
+            setQueue(previousQueue);
+            queueRef.current = previousQueue;
+            setLocalCourtSlots(previousSlots);
+            courtSlotsRef.current = previousSlots;
+            const message = result?.status === 'failed' && result.reason === 'permission'
+              ? 'Firebase rejected the result. Host access may have expired; the previous match was restored.'
+              : 'The result could not be saved. Check the connection and try again; the previous match was restored.';
+            showToast(message);
             return;
           }
           setQueue(result.queue);
           queueRef.current = result.queue;
           setLocalCourtSlots(result.courtSlots);
           courtSlotsRef.current = result.courtSlots;
+          if (result.status === 'stale') {
+            setLocalHistory(previous => previous.filter(item => item.id !== entry.id));
+            showToast('This court already changed. Its latest assignment has been restored.');
+            return;
+          }
+          recordCareerResult(entry.players, entry.winner);
+          setCareerStats(loadCareerStats());
+          setModalWinner(`${winner} wins!`);
+          setModalScore(score);
+          setModalOpen(true);
         }).finally(() => processingCourtIdsRef.current.delete(courtId));
       } else {
+        recordCareerResult(entry.players, entry.winner);
+        setCareerStats(loadCareerStats());
+        setModalWinner(`${winner} wins!`);
+        setModalScore(score);
+        setModalOpen(true);
         processingCourtIdsRef.current.delete(courtId);
       }
-
-      setModalWinner(`${winner} wins!`);
-      setModalScore(score);
-      setModalOpen(true);
       return;
     }
 
     if (isProcessingMatchRef.current) return;
     isProcessingMatchRef.current = true;
     const [p1, p2] = [queue[0], queue[1]];
+    const previousQueue = [...queue];
+    const previousPaddleState = clonePaddleState(paddleStateRef.current);
+    const previousSinglesState = cloneSinglesState(singlesStateRef.current);
     undoSnapshotRef.current = {
-      queue: [...queue],
-      paddleState: clonePaddleState(paddleStateRef.current),
-      singlesState: cloneSinglesState(singlesStateRef.current),
+      queue: previousQueue,
+      paddleState: previousPaddleState,
+      singlesState: previousSinglesState,
     };
     setHasUndo(true);
-    playSingles(winner);
     if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
     let newQueue: string[];
 
@@ -870,21 +911,66 @@ function QueueSystemContent() {
       newQueue = [loser, ...rest, winner];
     }
     setQueue(newQueue);
-    addHistory({ id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`, winner, score, timestamp: new Date().toLocaleTimeString() }, newQueue); setModalWinner(`${winner} wins!`); setModalScore(score); setModalOpen(true);
-    isProcessingMatchRef.current = false;
+    queueRef.current = newQueue;
+    const entry: MatchHistoryEntry = {
+      id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`,
+      winner, score, timestamp: new Date().toLocaleTimeString(),
+    };
+    setLocalHistory(current => [entry, ...current]);
+
+    const finishSuccess = () => {
+      recordCareerResult(entry.players, entry.winner);
+      setCareerStats(loadCareerStats());
+      setModalWinner(`${winner} wins!`);
+      setModalScore(score);
+      setModalOpen(true);
+    };
+
+    if (!session.sessionId) {
+      finishSuccess();
+      isProcessingMatchRef.current = false;
+      return;
+    }
+
+    const enginePatch = activeQueueMode === 'default'
+      ? { singlesEngineState: serializeSinglesState(singlesStateRef.current) as unknown as Record<string, unknown> }
+      : {};
+    void session.commitMatchResult(
+      { queue: newQueue, liveScore: null, ...enginePatch },
+      entry,
+    ).then(result => {
+      const message = matchResultFailureMessage(result);
+      if (!message) {
+        finishSuccess();
+        return;
+      }
+      setLocalHistory(current => current.filter(item => item.id !== entry.id));
+      setQueue(previousQueue);
+      queueRef.current = previousQueue;
+      paddleStateRef.current = previousPaddleState;
+      setPaddleStateUI(previousPaddleState);
+      singlesStateRef.current = previousSinglesState;
+      setSinglesStateUI(previousSinglesState);
+      setHasUndo(false);
+      showToast(message);
+    }).finally(() => {
+      isProcessingMatchRef.current = false;
+    });
   };
 
-  const handleDoublesMatch = (a: string[], b: string[], w: 'A' | 'B', score?: string) => {
-    if (isProcessingMatchRef.current) return;
+  const handleDoublesMatch = async (a: string[], b: string[], w: 'A' | 'B', score?: string): Promise<boolean> => {
+    if (isProcessingMatchRef.current) return false;
     isProcessingMatchRef.current = true;
+    const previousQueue = [...queue];
+    const previousPaddleState = clonePaddleState(paddleStateRef.current);
+    const previousSinglesState = cloneSinglesState(singlesStateRef.current);
     // Save undo snapshot before mutating state
     undoSnapshotRef.current = {
-      queue: [...queue],
-      paddleState: clonePaddleState(paddleStateRef.current),
-      singlesState: cloneSinglesState(singlesStateRef.current),
+      queue: previousQueue,
+      paddleState: previousPaddleState,
+      singlesState: previousSinglesState,
     };
     setHasUndo(true);
-    playDoubles([...a], [...b], w);
     if (activeQueueMode === 'playall') recordPlayAllDoubles(a, b);
     const winnerTeam = (w === 'A' ? a : b) as [string, string];
     const loserTeam  = (w === 'A' ? b : a) as [string, string];
@@ -909,9 +995,54 @@ function QueueSystemContent() {
       newQueue = [...loserTeam, ...rest, ...winnerTeam];
     }
     setQueue(newQueue);
-    addHistory({ id: Date.now(), mode: 'Doubles', players: `${a.join(' & ')} vs ${b.join(' & ')}`, winner: winnerNames, score, timestamp: new Date().toLocaleTimeString() }, newQueue);
-    setModalWinner(`${winnerNames} win!`); setModalScore(score); setModalOpen(true);
-    isProcessingMatchRef.current = false;
+    queueRef.current = newQueue;
+    const entry: MatchHistoryEntry = {
+      id: Date.now(), mode: 'Doubles', players: `${a.join(' & ')} vs ${b.join(' & ')}`,
+      winner: winnerNames, score, timestamp: new Date().toLocaleTimeString(),
+    };
+    setLocalHistory(current => [entry, ...current]);
+
+    const finishSuccess = () => {
+      recordCareerResult(entry.players, entry.winner);
+      setCareerStats(loadCareerStats());
+      setModalWinner(`${winnerNames} win!`);
+      setModalScore(score);
+      setModalOpen(true);
+    };
+
+    try {
+      if (!session.sessionId) {
+        finishSuccess();
+        return true;
+      }
+
+      const result = await session.commitMatchResult(
+        {
+          queue: newQueue,
+          liveScore: null,
+          doublesEngineState: serializePaddleState(paddleStateRef.current) as unknown as Record<string, unknown>,
+        },
+        entry,
+      );
+      const message = matchResultFailureMessage(result);
+      if (!message) {
+        finishSuccess();
+        return true;
+      }
+
+      setLocalHistory(current => current.filter(item => item.id !== entry.id));
+      setQueue(previousQueue);
+      queueRef.current = previousQueue;
+      paddleStateRef.current = previousPaddleState;
+      setPaddleStateUI(previousPaddleState);
+      singlesStateRef.current = previousSinglesState;
+      setSinglesStateUI(previousSinglesState);
+      setHasUndo(false);
+      showToast(message);
+      return false;
+    } finally {
+      isProcessingMatchRef.current = false;
+    }
   };
 
   const handleCourtMatch = (courtId: string, side: 'A' | 'B') => {
@@ -963,14 +1094,14 @@ function QueueSystemContent() {
       winner: winnerNames,
       timestamp: new Date().toLocaleTimeString(),
     };
+    const previousQueue = [...queueRef.current];
+    const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
 
     setLocalCourtSlots(updatedSlots);
     courtSlotsRef.current = updatedSlots;
     setQueue(newQueue);
     queueRef.current = newQueue;
     setLocalHistory(prev => [entry, ...prev]);
-    recordCareerResult(entry.players, entry.winner);
-    setCareerStats(loadCareerStats());
 
     if (session.sessionId) {
       void session.commitCourtResult({
@@ -981,23 +1112,41 @@ function QueueSystemContent() {
         id: entry.id,
         timestamp: entry.timestamp,
       }).then(result => {
-        if (!result || result.status === 'stale') {
+        if (!result || result.status === 'failed') {
           setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
-          showToast('This court already changed. Its latest assignment has been restored.');
+          setQueue(previousQueue);
+          queueRef.current = previousQueue;
+          setLocalCourtSlots(previousSlots);
+          courtSlotsRef.current = previousSlots;
+          const message = result?.status === 'failed' && result.reason === 'permission'
+            ? 'Firebase rejected the result. Host access may have expired; the previous match was restored.'
+            : 'The result could not be saved. Check the connection and try again; the previous match was restored.';
+          showToast(message);
           return;
         }
         setQueue(result.queue);
         queueRef.current = result.queue;
         setLocalCourtSlots(result.courtSlots);
         courtSlotsRef.current = result.courtSlots;
+        if (result.status === 'stale') {
+          setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
+          showToast('This court already changed. Its latest assignment has been restored.');
+          return;
+        }
+        recordCareerResult(entry.players, entry.winner);
+        setCareerStats(loadCareerStats());
+        setModalWinner(`${winnerNames} win!`);
+        setModalScore(undefined);
+        setModalOpen(true);
       }).finally(() => processingCourtIdsRef.current.delete(courtId));
     } else {
+      recordCareerResult(entry.players, entry.winner);
+      setCareerStats(loadCareerStats());
+      setModalWinner(`${winnerNames} win!`);
+      setModalScore(undefined);
+      setModalOpen(true);
       processingCourtIdsRef.current.delete(courtId);
     }
-
-    setModalWinner(`${winnerNames} win!`);
-    setModalScore(undefined);
-    setModalOpen(true);
   };
 
   // ── Mid-session player position swap ──────────────────────
@@ -1043,7 +1192,8 @@ function QueueSystemContent() {
     recordCareerResult(entry.players, entry.winner);
     setCareerStats(loadCareerStats());
     if (session.sessionId) void session.commitMatchResult({ queue }, entry).then(result => {
-      if (!result) showToast('Result was not saved because the session changed. Please confirm the court again.');
+      const message = matchResultFailureMessage(result);
+      if (message) showToast(message);
     });
 
     setModalWinner(`${winnerNames} win!`); setModalScore(undefined); setModalOpen(true);
@@ -1079,7 +1229,7 @@ function QueueSystemContent() {
   const handlePartnerPairsChange = (nextPairs: [string, string][]) => {
     const playerSet = new Set(players);
     const used = new Set<string>();
-    const maxPairs = Math.floor(players.length / 2);
+    const maxPairs = getMaxPartnerPairs(players.length);
     const validPairs = nextPairs.filter(([a, b]) => {
       if (a === b || !playerSet.has(a) || !playerSet.has(b)) return false;
       if (used.has(a) || used.has(b)) return false;
@@ -1137,19 +1287,32 @@ function QueueSystemContent() {
     }
   };
 
-  const doConfirmedAction = () => {
+  const doConfirmedAction = async () => {
     const action = pendingConfirm;
     if (!action) return;
-    setPendingConfirm(null);
     if (action.type === 'clear-history') {
+      setPendingConfirm(null);
       setLocalHistory([]);
-      session.clearMatchHistory();
+      await session.clearMatchHistory();
     } else if (action.type === 'hard-reset') {
-      try { clearHostFromStorage(); clearCourtGroup(); sessionStorage.clear(); } catch { /* ignore */ }
-      window.location.href = '/';
+      setIsDeletingSession(true);
+      try {
+        await session.deleteHostedSession();
+        clearCourtGroup();
+        sessionStorage.clear();
+        router.push('/');
+      } catch (error) {
+        console.error('[queue] delete session error:', error);
+        showToast('Event data was not deleted. Check your connection and try again.');
+      } finally {
+        setIsDeletingSession(false);
+        setPendingConfirm(null);
+      }
     } else if (action.type === 'back-home') {
+      setPendingConfirm(null);
       router.push('/');
     } else if (action.type === 'remove-court') {
+      setPendingConfirm(null);
       removeCourtFromGroup(action.sessionId);
       setCourts(loadCourtGroup());
     }
@@ -1453,14 +1616,14 @@ function QueueSystemContent() {
             <div className="confirm-dialog">
               <p className="confirm-message">
                 {pendingConfirm.type === 'clear-history' && 'Clear all match history? The queue and players will stay.'}
-                {pendingConfirm.type === 'hard-reset' && 'Hard Reset will clear your session data. Roster and career stats will be kept.'}
+                {pendingConfirm.type === 'hard-reset' && 'Permanently delete this event and all match history from Firebase? Saved roster and career stats on this device will stay.'}
                 {pendingConfirm.type === 'back-home' && 'Leave this session? The session stays active — rejoin anytime with the room code.'}
                 {pendingConfirm.type === 'remove-court' && 'Remove this court from your session group?'}
               </p>
               <div className="confirm-actions">
-                <button className="confirm-btn confirm-btn--cancel" onClick={() => setPendingConfirm(null)}>Cancel</button>
-                <button className={`confirm-btn ${pendingConfirm.type === 'back-home' ? 'confirm-btn--warn' : 'confirm-btn--danger'}`} onClick={doConfirmedAction}>
-                  {pendingConfirm.type === 'back-home' ? 'Leave' : 'Confirm'}
+                <button className="confirm-btn confirm-btn--cancel" onClick={() => setPendingConfirm(null)} disabled={isDeletingSession}>Cancel</button>
+                <button className={`confirm-btn ${pendingConfirm.type === 'back-home' ? 'confirm-btn--warn' : 'confirm-btn--danger'}`} onClick={() => void doConfirmedAction()} disabled={isDeletingSession}>
+                  {isDeletingSession ? 'Deleting…' : pendingConfirm.type === 'back-home' ? 'Leave' : 'Confirm'}
                 </button>
               </div>
             </div>
@@ -1895,14 +2058,14 @@ function QueueSystemContent() {
           <div className="confirm-dialog">
             <p className="confirm-message">
               {pendingConfirm.type === 'clear-history' && 'Clear all match history? The queue and players will stay.'}
-              {pendingConfirm.type === 'hard-reset' && 'Hard Reset will clear your session data. Roster and career stats will be kept.'}
+              {pendingConfirm.type === 'hard-reset' && 'Permanently delete this event and all match history from Firebase? Saved roster and career stats on this device will stay.'}
               {pendingConfirm.type === 'back-home' && 'Leave this session? The session stays active — rejoin anytime with the room code.'}
               {pendingConfirm.type === 'remove-court' && 'Remove this court from your session group?'}
             </p>
             <div className="confirm-actions">
-              <button className="confirm-btn confirm-btn--cancel" onClick={() => setPendingConfirm(null)}>Cancel</button>
-              <button className={`confirm-btn ${pendingConfirm.type === 'back-home' ? 'confirm-btn--warn' : 'confirm-btn--danger'}`} onClick={doConfirmedAction}>
-                {pendingConfirm.type === 'back-home' ? 'Leave' : 'Confirm'}
+              <button className="confirm-btn confirm-btn--cancel" onClick={() => setPendingConfirm(null)} disabled={isDeletingSession}>Cancel</button>
+              <button className={`confirm-btn ${pendingConfirm.type === 'back-home' ? 'confirm-btn--warn' : 'confirm-btn--danger'}`} onClick={() => void doConfirmedAction()} disabled={isDeletingSession}>
+                {isDeletingSession ? 'Deleting…' : pendingConfirm.type === 'back-home' ? 'Leave' : 'Confirm'}
               </button>
             </div>
           </div>

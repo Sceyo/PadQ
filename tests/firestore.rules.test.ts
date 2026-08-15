@@ -77,13 +77,19 @@ suite('Firestore V1 production rules', () => {
   beforeEach(async () => env.clearFirestore());
   afterAll(async () => env.cleanup());
 
-  it('allows a known-room get but denies unauthenticated access and session listing', async () => {
+  it('allows only the owner to read pre-live rooms, then allows known-room live viewing without listing', async () => {
     const host = env.authenticatedContext('host-1').firestore();
     const viewer = env.authenticatedContext('viewer-1').firestore();
     const anonymous = env.unauthenticatedContext().firestore();
     const ref = doc(host, 'sessions', 'A2THQ7');
 
+    await assertSucceeds(getDoc(doc(host, 'sessions', 'M7SSNG')));
     await assertSucceeds(setDoc(ref, sessionData('host-1')));
+    await assertSucceeds(getDoc(ref));
+    await assertFails(getDoc(doc(viewer, 'sessions', 'A2THQ7')));
+    await assertSucceeds(updateDoc(ref, {
+      isLive: true, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
+    }));
     await assertSucceeds(getDoc(doc(viewer, 'sessions', 'A2THQ7')));
     await assertFails(getDoc(doc(anonymous, 'sessions', 'A2THQ7')));
     await assertFails(getDocs(collection(viewer, 'sessions')));
@@ -260,6 +266,29 @@ suite('Firestore V1 production rules', () => {
     }));
   });
 
+  it('rejects duplicate rosters, invalid queues and players assigned outside the roster', async () => {
+    const host = env.authenticatedContext('host-content').firestore();
+    const players = Array.from({ length: 30 }, (_, index) => `Player ${index + 1}`);
+
+    await assertFails(setDoc(doc(host, 'sessions', 'P7DUPX'), sessionData('host-content', {
+      players: [...players.slice(0, 29), players[0]],
+      queue: players,
+    })));
+    await assertFails(setDoc(doc(host, 'sessions', 'Q7OUTR'), sessionData('host-content', {
+      players,
+      queue: [...players.slice(0, 29), 'Not in roster'],
+    })));
+    await assertFails(setDoc(doc(host, 'sessions', 'Q7DUPX'), sessionData('host-content', {
+      players,
+      queue: [...players.slice(0, 29), players[0]],
+    })));
+    await assertFails(setDoc(doc(host, 'sessions', 'C7OUTR'), sessionData('host-content', {
+      players,
+      queue: players.slice(4),
+      courtSlots: [{ id: 'court-0', name: 'Court 1', onCourt: [players[0], players[1], players[2], 'Outsider'] }],
+    })));
+  });
+
   it('commits a result for three populated courts with an active partner pair', async () => {
     const host = env.authenticatedContext('host-7b').firestore();
     const ref = doc(host, 'sessions', 'G7MTCH');
@@ -358,6 +387,10 @@ suite('Firestore V1 production rules', () => {
       tx.set(doc(host, 'sessions', 'H8MTCH', 'history', UUID_A), historyData());
     }));
 
+    await assertFails(getDocs(collection(viewer, 'sessions', 'H8MTCH', 'history')));
+    await assertSucceeds(updateDoc(ref, {
+      isLive: true, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
+    }));
     await assertSucceeds(getDocs(collection(viewer, 'sessions', 'H8MTCH', 'history')));
     await assertFails(updateDoc(doc(host, 'sessions', 'H8MTCH', 'history', UUID_A), { winner: 'C & D' }));
   });
