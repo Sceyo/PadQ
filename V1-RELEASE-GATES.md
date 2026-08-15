@@ -1,5 +1,12 @@
 # PADQ V1 Release Gates
 
+> **Superseded release record.** Gates 0–5 below preserve the history of the RC2
+> rollout, including decisions that are no longer current. Do not treat its
+> “production smoke test passed” or “App Check disabled” entries as approval for
+> the latest candidate. The authoritative public-release checklist is
+> [`V1-PUBLIC-RELEASE-TASKS.md`](./V1-PUBLIC-RELEASE-TASKS.md); the current App
+> Check procedure is [`FIREBASE-APP-CHECK-ROLLOUT.md`](./FIREBASE-APP-CHECK-ROLLOUT.md).
+
 **Release branch:** `v1-prod-hardening`  
 **Hosting constraint:** Vercel Hobby (free tier)  
 **Backend constraint:** Firebase Spark (free tier)  

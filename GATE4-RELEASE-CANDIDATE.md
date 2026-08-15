@@ -1,5 +1,12 @@
 # PADQ V1 Gate 4 Release-Candidate Verification
 
+> **Historical record — superseded.** This document describes the earlier RC2
+> decision and must not be used to approve the current public release. Scoring
+> persistence defects and additional public-release blockers were found after
+> RC2. The authoritative release state is now
+> [`V1-PUBLIC-RELEASE-TASKS.md`](./V1-PUBLIC-RELEASE-TASKS.md), which requires a
+> monitored Firebase App Check rollout before enforcement and final release.
+
 **Branch:** `v1-prod-hardening`
 
 **Date:** 2026-08-03

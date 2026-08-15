@@ -84,6 +84,7 @@
 
 ## 8. Final task — supervised real pickleball event
 
+- [x] Prepare the roles, scenarios, monitoring table, stop conditions, and rollback procedure in `V1-SUPERVISED-EVENT-RUNBOOK.md`.
 - [ ] Run one supervised real event using representative players and up to three courts.
 - [ ] Monitor Firestore reads/writes, Vercel usage, reconnects, score corrections, queue fairness, and viewer updates during the event.
 - [ ] Record incidents and roll back if ownership, assignment integrity, persistence, or free-tier headroom fails.
