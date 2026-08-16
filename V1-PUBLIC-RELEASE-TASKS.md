@@ -99,7 +99,7 @@ This task intentionally remains last because automated and console verification 
 
 ### 2026-08-15 — local public-hardening pass
 
-- Verified release-candidate code commit: `f7e8e8d9e00782836a42dc85d65378f0fcd8ea35` on `codex/v1-public-rc`; unrelated local documents were excluded.
+- Verified release-candidate code commit: `f7e8e8d9e00782836a42dc85d65378f0fcd8ea35` on `v1-public-rc`; unrelated local documents were excluded.
 - Production build: passed with Next.js 16.3.1.
 - Lint: passed with no errors.
 - Unit/scenario suite: 171 passed; 20 intentionally skipped emulator-only cases.
