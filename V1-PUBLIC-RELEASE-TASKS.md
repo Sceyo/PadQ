@@ -17,7 +17,7 @@
 - [x] Record every public-release blocker and its evidence requirement in this file.
 - [x] Separate PADQ release changes from unrelated working-tree files.
 - [x] Produce one clean release-candidate commit after all automated work passes.
-- [ ] Tag the candidate only after the App Check configuration is ready for production verification.
+- [x] Tag the candidate only after the App Check configuration is ready for production verification.
 
 **Verification:** clean intended diff, exact commit recorded, no unrelated files in the release commit, production dependencies audited.
 
@@ -79,7 +79,7 @@
 - [x] Run lint, unit/scenario tests, Firestore rules tests, full browser stress tests, production build, and production dependency audit.
 - [x] Verify 30 players, 3 courts, locked partners, score correction, 30 viewers, reconnect, history, and deletion.
 - [x] Repeat the complete quality gate in GitHub Actions on a clean Ubuntu/Node 22 runner.
-- [ ] Create and push a clean `v1.0.0-rc3` or later tag from the verified commit.
+- [x] Create and push a clean `v1.0.0-rc.3` or later tag from the verified commit.
 - [ ] Deploy exactly that commit to Vercel and deploy exactly its Firestore rules.
 - [ ] Recheck live security headers, App Check, mobile behavior, and Firebase/Vercel usage.
 
@@ -122,3 +122,4 @@ This task intentionally remains last because automated and console verification 
 - Vercel shows both App Check variables saved with **Production** scope; Preview and Development remain excluded.
 - The accidental Vercel redeployment used old `main` commit `eb6235183133eafff5b0c400a6a07110547cb9b0`, which is the direct ancestor of the candidate. It did not deploy the release candidate, privacy page, or security headers and requires no rollback.
 - Firestore enforcement remains intentionally off until the tagged candidate produces verified production traffic.
+- Annotated tag `v1.0.0-rc.3` was pushed and resolves to commit `e112c8612d471e55d633d93d019d4a8e39aae00c`.
