@@ -25,8 +25,8 @@
 
 - [x] Record PADQ as proprietary software under an All Rights Reserved notice, with Francis Aliser as the copyright holder.
 - [x] Configure the repository Git author name as `Francis Aliser` so the final V1 tag does not use the placeholder `Your Name` identity.
-- [ ] Add `SECURITY.md` and enable GitHub private vulnerability reporting before directing users to report security issues.
-- [ ] Protect `main` with an active GitHub ruleset that blocks deletion and force pushes, requires a pull request and the `verify` status check, and preserves linear history. A solo-maintainer configuration must not require another person's approval.
+- [x] Add `SECURITY.md` and enable GitHub private vulnerability reporting before directing users to report security issues. Verified enabled through GitHub's repository API on 2026-08-17.
+- [x] Protect `main` with active GitHub ruleset `20927157`, which blocks deletion and force pushes, requires a pull request and the strict `verify` status check, and preserves linear history. Verified on 2026-08-17 with zero required approvals and no bypass actor.
 - [ ] Open the release pull request from `v1-public-rc` to `main`, confirm its quality gate passes, and merge only the approved candidate.
 
 **Verification:** GitHub's repository API reports private vulnerability reporting enabled and `main` protected; the merged commit matches the approved release tag and has a successful quality-gate run.
