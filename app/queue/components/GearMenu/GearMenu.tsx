@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import Link from 'next/link';
 import {
   Settings, RotateCcw, HelpCircle, Copy, Check,
-  QrCode, LayoutGrid, Undo2, KeyRound, LogIn,
+  QrCode, LayoutGrid, Undo2, KeyRound, LogIn, ShieldCheck,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -233,9 +234,18 @@ export function GearMenu({
               role="menuitem"
               onClick={() => { closeMenu(); onHardReset(); }}
             >
-              <RotateCcw size={14} /> Hard Reset
+              <RotateCcw size={14} /> End & Delete Event
             </button>
           )}
+
+          <Link
+            className="gear-menu-item"
+            role="menuitem"
+            href="/privacy"
+            onClick={closeMenu}
+          >
+            <ShieldCheck size={14} /> Privacy &amp; Data
+          </Link>
 
           <button
             className="gear-menu-item"

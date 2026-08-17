@@ -23,6 +23,7 @@ import {
   batchMatchResult,
   commitMultiCourtResult,
   clearHistory,
+  deleteSessionData,
   deleteLatestHistoryEntry,
   touchSession,
   subscribeToSession,
@@ -79,11 +80,35 @@ export interface SessionActions {
   startSession:      (data: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt'>) => Promise<StartSessionResult>;
   joinSession:       (sessionId: string) => Promise<boolean>;
   endSession:        () => void;
-  commitMatchResult: (patch: Partial<SessionDoc>, entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>) => Promise<CommitMatchResult | null>;
-  commitCourtResult: (command: CourtResultCommand) => Promise<CourtResultCommit | null>;
+  commitMatchResult: (patch: Partial<SessionDoc>, entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>) => Promise<MatchResultOutcome | null>;
+  commitCourtResult: (command: CourtResultCommand) => Promise<CourtResultOutcome | null>;
   undoLastMatch:     (patch: Partial<SessionDoc>) => Promise<void>;
   syncField:         (patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>) => Promise<void>;
   clearMatchHistory: () => Promise<void>;
+  deleteHostedSession: () => Promise<void>;
+}
+
+type CourtResultFailureReason = 'permission' | 'unavailable' | 'unknown';
+
+export type MatchResultOutcome = CommitMatchResult | {
+  status: 'stale';
+} | {
+  status: 'failed';
+  reason: CourtResultFailureReason;
+};
+
+export type CourtResultOutcome = CourtResultCommit | {
+  status: 'failed';
+  reason: CourtResultFailureReason;
+};
+
+function courtResultFailureReason(error: unknown): CourtResultFailureReason {
+  const code = typeof error === 'object' && error !== null && 'code' in error
+    ? String((error as { code?: unknown }).code)
+    : '';
+  if (code.includes('permission-denied') || code.includes('unauthenticated')) return 'permission';
+  if (code.includes('unavailable') || code.includes('deadline-exceeded') || code.includes('network')) return 'unavailable';
+  return 'unknown';
 }
 
 export type StartSessionResult =
@@ -366,9 +391,12 @@ export function useSession(): SessionState & SessionActions {
   const commitMatchResult = useCallback(async (
     patch: Partial<SessionDoc>,
     entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>,
-  ) => {
+  ): Promise<MatchResultOutcome | null> => {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return null;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return { status: 'failed', reason: 'unavailable' };
+    }
     const commandId = crypto.randomUUID();
     setState(prev => ({ ...prev, isSaving: true }));
     try {
@@ -382,16 +410,19 @@ export function useSession(): SessionState & SessionActions {
       return result;
     } catch (err) {
       console.error('[useSession] commitMatchResult error:', err);
-      if (err instanceof StaleSessionRevisionError) return null;
-      return null;
+      if (err instanceof StaleSessionRevisionError) return { status: 'stale' };
+      return { status: 'failed', reason: courtResultFailureReason(err) };
     } finally {
       setState(prev => ({ ...prev, isSaving: false }));
     }
   }, []);
 
-  const commitCourtResult = useCallback(async (command: CourtResultCommand) => {
+  const commitCourtResult = useCallback(async (command: CourtResultCommand): Promise<CourtResultOutcome | null> => {
     const sessionId = sessionIdRef.current;
     if (!sessionId) return null;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return { status: 'failed', reason: 'unavailable' };
+    }
 
     setState(prev => ({ ...prev, isSaving: true }));
     try {
@@ -410,7 +441,7 @@ export function useSession(): SessionState & SessionActions {
       return result;
     } catch (err) {
       console.error('[useSession] commitCourtResult error:', err);
-      return null;
+      return { status: 'failed', reason: courtResultFailureReason(err) };
     } finally {
       setState(prev => ({ ...prev, isSaving: false }));
     }
@@ -499,6 +530,25 @@ export function useSession(): SessionState & SessionActions {
     }
   }, [state.isHost]);
 
+  /** Permanently deletes the host-owned event and all of its match history. */
+  const deleteHostedSession = useCallback(async () => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !state.isHost) throw new Error('Only the host can delete this event.');
+    setState(prev => ({ ...prev, isSaving: true }));
+    try {
+      await deleteSessionData(sessionId);
+      unsubSessionRef.current?.();
+      unsubHistoryRef.current?.();
+      clearHostFromStorage();
+      sessionIdRef.current = null;
+      revisionRef.current = 0;
+      setState(INITIAL_STATE);
+    } catch (error) {
+      setState(prev => ({ ...prev, isSaving: false }));
+      throw error;
+    }
+  }, [state.isHost]);
+
   return {
     ...state,
     startSession,
@@ -509,5 +559,6 @@ export function useSession(): SessionState & SessionActions {
     undoLastMatch,
     syncField,
     clearMatchHistory,
+    deleteHostedSession,
   };
 }

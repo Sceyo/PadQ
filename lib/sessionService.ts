@@ -468,12 +468,8 @@ export async function deleteSession(
   sessionId: string,
 ): Promise<void> {
   // Firestore rules validate the current authenticated UID against hostUid.
-  try {
-    await ensureAuthenticated();
-    await deleteDoc(sessionRef(sessionId));
-  } catch {
-    // If already deleted, ignore
-  }
+  await ensureAuthenticated();
+  await deleteDoc(sessionRef(sessionId));
 }
 
 /**
@@ -491,11 +487,24 @@ export async function clearHistory(
     throw new Error('Not the host');
   }
   const histRef = collection(db, 'sessions', sessionId, 'history');
-  const snap = await getDocs(histRef);
-  if (snap.empty) return;
-  const batch = writeBatch(db);
-  snap.docs.forEach(d => batch.delete(d.ref));
-  await batch.commit();
+  // Stay comfortably below Firestore's 500-operation batch limit and repeat
+  // until the subcollection is empty. This also bounds browser memory for a
+  // long-running event with hundreds of match results.
+  const cleanupBatchSize = 400;
+  while (true) {
+    const snap = await getDocs(query(histRef, limit(cleanupBatchSize)));
+    if (snap.empty) return;
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    if (snap.size < cleanupBatchSize) return;
+  }
+}
+
+/** Permanently removes event history first, then its parent session document. */
+export async function deleteSessionData(sessionId: string): Promise<void> {
+  await clearHistory(sessionId);
+  await deleteSession(sessionId);
 }
 
 /**
@@ -550,16 +559,21 @@ export function subscribeToSession(
 export function subscribeToHistory(
   sessionId: string,
   onChange: (entries: MatchHistoryEntry[]) => void,
+  onError?: (error: Error) => void,
 ): Unsubscribe {
   const q = query(
     collection(db, 'sessions', sessionId, 'history'),
     orderBy('id', 'desc'),
     limit(100),
   );
-  return onSnapshot(q, (snap) => {
-    const entries = snap.docs.map(d => d.data() as MatchHistoryEntry);
-    onChange(entries);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const entries = snap.docs.map(d => d.data() as MatchHistoryEntry);
+      onChange(entries);
+    },
+    error => onError?.(error),
+  );
 }
 
 // ── localStorage helpers ──────────────────────────────────
@@ -759,5 +773,15 @@ export function saveSkilledBrackets(b: SkilledBracketsStore): void {
 }
 
 export function clearSkilledBrackets(): void {
+  localStorage.removeItem(LS_SKILLED_BRACKETS);
+}
+
+/**
+ * Removes player information PADQ intentionally keeps on this browser between
+ * events. It does not delete or leave an active Firestore session.
+ */
+export function clearSavedPlayerData(): void {
+  localStorage.removeItem(LS_ROSTER);
+  localStorage.removeItem(LS_CAREER_STATS);
   localStorage.removeItem(LS_SKILLED_BRACKETS);
 }

@@ -1,7 +1,12 @@
 {
   "name": "PadQ",
-  "version": "0.1.0",
+  "version": "1.0.0-rc.4",
   "private": true,
+  "license": "UNLICENSED",
+  "author": {
+    "name": "Francis Aliser",
+    "url": "https://github.com/Sceyo"
+  },
   "scripts": {
     "dev": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next dev",
     "build": "next build",
@@ -13,11 +18,9 @@
     "test:e2e": "firebase --config firebase.e2e.json emulators:exec --only auth,firestore \"playwright test\""
   },
   "dependencies": {
-    "brackets-manager": "^1.9.1",
-    "brackets-memory-db": "^1.0.5",
-    "firebase": "^12.11.0",
+    "firebase": "^12.17.1",
     "lucide-react": "^1.7.0",
-    "next": "16.2.1",
+    "next": "16.3.1",
     "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -32,7 +35,7 @@
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.27",
     "eslint": "^9",
-    "eslint-config-next": "16.2.1",
+    "eslint-config-next": "16.3.1",
     "firebase-tools": "^15.25.1",
     "postcss": "^8.5.8",
     "typescript": "^5",

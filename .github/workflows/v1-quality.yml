@@ -1,0 +1,68 @@
+name: V1 quality gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "v1-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v1-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_PUBLIC_FIREBASE_API_KEY: emulator-only-key
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: localhost
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: padq-ccb6a
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: padq-ccb6a.appspot.com
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+      NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:emulator"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          package-manager-cache: true
+
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Lint
+        run: npm run lint -- --quiet
+
+      - name: Unit and scenario tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Firestore security rules
+        run: npm run test:rules
+
+      - name: Browser and stress tests
+        run: npm run test:e2e
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high

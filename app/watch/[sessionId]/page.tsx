@@ -20,6 +20,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
@@ -187,7 +188,13 @@ function WatchPageContent() {
         // onError: connection dropped — show reconnecting state
         (err) => {
           console.error('[Watch] snapshot error', err);
-          setStatus('reconnecting');
+          const code = (err as { code?: string }).code ?? '';
+          if (code.includes('permission-denied')) {
+            setStatus('ended');
+            setSession(null);
+          } else {
+            setStatus('reconnecting');
+          }
         },
         // onDeleted: TTL fired or host hard-reset — session is gone
         () => {
@@ -196,6 +203,14 @@ function WatchPageContent() {
         },
       );
 
+    }).catch(error => {
+      if (cancelled) return;
+      console.error('[Watch] initial room read failed', error);
+      const code = (error as { code?: string }).code ?? '';
+      setStatus('error');
+      setErrorMsg(code.includes('permission-denied')
+        ? `Session "${sessionId}" is not live or is unavailable.`
+        : 'PADQ could not load this room. Check your connection and try again.');
     });
 
     return () => {
@@ -208,7 +223,11 @@ function WatchPageContent() {
   // live court status, so this avoids a second Firestore listener/read.
   useEffect(() => {
     if (!showHistory || !validSessionId || status !== 'live') return;
-    return subscribeToHistory(sessionId, setHistory);
+    return subscribeToHistory(sessionId, setHistory, error => {
+      console.error('[Watch] history listener error', error);
+      const code = (error as { code?: string }).code ?? '';
+      if (code.includes('permission-denied')) setShowHistory(false);
+    });
   }, [sessionId, showHistory, status, validSessionId]);
 
   // ── Match change detection — fires announcement ──────────
@@ -428,6 +447,7 @@ function WatchPageContent() {
         <button className="w-back-btn" onClick={() => router.push('/')}>
           <ArrowLeft size={14} /> Home
         </button>
+        <Link className="w-back-btn" href="/privacy">Privacy</Link>
 
         <div className="w-session-info">
           <span className={`w-dot ${status === 'live' ? 'w-dot--live' : 'w-dot--off'}`} />
