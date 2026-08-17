@@ -330,13 +330,15 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 
 ## Usage notice
 
-Copyright © 2026 PAD-Q. All rights reserved.
+Copyright © 2026 Francis Aliser. All rights reserved.
 
-This repository is publicly available for portfolio review, learning, and evaluation. No license is granted to copy, modify, redistribute, sublicense, or commercially use the source code or product assets without prior written permission from the owner.
+PADQ is proprietary software. This repository is publicly visible for review, evaluation, and portfolio purposes. No permission is granted to use, copy, modify, redistribute, sublicense, host, commercially exploit, or create derivative works from the source code or product assets without prior written permission from the copyright holder.
 
-This source-visible notice keeps ownership with the creator; it is not an open-source license.
+See the [proprietary software notice](LICENSE) for the complete terms. PADQ is not open-source software.
 
-## Contact
+## Author and contact
 
+- **Created and maintained by Francis Aliser**
+- [GitHub](https://github.com/Sceyo)
 - [LinkedIn](https://www.linkedin.com/in/francis-aliser/)
 - [Portfolio](https://aliser-portfolio.vercel.app/)

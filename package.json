@@ -2,6 +2,11 @@
   "name": "PadQ",
   "version": "1.0.0-rc.3",
   "private": true,
+  "license": "UNLICENSED",
+  "author": {
+    "name": "Francis Aliser",
+    "url": "https://github.com/Sceyo"
+  },
   "scripts": {
     "dev": "node --max-old-space-size=4096 ./node_modules/next/dist/bin/next dev",
     "build": "next build",

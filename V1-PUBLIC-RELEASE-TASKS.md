@@ -23,8 +23,8 @@
 
 ## 1.5. Public GitHub release governance
 
-- [ ] Choose and record the source-code license and copyright holder; do not imply open-source permission without an explicit license.
-- [ ] Configure the repository Git author name so the final V1 tag does not use the placeholder `Your Name` identity.
+- [x] Record PADQ as proprietary software under an All Rights Reserved notice, with Francis Aliser as the copyright holder.
+- [x] Configure the repository Git author name as `Francis Aliser` so the final V1 tag does not use the placeholder `Your Name` identity.
 - [ ] Add `SECURITY.md` and enable GitHub private vulnerability reporting before directing users to report security issues.
 - [ ] Protect `main` with an active GitHub ruleset that blocks deletion and force pushes, requires a pull request and the `verify` status check, and preserves linear history. A solo-maintainer configuration must not require another person's approval.
 - [ ] Open the release pull request from `v1-public-rc` to `main`, confirm its quality gate passes, and merge only the approved candidate.
