@@ -10,14 +10,26 @@
 
 ## Project status
 
-PAD-Q is an independently developed product in **active development**. The `main` branch is the focused V1 launch build; the complete experimental feature set is preserved on `all-features-archive`.
+PAD-Q is an independently developed product in **active development**. The `main` branch contains the production V1 release candidate; the complete experimental feature set is preserved on `all-features-archive`.
 
-- Deployed on Vercel
-- Backed by Firebase Cloud Firestore
-- 164 application tests, 17 Firestore emulator rules tests, and browser end-to-end coverage passing
+- Production candidate: **`v1.0.0-rc.6`**
+- Deployed on Vercel with Firebase Cloud Firestore and Firebase App Check enforcement
+- 173 application tests, 20 Firestore emulator tests, and 16 browser/stress scenarios passing
+- Protected `main` branch with a required GitHub Actions quality gate
 - Designed for browser-based host and spectator experiences
 
-The project is a V1 release candidate. Security and capacity hardening are complete; clean-checkout verification and the controlled production launch remain before the official V1 release. Current limitations are documented below.
+RC6 is deployed and has passed the clean CI, production build, security-rule,
+30-viewer, and three-court concurrency gates. The only remaining release gate is
+a supervised real pickleball event. PAD-Q must remain labeled as a release
+candidate until that event completes without a production-blocking incident.
+
+### V1 operating contract
+
+- Up to **30 players**, **3 courts**, and **30 simultaneous Live Watch viewers**
+- One host device and one anonymous session owner
+- Temporary event rooms rather than permanent venue or player accounts
+- Firebase Spark and Vercel Hobby operation with a **$0 / ₱0 infrastructure target**
+- Online-first operation with safe manual retry after a failed result submission
 
 ## The problem
 
@@ -46,10 +58,11 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 
 - Default singles and doubles queue rotation
 - Shared multi-court assignment for one to three courts
-- Shared FIFO multi-court rotation with optional permanent partner pairs
+- Shared multi-court rotation that avoids immediate unlocked-partner repeats, with optional permanent partner pairs
 - Optional point-by-point live scoring for single-court sessions; winner-only results for multi-court sessions
 - Player sit-out, return, substitution, and “sit next” controls
 - Single-step undo for supported match flows
+- Score correction, duplicate-submit protection, failed-save rollback, and refresh persistence
 - Saved club roster for faster future setup
 
 ### History and analytics
@@ -142,13 +155,12 @@ There is no separate REST or GraphQL backend in this repository. The browser use
 
 | Area | Technology | Use in PAD-Q |
 |---|---|---|
-| Framework | Next.js 16.2.1, App Router | Routing and application structure |
+| Framework | Next.js 16.3.1, App Router | Routing and application structure |
 | UI | React 19.2.4 | Interactive host and spectator experiences |
 | Language | TypeScript 5 | Typed application and matchmaking logic |
-| Data | Firebase 12.11.0 / Cloud Firestore | Persistence and real-time synchronization |
+| Data | Firebase 12.17.1 / Cloud Firestore | Persistence and real-time synchronization |
 | Testing | Vitest 4.1.9 | Unit and simulation tests |
 | Styling | Custom CSS, CSS Modules, Tailwind CSS 4 | Responsive interface and theme styling |
-| Tournament logic | `brackets-manager`, `brackets-memory-db` | In-memory bracket management |
 | Supporting UI | Lucide React, `qrcode.react` | Icons and session QR codes |
 | Deployment | Vercel | Hosted Next.js application |
 
@@ -175,11 +187,11 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 
 ## Testing and quality assurance
 
-The current automated suite includes:
+The RC6 automated suite includes:
 
-- 164 passing application unit, simulation, and component tests;
-- 17 passing Firestore Emulator security and concurrency tests; and
-- browser end-to-end scenarios for live court status, free-tier capacity, and the sealed V1 scope.
+- 173 passing application unit, simulation, scenario, and component tests;
+- 20 passing Firestore Emulator security and concurrency tests; and
+- 16 passing browser end-to-end and stress scenarios.
 
 The suite focuses on deterministic domain logic and verifies:
 
@@ -187,11 +199,21 @@ The suite focuses on deterministic domain logic and verifies:
 - doubles phase transitions, partner selection, pool limits, and serialization;
 - skill-priority selection, rest cycles, starvation prevention, and idle-court filling;
 - player statistics and matchmaking suggestions; and
-- club-night simulations with as many as 50 players over repeated rotation cycles.
+- 25- and 30-player rush scenarios, three-court concurrent completion, queue
+  removal, score recovery, reconnects, and 30 simultaneous Live Watch viewers.
 
 The simulations check important invariants, including preventing a player from occupying two courts, keeping every player accounted for, bounding player-pool sizes, and ensuring waiting players eventually receive matches.
 
-The repository includes Firestore Emulator rule tests, focused React component tests for Live Court Status, and browser end-to-end tests against local Authentication and Firestore emulators. It does not yet include a CI quality gate. ESLint has no errors, with existing warnings tracked as development limitations.
+The repository includes Firestore Emulator rule tests, focused React component
+tests for Live Court Status, and browser end-to-end tests against local
+Authentication and Firestore emulators. GitHub Actions runs lint, the unit and
+scenario suite, the production build, Firestore rules tests, browser/stress
+tests, and a production dependency audit. This strict `verify` check is required
+before protected `main` can accept a pull request. ESLint has no errors; existing
+warnings remain tracked as non-blocking development limitations.
+
+The detailed persona assessment is recorded in
+[`V1-PERSONA-ACCEPTANCE-MATRIX.md`](V1-PERSONA-ACCEPTANCE-MATRIX.md).
 
 ## Local setup
 
@@ -284,18 +306,25 @@ running, stop and restart it. The local Emulator UI is available at
 | `npm run start` | Serve the production build |
 | `npm run lint` | Run ESLint |
 | `npm test` | Run the Vitest suite once |
+| `npm run test:rules` | Run Firestore security and concurrency tests in the emulator |
+| `npm run test:e2e` | Run the full browser and stress suite against local emulators |
 | `npx tsc --noEmit --incremental false` | Run a standalone TypeScript check without emitting files |
 
 ## Deployment
 
-The authoritative go-live sequence and acceptance criteria are maintained in
-[`V1-RELEASE-GATES.md`](V1-RELEASE-GATES.md). Gate 1.5 (selective spectator
-viewing of the current players on Courts 1–3) and Gate 2 (free-tier capacity and
-real-life reliability) are blocking requirements for the official V1 release.
-The planned scope after launch, including V1.1 multi-host sessions, is maintained
-in [`PADQ-RELEASE-ROADMAP.md`](PADQ-RELEASE-ROADMAP.md).
+The authoritative public-release register is
+[`V1-PUBLIC-RELEASE-TASKS.md`](V1-PUBLIC-RELEASE-TASKS.md). RC6 has completed
+the automated, security, capacity, clean-CI, merge, tag, and production
+deployment work. The final go/no-go activity is the supervised event described
+in [`V1-SUPERVISED-EVENT-RUNBOOK.md`](V1-SUPERVISED-EVENT-RUNBOOK.md). The
+planned scope after launch, including multi-host sessions, is maintained in
+[`PADQ-RELEASE-ROADMAP.md`](PADQ-RELEASE-ROADMAP.md).
 
-The live application is hosted on Vercel at [pad-q.vercel.app](https://pad-q.vercel.app). A deployment requires the same six Firebase environment variables listed above to be configured in the hosting environment.
+The live application is hosted on Vercel at [pad-q.vercel.app](https://pad-q.vercel.app).
+A production deployment requires the six Firebase web configuration variables
+plus `NEXT_PUBLIC_FIREBASE_APP_CHECK_ENABLED` and
+`NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY`. Preview and local environments should
+leave App Check disabled unless their hostnames are separately registered.
 
 Firestore is managed separately:
 
@@ -307,26 +336,29 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 
 ## Known limitations
 
-- **Anonymous host identity:** ownership persists in the same browser, but safe cross-device host recovery requires account linking and is sealed for V1.
+- **Single host:** V1 has one anonymous session owner. Multi-host management, delegated referees, and safe cross-device ownership transfer are deferred.
 - **No guaranteed 30-minute expiry:** activity timestamps exist, but an appropriate expiration timestamp and confirmed deployed TTL policy do not.
 - **Browser-local data:** saved rosters, skill assignments, court groups, recovery data, and career statistics are device-specific.
-- **Online-first behavior:** explicit offline persistence and conflict recovery are not implemented.
+- **Online-first behavior:** a failed authoritative result safely restores the previous state and can be retried manually, but V1 has no durable automatic offline replay queue.
 - **Multi-court scoring:** V1 shares current players and completed results, but intentionally does not synchronize point-by-point scores for multiple courts.
-- **Partial test boundary:** automated browser coverage includes core host, viewer, capacity, reconnect, and scope-seal journeys, but mobile devices, offline recovery, and every secondary control still require manual release-candidate checks.
+- **Viewer and court ceiling:** the tested free-tier contract is 30 viewers and 3 courts. PAD-Q does not promise 300-viewer events or four or more courts in V1.
+- **No ETA or competitive rating:** Live Watch shows current courts and next players, but not an estimated wait. Bronze–Diamond tiers summarize session win rate and are not Elo, DUPR, or opponent-adjusted ratings.
+- **No permanent venue or player accounts:** V1 rooms are temporary, and PAD-Q does not claim certified GDPR compliance or provide cloud player-profile requests.
+- **Partial test boundary:** automated browser coverage includes core host, viewer, capacity, reconnect, score recovery, and scope-seal journeys; the supervised real event remains the final human-use gate.
 - **Open quality findings:** the test suite and build pass; linting still reports warnings.
 - **Large controllers:** the main host and spectator pages still contain substantial orchestration logic and would benefit from further decomposition.
 
 ## Planned improvements
 
-1. Add optional permanent account linking for safe cross-device host recovery.
-2. Separate public spectator data into a dedicated projection if stronger viewer privacy is required.
-3. Implement an explicit `expireAt` strategy and enable a verified Firestore TTL policy.
-4. Expand browser end-to-end coverage for single-court scoring, error recovery, and secondary host controls.
-5. Add continuous integration for tests, TypeScript, linting, and production builds.
-6. Improve offline behavior and visible connection recovery.
-7. Complete skilled-mode undo behavior and further separate page orchestration into focused controllers.
-8. Add CSV history export, roster import, and configurable singles streak limits.
-9. Add a short product demonstration video.
+1. Add secure multi-host roles, delegated court scoring, and cross-device ownership recovery.
+2. Add a compact spectator projection and high-fan-out realtime delivery for events beyond 30 viewers.
+3. Implement a durable offline result outbox with automatic replay and clearer synchronization status.
+4. Implement an explicit `expireAt` strategy and enable a verified Firestore TTL policy.
+5. Add persistent venues and optional player accounts with appropriate privacy and deletion controls.
+6. Add measured wait estimates only after PAD-Q can collect reliable match-duration data.
+7. Add opponent-aware competitive ratings and tournament rules as separately validated modes.
+8. Add CSV history export, roster import, stat-card sharing, and configurable rotation policies.
+9. Further decompose the host and spectator controllers and resolve remaining lint warnings.
 
 ## Usage notice
 
