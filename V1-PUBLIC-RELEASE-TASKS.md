@@ -27,7 +27,7 @@
 - [x] Configure the repository Git author name as `Francis Aliser` so the final V1 tag does not use the placeholder `Your Name` identity.
 - [x] Add `SECURITY.md` and enable GitHub private vulnerability reporting before directing users to report security issues. Verified enabled through GitHub's repository API on 2026-08-17.
 - [x] Protect `main` with active GitHub ruleset `20927157`, which blocks deletion and force pushes, requires a pull request and the strict `verify` status check, and preserves linear history. Verified on 2026-08-17 with zero required approvals and no bypass actor.
-- [ ] Open the release pull request from `v1-public-rc` to `main`, confirm its quality gate passes, and merge only the approved candidate.
+- [x] Open the release pull request from `v1-public-rc` to `main`, confirm its quality gate passes, and merge only the approved candidate. PR [#1](https://github.com/Sceyo/PadQ/pull/1) merged the public candidate; PRs [#2](https://github.com/Sceyo/PadQ/pull/2), [#3](https://github.com/Sceyo/PadQ/pull/3), and [#4](https://github.com/Sceyo/PadQ/pull/4) carried the reviewed identity, partner-rotation, and queue-removal corrections into RC6.
 
 **Verification:** GitHub's repository API reports private vulnerability reporting enabled and `main` protected; the merged commit matches the approved release tag and has a successful quality-gate run.
 
@@ -74,13 +74,13 @@
 
 ## 6. Firebase App Check and free-tier abuse controls
 
-- [ ] Follow the no-billing rollout recorded in `FIREBASE-APP-CHECK-ROLLOUT.md`.
+- [x] Follow the no-billing rollout recorded in `FIREBASE-APP-CHECK-ROLLOUT.md`.
 - [x] Register every production hostname with Firebase App Check using reCAPTCHA Enterprise.
 - [x] Add the App Check site key and enable flag to Vercel production configuration.
-- [ ] Deploy in monitoring mode first and confirm valid host/viewer requests.
-- [ ] Enforce App Check for Firestore only after monitoring shows legitimate traffic is accepted.
+- [x] Deploy in monitoring mode first and confirm valid host/viewer requests.
+- [x] Enforce App Check for Firestore only after monitoring shows legitimate traffic is accepted.
 - [x] Reconfirm Firebase Spark and Vercel Hobby status and document quota response steps.
-- [ ] Confirm no billing account, paid Vercel plan, or paid marketplace/add-on has been attached before deployment.
+- [x] Confirm no billing account, paid Vercel plan, or paid marketplace/add-on has been attached before deployment. Firebase remains on Spark with billing disabled, and Vercel remains on Hobby.
 
 **Verification:** Firebase App Check metrics show verified production traffic, invalid test traffic is rejected after enforcement, and normal host/viewer flows still pass.
 
@@ -89,9 +89,9 @@
 - [x] Run lint, unit/scenario tests, Firestore rules tests, full browser stress tests, production build, and production dependency audit.
 - [x] Verify 30 players, 3 courts, locked partners, score correction, 30 viewers, reconnect, history, and deletion.
 - [x] Repeat the complete quality gate in GitHub Actions on a clean Ubuntu/Node 22 runner.
-- [ ] Create and push a clean `v1.0.0-rc.6` tag from the verified post-merge commit. RC6 includes the multi-court partner-rotation correction and the authoritative queue-removal correction found during the 2026-08-20 supervised preflight; RC4 and RC5 must not be used for the final event.
-- [ ] Deploy exactly that commit to Vercel and deploy exactly its Firestore rules.
-- [ ] Recheck live security headers, App Check, mobile behavior, and Firebase/Vercel usage.
+- [x] Create and push a clean `v1.0.0-rc.6` tag from verified post-merge application commit `1f0eb6af9cdc3e1f437b7848c6988a5130562a37`. RC6 includes the multi-court partner-rotation correction and the authoritative queue-removal correction found during the 2026-08-20 supervised preflight; RC4 and RC5 must not be used for the final event.
+- [x] Deploy the exact RC6 application commit to Vercel and confirm its Firestore rules are the deployed rules. Post-tag `main` documentation commits begin at `d71b7844a9310074313a4ff4704a1f637e3d0a57`; they change only Markdown records, so their automatic Vercel deployments are runtime-equivalent to RC6.
+- [x] Recheck live security headers, App Check, mobile behavior, and Firebase/Vercel usage.
 
 **Verification:** all automated checks pass against the exact tagged code and the production smoke test matches it.
 
@@ -120,7 +120,7 @@ This task intentionally remains last because automated and console verification 
 - Full browser/stress suite against the recorded candidate: 15/15 passed in 1.7 minutes, including 30 simultaneous viewer tabs.
 - Remote clean-run verification: GitHub Actions **V1 quality gate** run [#1](https://github.com/Sceyo/PadQ/actions/runs/31889805963) passed every stage for commit `bda088dce0e1e709d97b85ba20c792a78b15e36b` on Ubuntu/Node 22.
 
-### 2026-08-15 — current production gap confirmation
+### 2026-08-15 — historical production gap confirmation (resolved by RC4–RC6)
 
 - `https://pad-q.vercel.app/` responded successfully but did not include the candidate's CSP, `X-Frame-Options`, `X-Content-Type-Options`, or `Referrer-Policy` headers.
 - `https://pad-q.vercel.app/privacy` returned 404 and the homepage did not expose the candidate's Privacy link.
@@ -160,3 +160,36 @@ This task intentionally remains last because automated and console verification 
 - The same acceptance pass strengthens the Firestore concurrency case from two
   simultaneous court completions to all three supported courts with 30 viewers,
   three revisions, three history entries, and no double-booked player.
+
+### 2026-08-20 — RC6 pre-event production verification
+
+- PR [#4](https://github.com/Sceyo/PadQ/pull/4) merged through protected
+  `main` after the required `verify` workflow passed. Annotated tag
+  `v1.0.0-rc.6` resolves to application commit
+  `1f0eb6af9cdc3e1f437b7848c6988a5130562a37`.
+- RC6 passed 173 unit/scenario/component tests, 20 Firestore Emulator tests,
+  16 browser/stress scenarios, a production build, lint with zero errors, and
+  the production dependency audit with zero reported vulnerabilities.
+- The exact RC6 commit reached Vercel production successfully. The production
+  deployment recorded during this audit used later documentation commit
+  `d71b7844a9310074313a4ff4704a1f637e3d0a57`; its only change from RC6 was
+  `README.md`. Any later pre-event deployment must repeat the documented diff
+  check and contain Markdown changes only, keeping application code,
+  configuration, dependencies, and Firestore rules identical to RC6.
+- The RC6 Firestore rules are unchanged from the previously deployed hardened
+  rules. The Firebase deploy reported the latest rules already up to date and
+  released them successfully for project `padq-ccb6a`.
+- Firebase App Check monitoring showed legitimate production traffic accepted
+  before Cloud Firestore enforcement was enabled. After propagation, the
+  recorded Cloud Firestore metrics showed 83 verified requests allowed and 5
+  invalid/unknown requests denied. Replay protection remains off for V1.
+- Live smoke checks returned HTTP 200 for `/`, `/privacy`, and
+  `/queue?mode=doubles`. Each response included Content Security Policy,
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, and Permissions Policy.
+- Firebase remains on Spark with billing disabled, and Vercel remains on Hobby.
+  The zero-spend boundary is unchanged.
+- PR [#5](https://github.com/Sceyo/PadQ/pull/5) refreshed the public README and
+  passed the same protected quality gate. No runtime file changed after RC6.
+- **Sections 1–7 are complete. The supervised real pickleball event in section
+  8 is the only remaining V1 release gate.**
