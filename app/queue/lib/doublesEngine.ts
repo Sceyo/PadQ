@@ -567,9 +567,17 @@ export function rotateMultiCourtDoubles(
   lockedPairs: LockedPartnerPair[],
 ): PartnerAwareSelection {
   const finishedSet = new Set(finishedPlayers);
+  // Court slots store Team A followed by Team B. Re-appending that order
+  // directly makes the old teammates adjacent again, so FIFO selection can
+  // immediately rebuild one of the same teams. Interleave the two teams before
+  // they return to the bench. selectPartnerAwareMatch will still reconstruct
+  // any explicitly locked pair as an indivisible team.
+  const rotatedFinishers = finishedPlayers.length === 4
+    ? [finishedPlayers[0], finishedPlayers[2], finishedPlayers[1], finishedPlayers[3]]
+    : [...finishedPlayers];
   const ranked = [
     ...waitingPlayers.filter(player => !finishedSet.has(player)),
-    ...finishedPlayers,
+    ...rotatedFinishers,
   ];
   return selectPartnerAwareMatch(ranked, lockedPairs);
 }

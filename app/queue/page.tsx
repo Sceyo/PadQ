@@ -1661,7 +1661,7 @@ function QueueSystemContent() {
 
             {activeQueueMode === 'default' && gameMode === 'doubles' && (
               <p className="mode-description">
-                <Trophy size={11} className="mode-desc-icon" /> Advanced Paddle Queue · Winners &amp; Losers cycles · Partners always swap
+                <Trophy size={11} className="mode-desc-icon" /> Advanced Paddle Queue · Winners &amp; Losers cycles · Partners rotate unless locked
               </p>
             )}
             {activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
