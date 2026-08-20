@@ -428,7 +428,7 @@ suite('Firestore V1 production rules', () => {
     expect((await getDocs(collection(host, 'sessions', 'KARTCE', 'history'))).size).toBe(1);
   });
 
-  it('delivers two concurrent court completions to 30 viewers without double-booking', async () => {
+  it('delivers three concurrent court completions to 30 viewers without double-booking', async () => {
     const players = Array.from({ length: 30 }, (_, index) => `P${index + 1}`);
     const courtSlots = Array.from({ length: 3 }, (_, index) => ({
       id: `court-${index}`,
@@ -514,19 +514,20 @@ suite('Firestore V1 production rules', () => {
       await Promise.all([
         commit('33333333-3333-4333-8333-333333333333', 'court-0', courtSlots[0].onCourt, 'A', 1),
         commit('44444444-4444-4444-8444-444444444444', 'court-1', courtSlots[1].onCourt, 'B', 2),
+        commit('55555555-5555-4555-8555-555555555555', 'court-2', courtSlots[2].onCourt, 'A', 3),
       ]);
 
       const deadline = Date.now() + 10_000;
-      while (revisions.some(revision => revision < 2) && Date.now() < deadline) {
+      while (revisions.some(revision => revision < 3) && Date.now() < deadline) {
         await new Promise(resolveWait => setTimeout(resolveWait, 20));
       }
-      expect(revisions.every(revision => revision === 2)).toBe(true);
+      expect(revisions.every(revision => revision === 3)).toBe(true);
 
       const finalSession = (await getDoc(ref)).data()!;
       const assigned = [...finalSession.courtSlots.flatMap((court: { onCourt: string[] }) => court.onCourt), ...finalSession.queue];
       expect(assigned).toHaveLength(30);
       expect(new Set(assigned).size).toBe(30);
-      expect((await getDocs(collection(host, 'sessions', 'M3LAD7', 'history'))).size).toBe(2);
+      expect((await getDocs(collection(host, 'sessions', 'M3LAD7', 'history'))).size).toBe(3);
     } finally {
       viewerUnsubscribes.forEach(unsubscribe => unsubscribe());
     }
