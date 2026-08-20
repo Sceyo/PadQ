@@ -89,7 +89,7 @@
 - [x] Run lint, unit/scenario tests, Firestore rules tests, full browser stress tests, production build, and production dependency audit.
 - [x] Verify 30 players, 3 courts, locked partners, score correction, 30 viewers, reconnect, history, and deletion.
 - [x] Repeat the complete quality gate in GitHub Actions on a clean Ubuntu/Node 22 runner.
-- [ ] Create and push a clean `v1.0.0-rc.4` tag from the verified post-merge commit. The earlier RC3 tag predates the final public-governance changes and must not be deployed as the final candidate.
+- [ ] Create and push a clean `v1.0.0-rc.5` tag from the verified post-merge commit. RC5 includes the multi-court partner-rotation correction found during the 2026-08-20 supervised preflight; RC4 must not be used for the final event.
 - [ ] Deploy exactly that commit to Vercel and deploy exactly its Firestore rules.
 - [ ] Recheck live security headers, App Check, mobile behavior, and Firebase/Vercel usage.
 
@@ -133,3 +133,12 @@ This task intentionally remains last because automated and console verification 
 - The accidental Vercel redeployment used old `main` commit `eb6235183133eafff5b0c400a6a07110547cb9b0`, which is the direct ancestor of the candidate. It did not deploy the release candidate, privacy page, or security headers and requires no rollback.
 - Firestore enforcement remains intentionally off until the tagged candidate produces verified production traffic.
 - Annotated tag `v1.0.0-rc.3` was pushed and resolves to commit `e112c8612d471e55d633d93d019d4a8e39aae00c`.
+
+### 2026-08-20 — supervised preflight partner-rotation incident
+
+- A 10-player, two-court doubles run showed ordinary teams such as `9 & 10`, `5 & 6`, and `7 & 8` remaining together in consecutive assignments even though they were not locked pairs.
+- Root cause: the multi-court FIFO rotation appended each finished court as Team A followed by Team B. The next four-player selection therefore rebuilt one of the previous adjacent teams; the winning side was recorded in history but did not affect this ordering.
+- Fix candidate `1.0.0-rc.5` interleaves the two finished teams before returning them to the shared queue. Explicitly locked pairs are reconstructed and intentionally remain together.
+- The host label and user guide now say **Partners rotate unless locked** so fixed-pair behavior is not mistaken for a rotation failure.
+- Regression coverage runs 10 players across 2 courts for 40 results and rejects any immediately repeated unlocked partner. The complete local gate passed with 172 unit/scenario tests, 20 Firestore rules tests, 15 browser/stress scenarios, lint, and a production build.
+- The supervised event remains incomplete and must restart in a new room after RC5 reaches production.

@@ -106,6 +106,36 @@ describe('partner-aware multi-court doubles', () => {
     expect(seen).toEqual(new Set(players));
   });
 
+  it('splits ordinary teammates before their next match in a 10-player, two-court rotation', () => {
+    const players = Array.from({ length: 10 }, (_, index) => String(index + 1));
+    const seeded = seedMultiCourtDoubles(players, 2, []);
+    const courts = seeded.courts.map(onCourt => [...onCourt]);
+    let waiting = [...seeded.waiting];
+    const lastPartner = new Map<string, string>();
+
+    const rememberTeams = (onCourt: string[]) => {
+      for (const [first, second] of [[onCourt[0], onCourt[1]], [onCourt[2], onCourt[3]]]) {
+        lastPartner.set(first, second);
+        lastPartner.set(second, first);
+      }
+    };
+
+    for (let result = 0; result < 40; result += 1) {
+      const courtIndex = result % 2;
+      rememberTeams(courts[courtIndex]);
+
+      const next = rotateMultiCourtDoubles(waiting, courts[courtIndex], []);
+      for (const [first, second] of [[next.onCourt[0], next.onCourt[1]], [next.onCourt[2], next.onCourt[3]]]) {
+        expect(lastPartner.get(first)).not.toBe(second);
+        expect(lastPartner.get(second)).not.toBe(first);
+      }
+
+      courts[courtIndex] = next.onCourt;
+      waiting = next.waiting;
+      expectValidPartition(players, courts, waiting, []);
+    }
+  });
+
   it('serializes different court results from the latest shared queue and rejects a duplicate tap', () => {
     const players = Array.from({ length: 30 }, (_, i) => `P${i + 1}`);
     const seeded = seedMultiCourtDoubles(players, 3, []);
