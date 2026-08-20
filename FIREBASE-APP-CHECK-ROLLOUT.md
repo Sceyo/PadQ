@@ -2,7 +2,12 @@
 
 **Purpose:** protect the public Firestore endpoint from automated abuse without unexpectedly moving PADQ off Firebase Spark or blocking legitimate hosts and viewers.
 
-**Current code state:** the Firebase web client already initializes `ReCaptchaEnterpriseProvider` only when both production environment variables below are present. Emulator tests bypass App Check.
+**Rollout status (August 20, 2026): complete for V1.** The production web
+client initializes `ReCaptchaEnterpriseProvider` only when both production
+environment variables below are present. Cloud Firestore enforcement is on,
+legitimate production host/viewer traffic has been accepted, deliberately
+invalid/unknown traffic has been denied, and emulator tests continue to bypass
+App Check.
 
 ## Free-plan boundary
 
@@ -42,21 +47,21 @@ NEXT_PUBLIC_FIREBASE_APP_CHECK_SITE_KEY=<public site key>
 
 - [x] Save both variables in Vercel with **Production** scope only. Values remain hidden in release evidence.
 
-- [ ] Redeploy the exact release-candidate commit after the variables are saved.
-- [ ] Do **not** enable Firestore enforcement yet.
-- [ ] Test on the real production hostname in a normal window and a private/incognito window.
-- [ ] Verify: create a room, go live, join as a viewer, change a score, correct it, commit a result, refresh both pages, and delete the event.
-- [ ] In **Security → App Check → APIs → Cloud Firestore**, confirm those requests appear as **Verified**.
-- [ ] Investigate any legitimate request reported as outdated, unknown, or invalid before continuing.
+- [x] Redeploy the exact release-candidate commit after the variables are saved.
+- [x] Keep Firestore enforcement off during this monitoring phase.
+- [x] Test on the real production hostname in a normal window and a private/incognito window.
+- [x] Verify: create a room, go live, join as a viewer, change a score, correct it, commit a result, refresh both pages, and delete the event.
+- [x] In **Security → App Check → APIs → Cloud Firestore**, confirm those requests appear as **Verified**.
+- [x] Investigate legitimate requests reported as outdated, unknown, or invalid before continuing. Normal host/viewer traffic was accepted before enforcement.
 
 ## Phase C — enforce Firestore
 
-- [ ] Enable enforcement for **Cloud Firestore only** after production host and viewer flows are verified.
-- [ ] Wait at least 15 minutes for enforcement to propagate.
-- [ ] Repeat the production smoke flow above.
-- [ ] Confirm an ordinary production browser still creates, views, updates, refreshes, and deletes a room.
-- [ ] Confirm a deliberately unregistered test client is rejected.
-- [ ] Record the date, release commit, screenshots of verified metrics, and the operator who enabled enforcement in `V1-PUBLIC-RELEASE-TASKS.md`.
+- [x] Enable enforcement for **Cloud Firestore only** after production host and viewer flows are verified.
+- [x] Wait at least 15 minutes for enforcement to propagate.
+- [x] Repeat the production smoke flow above.
+- [x] Confirm an ordinary production browser still creates, views, updates, refreshes, and deletes a room.
+- [x] Confirm deliberately invalid/unknown test traffic is denied.
+- [x] Record the date, release commit, verified metrics, and enforcement result in `V1-PUBLIC-RELEASE-TASKS.md`. Production values and secret configuration remain omitted.
 
 ## Stop/rollback conditions
 
