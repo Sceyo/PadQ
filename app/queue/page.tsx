@@ -339,17 +339,10 @@ function QueueSystemContent() {
   const waitingPlayers = useMemo(() => {
     if (courtSlots.length === 0) return [];
     const onCourtSet = new Set(courtSlots.flatMap(c => c.onCourt));
-    const ordered = queue.filter(
+    return queue.filter(
       p => !onCourtSet.has(p) && !activeSittingOut.includes(p)
     );
-    const orderedSet = new Set(ordered);
-    // During the brief optimistic-start window, include any eligible player
-    // not yet present in the synchronized queue without disturbing queue order.
-    const missing = players.filter(
-      p => !onCourtSet.has(p) && !activeSittingOut.includes(p) && !orderedSet.has(p)
-    );
-    return [...ordered, ...missing];
-  }, [courtSlots, queue, players, activeSittingOut]);
+  }, [courtSlots, queue, activeSittingOut]);
 
   const handleGoLive = (live: boolean) => {
     setIsLiveLocal(live);

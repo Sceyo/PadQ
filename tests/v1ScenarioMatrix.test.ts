@@ -34,6 +34,24 @@ function assertLockedPairs(courts: string[][], waiting: string[], pairs: LockedP
 }
 
 describe('V1 court, player, and viewer scenario matrix', () => {
+  it('preserves rush check-in order for 25 players and a middle departure', () => {
+    const roster = players(25, 'RUSH');
+    const seeded = seedMultiCourtDoubles(roster, 3, []);
+
+    // The first 12 registrations fill Courts 1-3 in order. Everyone else
+    // remains in the shared waiting queue in exact registration order.
+    expect(seeded.courts.flat()).toEqual(roster.slice(0, 12));
+    expect(seeded.waiting).toEqual(roster.slice(12));
+
+    // Removing a departing player must not reorder anybody around them.
+    const departingPlayer = roster[18];
+    const remaining = seeded.waiting.filter(player => player !== departingPlayer);
+    expect(remaining).toEqual([
+      ...roster.slice(12, 18),
+      ...roster.slice(19),
+    ]);
+  });
+
   it('keeps doubles partitions and locked partners valid across 1-3 courts and 5-30 players', () => {
     for (const courtCount of [1, 2, 3]) {
       const minimum = courtCount === 1 ? 5 : courtCount * 4;

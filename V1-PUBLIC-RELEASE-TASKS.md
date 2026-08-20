@@ -89,7 +89,7 @@
 - [x] Run lint, unit/scenario tests, Firestore rules tests, full browser stress tests, production build, and production dependency audit.
 - [x] Verify 30 players, 3 courts, locked partners, score correction, 30 viewers, reconnect, history, and deletion.
 - [x] Repeat the complete quality gate in GitHub Actions on a clean Ubuntu/Node 22 runner.
-- [ ] Create and push a clean `v1.0.0-rc.5` tag from the verified post-merge commit. RC5 includes the multi-court partner-rotation correction found during the 2026-08-20 supervised preflight; RC4 must not be used for the final event.
+- [ ] Create and push a clean `v1.0.0-rc.6` tag from the verified post-merge commit. RC6 includes the multi-court partner-rotation correction and the authoritative queue-removal correction found during the 2026-08-20 supervised preflight; RC4 and RC5 must not be used for the final event.
 - [ ] Deploy exactly that commit to Vercel and deploy exactly its Firestore rules.
 - [ ] Recheck live security headers, App Check, mobile behavior, and Firebase/Vercel usage.
 
@@ -141,4 +141,22 @@ This task intentionally remains last because automated and console verification 
 - Fix candidate `1.0.0-rc.5` interleaves the two finished teams before returning them to the shared queue. Explicitly locked pairs are reconstructed and intentionally remain together.
 - The host label and user guide now say **Partners rotate unless locked** so fixed-pair behavior is not mistaken for a rotation failure.
 - Regression coverage runs 10 players across 2 courts for 40 results and rejects any immediately repeated unlocked partner. The complete local gate passed with 172 unit/scenario tests, 20 Firestore rules tests, 15 browser/stress scenarios, lint, and a production build.
-- The supervised event remains incomplete and must restart in a new room after RC5 reaches production.
+- The supervised event remains incomplete and must restart in a new room after RC6 reaches production.
+
+### 2026-08-20 — persona acceptance preflight queue-removal incident
+
+- A 25-player, three-court browser scenario showed that **Manage Queue** appeared
+  to remove a middle waiting player but then displayed that player at the end of
+  the waiting list.
+- Root cause: the synchronized queue removed the player correctly, but a host UI
+  fallback treated every roster player missing from the queue as an optimistic
+  startup omission and appended them to the displayed waiting list.
+- RC6 makes the synchronized queue authoritative. A player removed from the
+  queue remains available in the event roster but is no longer waiting or
+  eligible for automatic court assignment.
+- Focused unit and browser coverage verifies 25-player registration order, the
+  removal, unchanged relative order for the other 12 waiting players, and the
+  Live Watch count changing from 13 to 12 waiting players.
+- The same acceptance pass strengthens the Firestore concurrency case from two
+  simultaneous court completions to all three supported courts with 30 viewers,
+  three revisions, three history entries, and no double-booked player.
