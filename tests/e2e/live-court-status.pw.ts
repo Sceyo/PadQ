@@ -78,3 +78,67 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
     await hostContext.close();
   }
 });
+
+test('multi-court mode reveals Undo Last Match in settings and restores court and queue', async ({ browser }) => {
+  const hostContext = await browser.newContext();
+  const host = await hostContext.newPage();
+
+  try {
+    await host.goto('/queue?mode=doubles');
+    await expect(host.getByRole('heading', { name: 'Doubles Queue' })).toBeVisible();
+
+    const increaseCourtCount = host.locator('.court-count-adj').last();
+    await increaseCourtCount.click();
+    await expect(host.locator('.court-count-value')).toHaveText('2');
+
+    await host.getByPlaceholder(/Paste names separated by commas/).fill(PLAYERS.slice(0, 10).join(', '));
+    await host.getByTitle('Add all').click();
+    await expect(host.getByText('Players (10)')).toBeVisible();
+
+    await host.getByRole('button', { name: /Start Queue/ }).click();
+    await expect(host.locator('.session-bar--host')).toContainText('Connected', { timeout: 20_000 });
+
+    // Initial court assignments: Court 1 has Player 01 & 02 vs Player 03 & 04.
+    // Court 2 has Player 05 & 06 vs Player 07 & 08.
+    // Waiting queue has Player 09, Player 10.
+    const courtOneCard = host.locator('.courts-grid > div').filter({ hasText: 'Court 1' });
+    await expect(courtOneCard).toContainText('Player 01 & Player 02');
+    await expect(courtOneCard).toContainText('Player 03 & Player 04');
+    await expect(host.locator('.waiting-players-list')).toContainText('Player 09');
+    await expect(host.locator('.waiting-players-list')).toContainText('Player 10');
+
+    // Before any match finishes, gear menu has no Undo button
+    await host.getByTitle('Settings').click();
+    await expect(host.getByRole('menuitem', { name: 'Undo Last Match' })).toHaveCount(0);
+    await host.keyboard.press('Escape');
+
+    // Complete match on Court 1 (Team A win)
+    await courtOneCard.getByRole('button', { name: /win$/ }).first().click();
+
+    // WinnerModal opens after a win; autoClose is false by default, so dismiss it.
+    await expect(host.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
+    await host.keyboard.press('Escape');
+    await expect(host.locator('.modal-overlay')).not.toBeVisible({ timeout: 3_000 });
+
+    // Now Court 1 rotated: Player 09 and Player 10 were pulled onto Court 1
+    await expect(courtOneCard).not.toContainText('Player 01 & Player 02');
+
+    // Gear menu MUST now reveal Undo Last Match!
+    await host.getByTitle('Settings').click();
+    const undoBtn = host.getByRole('menuitem', { name: 'Undo Last Match' });
+    await expect(undoBtn).toBeVisible();
+
+    // Click Undo Last Match
+    await undoBtn.click();
+
+    // Verify Court 1 has Player 01 & 02 vs Player 03 & 04 restored!
+    await expect(courtOneCard).toContainText('Player 01 & Player 02');
+    await expect(courtOneCard).toContainText('Player 03 & Player 04');
+    // Waiting queue has Player 09 and Player 10 back!
+    await expect(host.locator('.waiting-players-list')).toContainText('Player 09');
+    await expect(host.locator('.waiting-players-list')).toContainText('Player 10');
+  } finally {
+    await hostContext.close();
+  }
+});
+

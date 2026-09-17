@@ -142,7 +142,7 @@ function QueueSystemContent() {
   const gameModeFromUrl = modeParam === 'singles' || modeParam === 'doubles' ? modeParam : null;
 
   const {
-    gameMode, players, queue, playAllRel,
+    gameMode, players, queue, playAllRel, restorationWarning, dismissRestorationWarning,
     setGameMode, setPlayers,
     randomizeQueue, setQueue, recordPlayAllDoubles,
     recordPlayAllSingles, resetPlayAllRelationships,
@@ -1414,7 +1414,10 @@ function QueueSystemContent() {
 
   // ── Shared fragments ──────────────────────────────────────
   const canControl = !session.sessionId || session.isHost;
-  const canUndo = canControl && hasUndo && courtSlots.length === 0;
+  // Undo is available in multi-court mode too: handleUndoLastMatch already
+  // restores courtSlots from the snapshot and syncs it through undoLastMatch,
+  // so there's no correctness reason to hide the control here.
+  const canUndo = canControl && hasUndo;
 
   const modeSelector = V1_RELEASE.showQueueModeSelector ? (
     <div className="mode-selector">
@@ -1543,6 +1546,7 @@ function QueueSystemContent() {
         <SessionBar sessionId={session.sessionId} isHost={session.isHost} isConnected={session.isConnected} isSaving={session.isSaving} />
         {session.isExpired && (<div className="session-alert session-alert--expired"><WifiOff size={14} /> Session expired. <button onClick={() => router.push('/')}>Go Home</button></div>)}
         {session.isReconnecting && !session.isExpired && (<div className="session-alert session-alert--reconnecting"><Wifi size={14} /> Reconnecting…</div>)}
+        {restorationWarning && (<div className="session-alert session-alert--warn">⚠ Queue state could not be restored (browser storage was corrupted). Your player list is empty — please re-enter it. <button onClick={dismissRestorationWarning}>Dismiss</button></div>)}
         {modeSelector}{elimSelector}{uiControls}{tabBar}
         {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
         {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} /> : (
@@ -1640,6 +1644,7 @@ function QueueSystemContent() {
 
       {session.isExpired && (<div className="session-alert session-alert--expired"><WifiOff size={14} /> Session expired. Your data has been cleared.{' '}<button onClick={() => router.push('/')}>Go Home</button></div>)}
       {session.isReconnecting && !session.isExpired && (<div className="session-alert session-alert--reconnecting"><Wifi size={14} /> Reconnecting to session…</div>)}
+      {restorationWarning && (<div className="session-alert session-alert--warn">⚠ Queue state could not be restored (browser storage was corrupted). Your player list is empty — please re-enter it. <button onClick={dismissRestorationWarning}>Dismiss</button></div>)}
 
       {modeSelector}{uiControls}{tabBar}
       {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}

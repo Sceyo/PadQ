@@ -167,15 +167,32 @@ export async function createSession(
   throw new Error('Unable to reserve a room code. Please try again.');
 }
 
+export const SESSION_INACTIVITY_LIMIT_MS = 30 * 60 * 1000;
+
+export function isSessionExpired(docData: SessionDoc): boolean {
+  if (!docData.lastActiveAt) return false;
+  // If lastActiveAt is a Firestore Timestamp object with toMillis()
+  const lastActiveMillis = typeof docData.lastActiveAt.toMillis === 'function'
+    ? docData.lastActiveAt.toMillis()
+    : (docData.lastActiveAt as unknown as { seconds?: number })?.seconds
+      ? (docData.lastActiveAt as unknown as { seconds: number }).seconds * 1000
+      : 0;
+  if (!lastActiveMillis) return false;
+  return Date.now() - lastActiveMillis > SESSION_INACTIVITY_LIMIT_MS;
+}
+
 /**
  * loadSession
  * Called on page load if localStorage has a sessionId.
- * Returns null if the session doesn't exist.
+ * Returns null if the session doesn't exist or is expired (> 30m idle).
  */
 export async function loadSession(sessionId: string): Promise<SessionDoc | null> {
   await ensureAuthenticated();
   const snap = await getDoc(sessionRef(sessionId));
-  return snap.exists() ? (snap.data() as SessionDoc) : null;
+  if (!snap.exists()) return null;
+  const data = snap.data() as SessionDoc;
+  if (isSessionExpired(data)) return null;
+  return data;
 }
 
 /**
@@ -541,7 +558,12 @@ export function subscribeToSession(
     sessionRef(sessionId),
     (snap) => {
       if (snap.exists()) {
-        onChange(snap.data() as SessionDoc);
+        const data = snap.data() as SessionDoc;
+        if (isSessionExpired(data)) {
+          onDeleted?.();
+        } else {
+          onChange(data);
+        }
       } else if (!snap.metadata.fromCache) {
         // Document gone — either TTL deleted it or hard reset
         onDeleted?.();

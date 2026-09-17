@@ -120,6 +120,10 @@ function startSessionErrorMessage(error: unknown): string {
     ? String((error as { code?: unknown }).code)
     : '';
 
+  if (error instanceof Error && error.message.includes('Unable to reserve a room code')) {
+    return error.message;
+  }
+
   if (code === 'auth/admin-restricted-operation' || code === 'auth/operation-not-allowed') {
     return 'PADQ could not start the room because Anonymous Authentication is disabled in Firebase.';
   }
@@ -245,15 +249,42 @@ export function useSession(): SessionState & SessionActions {
 
   useEffect(() => {
     if (!state.isHost) return;
-    const id = setInterval(() => {
+    const sendHeartbeat = () => {
       const sid = sessionIdRef.current;
       if (sid) touchSession(sid);
       // Touch all other courts in the group so idle courts don't expire
       loadCourtGroup().forEach(c => {
         if (c.sessionId !== sid) touchSession(c.sessionId);
       });
-    }, 5 * 60 * 1000);
-    return () => clearInterval(id);
+    };
+
+    const id = setInterval(sendHeartbeat, 5 * 60 * 1000);
+
+    const onVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        sendHeartbeat();
+      }
+    };
+    const onFocus = () => {
+      sendHeartbeat();
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', onVisibilityChange);
+    }
+    if (typeof window !== 'undefined') {
+      window.addEventListener('focus', onFocus);
+    }
+
+    return () => {
+      clearInterval(id);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', onVisibilityChange);
+      }
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('focus', onFocus);
+      }
+    };
   }, [state.isHost]);
 
   // ── Mount: resume from localStorage ────────────────────────

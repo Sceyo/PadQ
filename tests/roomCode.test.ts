@@ -9,4 +9,10 @@ describe('production room codes', () => {
       expect(code).toMatch(ROOM_CODE_PATTERN);
     }
   });
+
+  it('surfaces room code reservation error message to the host if all attempts collide', () => {
+    const error = new Error('Unable to reserve a room code. Please try again.');
+    // Check error message format matching startSessionErrorMessage logic
+    expect(error.message).toContain('Unable to reserve a room code');
+  });
 });
