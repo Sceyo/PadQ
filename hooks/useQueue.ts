@@ -252,27 +252,47 @@ export default function useQueue(initialGameMode: 'singles' | 'doubles' | null =
   // consumers can read it directly (e.g. to show a "novelty score" badge).
   const [playAllRel, setPlayAllRel] = useState<PlayAllRelationships>(EMPTY_RELATIONSHIPS);
 
+  // True when sessionStorage state was unparseable or structurally invalid on
+  // mount. The queue starts empty and the host sees an advisory banner so they
+  // know to re-enter their player list rather than wondering why it vanished.
+  const [restorationWarning, setRestorationWarning] = useState(false);
+
   // Load from storage
   useEffect(() => {
     const stored = sessionStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        // Support old saves that don't have playAllRel yet
-        // Strip playAllRel before setting queue state
-        const { playAllRel: storedRelationships, ...queueState } = parsed;
-        queueMicrotask(() => {
-          if (storedRelationships) setPlayAllRel(storedRelationships);
-          setState(prev => ({
-            ...queueState,
-            // An explicit /queue?mode= route may have updated gameMode while
-            // storage was being restored. Never overwrite that newer choice.
-            gameMode: prev.gameMode ?? queueState.gameMode,
-          }));
-        });
-      } catch {
-        console.error('Failed to parse stored queue state');
+    if (!stored) return;
+    try {
+      const parsed = JSON.parse(stored);
+      // Validate minimum shape: must be a plain object with array fields.
+      // A browser crash mid-write can produce valid JSON with wrong types.
+      if (
+        typeof parsed !== 'object' ||
+        parsed === null ||
+        Array.isArray(parsed) ||
+        !Array.isArray(parsed.players) ||
+        !Array.isArray(parsed.queue)
+      ) {
+        console.error('[useQueue] Stored queue state has invalid shape — discarding.', parsed);
+        queueMicrotask(() => setRestorationWarning(true));
+        sessionStorage.removeItem(STORAGE_KEY);
+        return;
       }
+      // Support old saves that don't have playAllRel yet.
+      // Strip playAllRel before setting queue state.
+      const { playAllRel: storedRelationships, ...queueState } = parsed;
+      queueMicrotask(() => {
+        if (storedRelationships) setPlayAllRel(storedRelationships);
+        setState(prev => ({
+          ...queueState,
+          // An explicit /queue?mode= route may have updated gameMode while
+          // storage was being restored. Never overwrite that newer choice.
+          gameMode: prev.gameMode ?? queueState.gameMode,
+        }));
+      });
+    } catch {
+      console.error('[useQueue] Failed to parse stored queue state — discarding.');
+      queueMicrotask(() => setRestorationWarning(true));
+      sessionStorage.removeItem(STORAGE_KEY);
     }
   }, []);
 
@@ -368,9 +388,13 @@ export default function useQueue(initialGameMode: 'singles' | 'doubles' | null =
     setPlayAllRel(EMPTY_RELATIONSHIPS);
   }, []);
 
+  const dismissRestorationWarning = useCallback(() => setRestorationWarning(false), []);
+
   return {
     ...state,
     playAllRel,
+    restorationWarning,
+    dismissRestorationWarning,
     setGameMode,
     setPlayers,
     playSingles,

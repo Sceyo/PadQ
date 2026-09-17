@@ -17,12 +17,27 @@ export const WinnerModal: React.FC<{
     return () => clearTimeout(t);
   }, [isOpen, autoClose, onClose]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content" onClick={e => e.stopPropagation()}>
+      <div
+        className="modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="winner-modal-title"
+        onClick={e => e.stopPropagation()}
+      >
         <Trophy size={42} className="modal-trophy" />
-        <h2>Match Result</h2>
+        <h2 id="winner-modal-title">Match Result</h2>
         <p className="winner-name">{winner}</p>
         {score && <p className="modal-score">{score}</p>}
         <div className="modal-controls">
@@ -30,7 +45,7 @@ export const WinnerModal: React.FC<{
             <input type="checkbox" checked={autoClose} onChange={e => setAutoClose(e.target.checked)} />
             Auto-close (3s)
           </label>
-          <button onClick={onClose} className="close-modal-btn"><X size={13} /> Close</button>
+          <button onClick={onClose} className="close-modal-btn" aria-label="Close dialog"><X size={13} /> Close</button>
         </div>
       </div>
     </div>

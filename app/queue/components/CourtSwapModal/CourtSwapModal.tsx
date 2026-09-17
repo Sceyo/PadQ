@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { X, ArrowLeftRight, Check } from 'lucide-react';
 import type { PlayerStat } from '../../lib/types';
 import styles from './CourtSwapModal.module.css';
@@ -55,15 +55,29 @@ export function CourtSwapModal({ courtName, onCourt, statsMap, onConfirm, onClos
 
   const hasChanges = players.join(',') !== onCourt.join(',');
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+      <div
+        className={styles.modal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="court-swap-title"
+        onClick={e => e.stopPropagation()}
+      >
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <ArrowLeftRight size={15} />
-            <span>{courtName} — Edit Players</span>
+            <span id="court-swap-title">{courtName} — Edit Players</span>
           </div>
-          <button className={styles.closeBtn} onClick={onClose}><X size={15} /></button>
+          <button className={styles.closeBtn} onClick={onClose} aria-label="Close dialog"><X size={15} /></button>
         </div>
 
         <p className={styles.hint}>

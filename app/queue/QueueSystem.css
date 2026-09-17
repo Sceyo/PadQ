@@ -1413,6 +1413,29 @@ body.dark-mode .on-court-label {
   50%       { opacity: 0.65; }
 }
 
+/* Warn — amber, static; used for non-fatal advisory messages (e.g. queue restore failure) */
+.session-alert--warn {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #f59e0b;
+}
+.session-alert--warn button {
+  margin-left: auto;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s;
+}
+.session-alert--warn button:hover {
+  background: rgba(245, 158, 11, 0.22);
+}
+
 /* ── Bracket: No Player label ────────────────────────────────
    Replaces the old "BYE" text in tournament bracket slots
    ─────────────────────────────────────────────────────────── */

@@ -541,4 +541,40 @@ suite('Firestore V1 production rules', () => {
     await assertFails(deleteDoc(doc(attacker, 'sessions', 'LDELET')));
     await assertSucceeds(deleteDoc(ref));
   });
+
+  it('enforces 30m session inactivity lockout on substantive writes, but permits heartbeat recovery and subsequent writes', async () => {
+    const host = env.authenticatedContext('host-recovery').firestore();
+    const ref = doc(host, 'sessions', 'STAL01');
+
+    // 1. Seed session with lastActiveAt set to 35 minutes in the past using rules-disabled context
+    await env.withSecurityRulesDisabled(async context => {
+      const adminDb = context.firestore();
+      await setDoc(doc(adminDb, 'sessions', 'STAL01'), {
+        ...sessionData('host-recovery'),
+        createdAt: new Date(Date.now() - 40 * 60 * 1000),
+        updatedAt: new Date(Date.now() - 35 * 60 * 1000),
+        lastActiveAt: new Date(Date.now() - 35 * 60 * 1000),
+      });
+    });
+
+    // 2. Attempt a substantive update (e.g. reordering queue) with still-stale lastActiveAt -> must fail
+    await assertFails(updateDoc(ref, {
+      queue: ['B', 'A', 'C', 'D', 'E', 'F'],
+      updatedAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
+    }));
+
+    // 3. Attempt a heartbeat-only update (updatedAt and lastActiveAt only) -> must succeed
+    await assertSucceeds(updateDoc(ref, {
+      updatedAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
+    }));
+
+    // 4. After heartbeat succeeds and un-stales session, attempt substantive update again -> must succeed
+    await assertSucceeds(updateDoc(ref, {
+      queue: ['B', 'A', 'C', 'D', 'E', 'F'],
+      updatedAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
+    }));
+  });
 });

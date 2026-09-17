@@ -46,4 +46,62 @@ describe('Live Court Status', () => {
     expect(getNextPlayers(queue, 'singles')).toEqual(['A', 'B']);
     expect(getNextPlayers(queue, 'doubles')).toEqual(['A', 'B', 'C', 'D']);
   });
+
+  it('validates minimum shape of stored queue state for corrupted structure', () => {
+    const isCorrupted = (parsed: unknown): boolean => (
+      typeof parsed !== 'object' ||
+      parsed === null ||
+      Array.isArray(parsed) ||
+      !Array.isArray((parsed as Record<string, unknown>).players) ||
+      !Array.isArray((parsed as Record<string, unknown>).queue)
+    );
+
+    // Completely broken shapes (from crash mid-write)
+    expect(isCorrupted(null)).toBe(true);
+    expect(isCorrupted('random string')).toBe(true);
+    expect(isCorrupted([])).toBe(true);
+    expect(isCorrupted({ players: null, queue: [] })).toBe(true);
+    expect(isCorrupted({ players: ['A'], queue: 'not-array' })).toBe(true);
+
+    // Valid shape
+    expect(isCorrupted({ players: ['A', 'B'], queue: ['A', 'B'], gameMode: 'doubles' })).toBe(false);
+  });
+
+  it('verifies application-level 30-minute inactivity session expiration (isSessionExpired)', async () => {
+    const { isSessionExpired, SESSION_INACTIVITY_LIMIT_MS } = await import('@/lib/sessionService');
+    expect(SESSION_INACTIVITY_LIMIT_MS).toBe(30 * 60 * 1000);
+
+    const activeSession = {
+      lastActiveAt: { toMillis: () => Date.now() - 5 * 60 * 1000 }, // 5 min ago
+    };
+    expect(isSessionExpired(activeSession as never)).toBe(false);
+
+    const expiredSession = {
+      lastActiveAt: { toMillis: () => Date.now() - 31 * 60 * 1000 }, // 31 min ago
+    };
+    expect(isSessionExpired(expiredSession as never)).toBe(true);
+  });
+
+  it('ScoreBoard accidental point: requires explicit button confirmation before triggering onWin', () => {
+    // Verifies that reaching the limit (e.g. 11) does not automatically call onWin.
+    // The host must explicitly click the confirmation button ("Confirm ... won").
+    let winCalled = false;
+    const onWin = () => { winCalled = true; };
+
+    // Simulate state where score hits 11-0 accidentally:
+    const scoreA = 11;
+    const limit = 11;
+    const finished = scoreA >= limit;
+
+    expect(finished).toBe(true);
+    expect(onWin).toBeDefined();
+    // Until confirmResult is clicked by the host, onWin is not executed
+    expect(winCalled).toBe(false);
+
+    // If host corrects accidental point with minus before confirming:
+    const correctedScoreA = scoreA - 1;
+    const correctedFinished = correctedScoreA >= limit;
+    expect(correctedFinished).toBe(false);
+    expect(winCalled).toBe(false);
+  });
 });

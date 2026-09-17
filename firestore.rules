@@ -30,6 +30,17 @@ service cloud.firestore {
       return data.hostUid == resource.data.hostUid;
     }
 
+    function isSessionActive() {
+      // Inactive sessions (> 30m without a host action or heartbeat) cannot receive updates
+      return request.time - resource.data.lastActiveAt <= duration.value(30, 'm');
+    }
+
+    function isHeartbeatUpdate(data) {
+      let changed = data.diff(resource.data).affectedKeys();
+      return changed.hasOnly(['updatedAt', 'lastActiveAt']) &&
+        data.revision == resource.data.revision;
+    }
+
     function validRoomCode(id) {
       return id.matches('^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$');
     }
@@ -327,9 +338,11 @@ service cloud.firestore {
         request.resource.data.revision <= resource.data.revision + 1 &&
         request.resource.data.updatedAt == request.time &&
         request.resource.data.lastActiveAt == request.time &&
-        (validRevisionedStateUpdate(request.resource.data)
-          ? true
-          : validSessionUpdate(request.resource.data));
+        (isHeartbeatUpdate(request.resource.data) ||
+          (isSessionActive() &&
+            (validRevisionedStateUpdate(request.resource.data)
+              ? true
+              : validSessionUpdate(request.resource.data))));
 
       allow delete: if isDocOwner();
 

@@ -197,4 +197,179 @@ describe('V1 court, player, and viewer scenario matrix', () => {
     const allPlayers = rooms.flatMap(room => room.courts.flat().concat(room.waiting));
     expect(new Set(allPlayers).size).toBe(150);
   });
+
+  describe('Human Stress Test Scenarios (1-court 12-player, 2-court 20-player, 3-court 30-player limit, 34-player boundary)', () => {
+    it('Scenario 1: 1-court 12-player singles rotation and king/challenger lifecycle', () => {
+      const roster = players(12, 'S1');
+      const state = {
+        queue: roster.slice(2),
+        courtSlots: [{ id: 'court-0', name: 'Court 1', onCourt: [roster[0], roster[1]] }],
+      };
+
+      // Initial court match check: P1 vs P2, 10 players waiting
+      expect(state.courtSlots[0].onCourt).toEqual(['S1-1', 'S1-2']);
+      expect(state.queue).toHaveLength(10);
+
+      // Match 1: P1 wins, P2 goes to back of queue, P3 steps up
+      const r1 = planMultiCourtResult(state, 'court-0', ['S1-1', 'S1-2'], 'A', 'singles');
+      expect(r1).not.toBeNull();
+      expect(r1!.courtSlots[0].onCourt).toEqual(['S1-1', 'S1-3']);
+      expect(r1!.queue).toEqual([...roster.slice(3), 'S1-2']);
+      expect(r1!.winner).toBe('S1-1');
+
+      // Match 2: Challenger P3 beats P1
+      const r2 = planMultiCourtResult(r1!, 'court-0', ['S1-1', 'S1-3'], 'B', 'singles');
+      expect(r2).not.toBeNull();
+      expect(r2!.courtSlots[0].onCourt).toEqual(['S1-3', 'S1-4']);
+      expect(r2!.queue).toEqual([...roster.slice(4), 'S1-2', 'S1-1']);
+      expect(r2!.winner).toBe('S1-3');
+
+      // Removal of a waiting player (e.g. P8 leaves mid-session)
+      const afterLeave = r2!.queue.filter(p => p !== 'S1-8');
+      expect(afterLeave).toHaveLength(9);
+      expect(afterLeave).not.toContain('S1-8');
+
+      // Late arrival P13 joins back of queue
+      const afterLateArrival = [...afterLeave, 'S1-13'];
+      expect(afterLateArrival).toHaveLength(10);
+      expect(afterLateArrival[afterLateArrival.length - 1]).toBe('S1-13');
+    });
+
+    it('Scenario 2: 2-court 20-player doubles with 2 locked partner pairs and sit-outs', () => {
+      const roster = players(20, 'D20');
+      const lockedPairs: LockedPartnerPair[] = [
+        ['D20-1', 'D20-2'],
+        ['D20-5', 'D20-6'],
+      ];
+
+      // Initial seeding for 2 courts
+      const seeded = seedMultiCourtDoubles(roster, 2, lockedPairs);
+      expect(seeded.courts).toHaveLength(2);
+      expect(seeded.waiting).toHaveLength(12);
+      assertPartition(roster, seeded.courts, seeded.waiting);
+      assertLockedPairs(seeded.courts, seeded.waiting, lockedPairs);
+
+      // Court 1 finishes with Court 1 Team A winning
+      let state = {
+        queue: seeded.waiting,
+        courtSlots: [
+          { id: 'court-0', name: 'Court 1', onCourt: seeded.courts[0] },
+          { id: 'court-1', name: 'Court 2', onCourt: seeded.courts[1] },
+        ],
+        lockedPartners: lockedPairs.map(([a, b]) => ({ a, b })),
+        sittingOut: ['D20-11', 'D20-12'], // D11 & D12 sitting out
+      };
+
+      const c1Result = planMultiCourtResult(
+        state,
+        'court-0',
+        state.courtSlots[0].onCourt,
+        'A',
+        'doubles',
+      );
+      expect(c1Result).not.toBeNull();
+
+      // Ensure sitting out players D11 and D12 were skipped from entering court-0
+      expect(c1Result!.courtSlots[0].onCourt).not.toContain('D20-11');
+      expect(c1Result!.courtSlots[0].onCourt).not.toContain('D20-12');
+
+      // Update state for Court 2 finishing
+      state = {
+        ...state,
+        queue: c1Result!.queue,
+        courtSlots: c1Result!.courtSlots,
+        sittingOut: [], // D11 & D12 return to play
+      };
+
+      const c2Result = planMultiCourtResult(
+        state,
+        'court-1',
+        state.courtSlots[1].onCourt,
+        'B',
+        'doubles',
+      );
+      expect(c2Result).not.toBeNull();
+      assertLockedPairs(
+        c2Result!.courtSlots.map(c => c.onCourt),
+        c2Result!.queue,
+        lockedPairs,
+      );
+    });
+
+    it('Scenario 3: 3-court 30-player limit (12 on court, 18 waiting, 3 locked pairs across 24 matches)', () => {
+      const roster = players(30, 'L30');
+      const lockedPairs: LockedPartnerPair[] = [
+        ['L30-1', 'L30-2'],
+        ['L30-3', 'L30-4'],
+        ['L30-29', 'L30-30'], // pair parked deep in the back
+      ];
+
+      const seeded = seedMultiCourtDoubles(roster, 3, lockedPairs);
+      expect(seeded.courts).toHaveLength(3);
+      expect(seeded.waiting).toHaveLength(18);
+      assertPartition(roster, seeded.courts, seeded.waiting);
+      assertLockedPairs(seeded.courts, seeded.waiting, lockedPairs);
+
+      let currentState = {
+        queue: seeded.waiting,
+        courtSlots: seeded.courts.map((onCourt, i) => ({
+          id: `court-${i}`,
+          name: `Court ${i + 1}`,
+          onCourt,
+        })),
+        lockedPartners: lockedPairs.map(([a, b]) => ({ a, b })),
+      };
+
+      // Run 24 consecutive match results cycling through all 3 courts
+      for (let i = 0; i < 24; i++) {
+        const courtId = `court-${i % 3}`;
+        const slot = currentState.courtSlots.find(c => c.id === courtId)!;
+        const result = planMultiCourtResult(
+          currentState,
+          courtId,
+          slot.onCourt,
+          i % 2 === 0 ? 'A' : 'B',
+          'doubles',
+        );
+        expect(result).not.toBeNull();
+        currentState = {
+          ...currentState,
+          queue: result!.queue,
+          courtSlots: result!.courtSlots,
+        };
+
+        // Validate partition and partner pair integrity after each completed match
+        assertPartition(
+          roster,
+          currentState.courtSlots.map(c => c.onCourt),
+          currentState.queue,
+        );
+        assertLockedPairs(
+          currentState.courtSlots.map(c => c.onCourt),
+          currentState.queue,
+          lockedPairs,
+        );
+      }
+    });
+
+    it('Scenario 4: Boundary rejection for 34 players and > 3 courts', async () => {
+      const overCapacityRoster = players(34, 'OVER');
+
+      // Check max partner pairs formula handles large counts defensively
+      expect(getMaxPartnerPairs(34)).toBe(17);
+      expect(getMaxPartnerPairs(30)).toBe(15);
+
+      // Verify seedMultiCourtDoubles with court count capped at 3
+      const seeded = seedMultiCourtDoubles(overCapacityRoster, 3, []);
+      expect(seeded.courts).toHaveLength(3);
+      expect(seeded.courts.flat()).toHaveLength(12);
+      expect(seeded.waiting).toHaveLength(22);
+
+      // If courtCount 4 is attempted, engine strictly allocates 4 courts only if invoked,
+      // but V1 capacity boundary enforces max 3 courts in application config.
+      const { V1_RELEASE } = await import('@/app/queue/lib/releaseConfig');
+      expect(V1_RELEASE.maxCourts).toBe(3);
+      expect(V1_RELEASE.maxPlayers).toBe(30);
+    });
+  });
 });
