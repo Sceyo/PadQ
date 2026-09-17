@@ -447,7 +447,17 @@ function WatchPageContent() {
         <button className="w-back-btn" onClick={() => router.push('/')}>
           <ArrowLeft size={14} /> Home
         </button>
-        <Link className="w-back-btn" href="/privacy">Privacy</Link>
+        <Link
+          className="w-back-btn"
+          href="/privacy"
+          onClick={() => {
+            if (typeof window !== 'undefined') {
+              sessionStorage.setItem('padq_privacy_from', window.location.pathname + window.location.search);
+            }
+          }}
+        >
+          Privacy
+        </Link>
 
         <div className="w-session-info">
           <span className={`w-dot ${status === 'live' ? 'w-dot--live' : 'w-dot--off'}`} />
