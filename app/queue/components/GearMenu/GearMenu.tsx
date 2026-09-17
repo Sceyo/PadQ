@@ -242,7 +242,12 @@ export function GearMenu({
             className="gear-menu-item"
             role="menuitem"
             href="/privacy"
-            onClick={closeMenu}
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('padq_privacy_from', window.location.pathname + window.location.search);
+              }
+              closeMenu();
+            }}
           >
             <ShieldCheck size={14} /> Privacy &amp; Data
           </Link>

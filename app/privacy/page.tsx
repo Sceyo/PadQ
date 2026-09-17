@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
 import { PrivacyControls } from './PrivacyControls';
+import { PrivacyBackButton } from './PrivacyBackButton';
 import './privacy.css';
 
 export const metadata: Metadata = {
@@ -13,7 +13,7 @@ export default function PrivacyPage() {
   return (
     <main className="privacy-page">
       <div className="privacy-shell">
-        <Link className="privacy-back" href="/">← Back to PADQ</Link>
+        <PrivacyBackButton />
         <h1>Privacy &amp; Data Retention</h1>
         <p className="privacy-lead">PADQ V1 is a free, online-first court queue. This page explains what it stores and what a host or player can delete.</p>
 

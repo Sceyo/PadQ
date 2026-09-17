@@ -275,7 +275,16 @@ export default function HomePage() {
         </div>
 
         <div className="hp-footer-links">
-          <Link href="/privacy">Privacy &amp; Data Retention</Link>
+          <Link
+            href="/privacy"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('padq_privacy_from', '/');
+              }
+            }}
+          >
+            Privacy &amp; Data Retention
+          </Link>
         </div>
       </div>
 

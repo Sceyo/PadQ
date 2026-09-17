@@ -1,6 +1,20 @@
 .privacy-page { min-height:100vh; background:#090a12; color:#eef2ff; padding:32px 18px 64px; }
 .privacy-shell { width:min(760px,100%); margin:0 auto; display:flex; flex-direction:column; gap:18px; }
-.privacy-back { color:#a5b4fc; text-decoration:none; font-size:.9rem; }
+.privacy-back {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #a5b4fc;
+  text-decoration: none;
+  font-size: .9rem;
+  width: fit-content;
+}
 .privacy-back:hover, .privacy-back:focus-visible { text-decoration:underline; }
 .privacy-page h1 { margin:8px 0 0; font-size:clamp(2rem,7vw,3.5rem); line-height:1; }
 .privacy-lead { margin:0; color:#a5adbd; line-height:1.65; }
