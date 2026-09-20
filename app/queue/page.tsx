@@ -81,6 +81,7 @@ import { CoordinatorOverlay } from './components/CoordinatorOverlay/CoordinatorO
 import { SetupView } from './components/SetupView/SetupView';
 import { SitOutPanel } from './components/SitOutPanel/SitOutPanel';
 import { SkilledView, type SkilledBrackets } from './components/SkilledView/SkilledView';
+import { RecapModal } from './components/RecapCard';
 
 // ── Undo snapshot type ────────────────────────────────────────
 interface UndoSnapshot {
@@ -181,6 +182,7 @@ function QueueSystemContent() {
   const [isLiveLocal,  setIsLiveLocal]  = useState(false);
   const [showGuide,       setShowGuide]       = useState(false);
   const [showCoordinator, setShowCoordinator] = useState(false);
+  const [showRecapModal,   setShowRecapModal]   = useState(false);
 
   // ── Career stats (persists across sessions) ───────────────
   const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadCareerStats());
@@ -1531,6 +1533,7 @@ function QueueSystemContent() {
     onShowCoordinator: () => setShowCoordinator(true),
     canUndo,
     onUndo: handleUndoLastMatch,
+    onShowRecap: activeHistory.length > 0 ? () => setShowRecapModal(true) : undefined,
   };
 
   // ── RENDER B — Tournament ─────────────────────────────────
@@ -1549,7 +1552,15 @@ function QueueSystemContent() {
         {restorationWarning && (<div className="session-alert session-alert--warn">⚠ Queue state could not be restored (browser storage was corrupted). Your player list is empty — please re-enter it. <button onClick={dismissRestorationWarning}>Dismiss</button></div>)}
         {modeSelector}{elimSelector}{uiControls}{tabBar}
         {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
-        {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} /> : (
+        {activeTab === 'analytics' ? (
+          <AnalyticsDashboard
+            stats={statsList}
+            careerStats={careerStats}
+            history={activeHistory}
+            roomCode={session.sessionId}
+            mode={gameMode ?? 'doubles'}
+          />
+        ) : (
           <div className="main-layout">
             <div className="queue-area">
               <h1 className="queue-title"><Trophy size={20} />{gameMode === 'singles' ? 'Singles' : 'Doubles'} Tournament</h1>
@@ -1601,6 +1612,15 @@ function QueueSystemContent() {
           ) : null;
         })()}
         <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
+        <RecapModal
+          isOpen={showRecapModal}
+          onClose={() => setShowRecapModal(false)}
+          stats={statsList}
+          history={activeHistory}
+          roomCode={session.sessionId}
+          mode={gameMode ?? 'doubles'}
+          defaultVariant="host"
+        />
         {V1_RELEASE.showLegacyCourtCoordinator && showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
         {toastMsg && (
           <div className="toast-notification" role="alert">
@@ -1649,7 +1669,16 @@ function QueueSystemContent() {
       {modeSelector}{uiControls}{tabBar}
       {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
 
-      {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} skilledBrackets={isSkilled ? skilledBrackets : undefined} /> : (
+      {activeTab === 'analytics' ? (
+        <AnalyticsDashboard
+          stats={statsList}
+          careerStats={careerStats}
+          skilledBrackets={isSkilled ? skilledBrackets : undefined}
+          history={activeHistory}
+          roomCode={session.sessionId}
+          mode={gameMode ?? 'doubles'}
+        />
+      ) : (
         <div className="main-layout">
           <div className="queue-area">
             <h1 className="queue-title">
@@ -2044,6 +2073,15 @@ function QueueSystemContent() {
         ) : null;
       })()}
       <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
+      <RecapModal
+        isOpen={showRecapModal}
+        onClose={() => setShowRecapModal(false)}
+        stats={statsList}
+        history={activeHistory}
+        roomCode={session.sessionId}
+        mode={gameMode ?? 'doubles'}
+        defaultVariant="host"
+      />
       {V1_RELEASE.showLegacyCourtCoordinator && showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
       {toastMsg && (
         <div className="toast-notification" role="alert">

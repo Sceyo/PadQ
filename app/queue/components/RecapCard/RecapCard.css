@@ -1,0 +1,575 @@
+/* ============================================================
+   PADQ 1080x1080 Square Social Media Recap Card Styles
+   High-DPI, Luxury Midnight Sports Aesthetic
+   ============================================================ */
+
+.recap-card-root {
+  width: 1080px;
+  height: 1080px;
+  box-sizing: border-box;
+  background-color: #090a12;
+  background-image: 
+    radial-gradient(circle at 10% 15%, rgba(16, 185, 129, 0.14) 0%, transparent 45%),
+    radial-gradient(circle at 90% 85%, rgba(6, 182, 212, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.08) 0%, transparent 60%);
+  color: #f8fafc;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 56px 64px;
+}
+
+/* Court grid lines texture in background */
+.recap-court-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-size: 80px 80px;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  mask-image: radial-gradient(circle at 50% 50%, black, transparent 80%);
+}
+
+/* ── Header ────────────────────────────────────────── */
+.recap-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 24px;
+}
+
+.recap-brand-group {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.recap-logo-pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 8px 18px;
+  border-radius: 9999px;
+}
+
+.recap-brand-title {
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  color: #ffffff;
+}
+
+.recap-brand-accent {
+  color: #10b981;
+}
+
+.recap-brand-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.recap-brand-subtitle {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #94a3b8;
+}
+
+.recap-mode-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #06b6d4;
+  background: rgba(6, 182, 212, 0.1);
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  padding: 6px 14px;
+  border-radius: 9999px;
+  letter-spacing: 1px;
+}
+
+.recap-meta-badges {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.recap-room-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  padding: 8px 16px;
+  border-radius: 9999px;
+}
+
+.recap-room-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 10px #10b981;
+}
+
+.recap-room-code {
+  font-size: 15px;
+  font-weight: 800;
+  color: #a7f3d0;
+  letter-spacing: 1px;
+}
+
+.recap-date-pill {
+  font-size: 14px;
+  font-weight: 600;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 14px;
+  border-radius: 9999px;
+}
+
+/* ── Standout HUD Row ───────────────────────────────── */
+.recap-hud-row {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-top: 24px;
+  margin-bottom: 24px;
+}
+
+.recap-hud-cell {
+  background: rgba(18, 21, 34, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(12px);
+  border-radius: 18px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.recap-hud-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  color: #64748b;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.recap-hud-val {
+  font-size: 32px;
+  font-weight: 900;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.recap-hud-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-top: 4px;
+}
+
+/* ── Host Variant (Podium Edition) ─────────────────── */
+.recap-host-content {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 24px;
+}
+
+.recap-podium-row {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  align-items: end;
+  gap: 18px;
+}
+
+.recap-podium-card {
+  position: relative;
+  border-radius: 22px;
+  padding: 24px 20px;
+  text-align: center;
+  backdrop-filter: blur(16px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+.recap-podium-card--gold {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.18) 0%, rgba(20, 24, 39, 0.9) 100%);
+  border: 2px solid rgba(245, 158, 11, 0.55);
+  box-shadow: 0 0 35px rgba(245, 158, 11, 0.2), 0 20px 45px rgba(0, 0, 0, 0.5);
+  padding: 32px 24px;
+  transform: translateY(-8px);
+}
+
+.recap-podium-card--silver {
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.12) 0%, rgba(18, 22, 34, 0.85) 100%);
+  border: 1.5px solid rgba(148, 163, 184, 0.35);
+}
+
+.recap-podium-card--bronze {
+  background: linear-gradient(180deg, rgba(217, 119, 6, 0.12) 0%, rgba(18, 22, 34, 0.85) 100%);
+  border: 1.5px solid rgba(217, 119, 6, 0.35);
+}
+
+.recap-gold-crown {
+  color: #fbbf24;
+  margin-bottom: 8px;
+  filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.6));
+}
+
+.recap-medal-tag {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  padding: 5px 14px;
+  border-radius: 9999px;
+  margin-bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.recap-medal-tag--gold {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fde68a;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.recap-medal-tag--silver {
+  background: rgba(148, 163, 184, 0.18);
+  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.recap-medal-tag--bronze {
+  background: rgba(217, 119, 6, 0.18);
+  color: #fed7aa;
+  border: 1px solid rgba(217, 119, 6, 0.4);
+}
+
+.recap-podium-name {
+  font-size: 26px;
+  font-weight: 900;
+  color: #ffffff;
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.recap-podium-name--champ {
+  font-size: 34px;
+  letter-spacing: -0.5px;
+}
+
+.recap-podium-stats {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.recap-podium-stats--champ {
+  font-size: 17px;
+  color: #cbd5e1;
+}
+
+.recap-podium-pct {
+  color: #10b981;
+}
+
+.recap-streak-chip {
+  margin-top: 12px;
+  font-size: 12px;
+  font-weight: 800;
+  color: #f97316;
+  background: rgba(249, 115, 22, 0.12);
+  border: 1px solid rgba(249, 115, 22, 0.3);
+  padding: 4px 12px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.recap-streak-chip--champ {
+  font-size: 13px;
+  padding: 5px 14px;
+  background: rgba(249, 115, 22, 0.2);
+}
+
+/* Runners Up List */
+.recap-runners-up-box {
+  background: rgba(18, 21, 34, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+  padding: 18px 24px;
+}
+
+.recap-section-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #64748b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.recap-runners-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 10px 16px;
+}
+
+.recap-runner-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.recap-runner-rank {
+  font-weight: 800;
+  color: #64748b;
+  font-size: 13px;
+}
+
+.recap-runner-name {
+  font-weight: 700;
+  color: #e2e8f0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recap-runner-score {
+  font-weight: 600;
+  color: #94a3b8;
+  font-size: 13px;
+}
+
+.recap-runner-pct {
+  font-weight: 700;
+  color: #10b981;
+  font-size: 13px;
+}
+
+.recap-runner-streak {
+  font-weight: 800;
+  color: #f97316;
+  font-size: 12px;
+}
+
+.recap-more-hint {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-top: 4px;
+}
+
+/* ── Viewer Variant (Full Standings Board) ─────────── */
+.recap-viewer-content {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.recap-viewer-table-shell {
+  background: rgba(18, 21, 34, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px 28px;
+  backdrop-filter: blur(14px);
+}
+
+.recap-standings-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.recap-standings-table th {
+  font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 1.2px;
+  padding: 10px 14px;
+  border-bottom: 1.5px solid rgba(255, 255, 255, 0.07);
+}
+
+.recap-standings-table td {
+  padding: 12px 14px;
+  font-size: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.recap-standings-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.recap-row--top-1 {
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.recap-row--top-2 {
+  background: rgba(148, 163, 184, 0.05);
+}
+
+.recap-row--top-3 {
+  background: rgba(217, 119, 6, 0.05);
+}
+
+.recap-col-rank {
+  font-weight: 800;
+  color: #94a3b8;
+  font-size: 16px;
+}
+
+.recap-col-name {
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.recap-col-tier {
+  font-size: 13px;
+  font-weight: 700;
+  color: #818cf8;
+}
+
+.recap-col-record {
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.recap-col-gp {
+  font-weight: 600;
+  color: #64748b;
+}
+
+.recap-col-pct {
+  font-weight: 700;
+}
+
+.recap-pct-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 14px;
+}
+
+.recap-col-streak {
+  font-weight: 800;
+  color: #94a3b8;
+}
+
+.recap-streak-pill {
+  color: #f97316;
+}
+
+/* ── Footer Branding & Watermark ─────────────────────── */
+.recap-footer {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1.5px solid rgba(255, 255, 255, 0.08);
+  padding-top: 24px;
+}
+
+.recap-footer-info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.recap-verified-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #a7f3d0;
+}
+
+.recap-shield-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #10b981;
+  color: #090a12;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.recap-tagline {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.recap-qr-block {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.recap-qr-frame {
+  background: #ffffff;
+  padding: 8px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.recap-qr-caption {
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.2px;
+  color: #94a3b8;
+  line-height: 1.3;
+}

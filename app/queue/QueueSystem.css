@@ -3547,10 +3547,38 @@ body.dark-mode .sitout-panel { background: rgba(0,0,0,.3); }
 .host-key-dismiss:hover { background: var(--btn-hover); color: var(--txt-1); }
 
 /* ── Analytics career tab switcher (Task 10) ────────────────── */
+.analytics-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.analytics-share-recap-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  color: #a7f3d0;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.analytics-share-recap-btn:hover {
+  background: rgba(16, 185, 129, 0.22);
+  color: #ffffff;
+  transform: translateY(-1px);
+}
 .analytics-tab-row {
   display: flex; gap: 4px;
   border-bottom: 2px solid var(--border);
-  margin-bottom: 20px;
+  margin-bottom: 0;
 }
 .analytics-tab-btn {
   padding: 8px 20px; background: none;

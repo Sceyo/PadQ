@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { BarChart2, TrendingUp, Activity, Clock, Flame, Layers } from 'lucide-react';
-import type { PlayerStat } from '../../lib/types';
+import { BarChart2, TrendingUp, Activity, Clock, Flame, Layers, Share2 } from 'lucide-react';
+import type { PlayerStat, MatchHistoryEntry } from '../../lib/types';
 import type { CareerStatsMap } from '@/lib/sessionService';
 import { RankBadge } from '../atoms/RankBadge';
+import { RecapModal } from '../RecapCard';
 
 const StatBar: React.FC<{ value: number; max: number; color: string }> = ({ value, max, color }) => (
   <div className="stat-bar-track">
@@ -26,7 +27,10 @@ export const AnalyticsDashboard: React.FC<{
   stats: PlayerStat[];
   careerStats?: CareerStatsMap;
   skilledBrackets?: SkilledBracketsShape;
-}> = ({ stats, careerStats, skilledBrackets }) => {
+  history?: MatchHistoryEntry[];
+  roomCode?: string | null;
+  mode?: string;
+}> = ({ stats, careerStats, skilledBrackets, history = [], roomCode, mode = 'Doubles' }) => {
   const hasCareer  = careerStats && Object.keys(careerStats).length > 0;
   const hasSkilled = !!skilledBrackets && (
     skilledBrackets.beginner.length > 0 ||
@@ -37,6 +41,7 @@ export const AnalyticsDashboard: React.FC<{
   const [tab, setTab] = useState<'session' | 'career' | 'skilled'>(
     hasSkilled ? 'skilled' : 'session'
   );
+  const [showRecapModal, setShowRecapModal] = useState(false);
 
   const careerList = Object.entries(careerStats ?? {})
     .map(([name, s]) => ({
@@ -52,32 +57,56 @@ export const AnalyticsDashboard: React.FC<{
 
   return (
     <div className="analytics-panel">
-      {(hasCareer || hasSkilled) && (
-        <div className="analytics-tab-row">
-          {hasSkilled && (
+      <div className="analytics-header-row">
+        {(hasCareer || hasSkilled) ? (
+          <div className="analytics-tab-row">
+            {hasSkilled && (
+              <button
+                className={`analytics-tab-btn ${tab === 'skilled' ? 'active' : ''}`}
+                onClick={() => setTab('skilled')}
+              >
+                <Layers size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />Skilled
+              </button>
+            )}
             <button
-              className={`analytics-tab-btn ${tab === 'skilled' ? 'active' : ''}`}
-              onClick={() => setTab('skilled')}
+              className={`analytics-tab-btn ${tab === 'session' ? 'active' : ''}`}
+              onClick={() => setTab('session')}
             >
-              <Layers size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />Skilled
+              Session
             </button>
-          )}
+            {hasCareer && (
+              <button
+                className={`analytics-tab-btn ${tab === 'career' ? 'active' : ''}`}
+                onClick={() => setTab('career')}
+              >
+                Career
+              </button>
+            )}
+          </div>
+        ) : <div />}
+
+        {stats.length > 0 && (
           <button
-            className={`analytics-tab-btn ${tab === 'session' ? 'active' : ''}`}
-            onClick={() => setTab('session')}
+            type="button"
+            className="analytics-share-recap-btn"
+            onClick={() => setShowRecapModal(true)}
+            title="Create shareable Instagram/social recap image"
           >
-            Session
+            <Share2 size={13} />
+            <span>Share Recap Card</span>
           </button>
-          {hasCareer && (
-            <button
-              className={`analytics-tab-btn ${tab === 'career' ? 'active' : ''}`}
-              onClick={() => setTab('career')}
-            >
-              Career
-            </button>
-          )}
-        </div>
-      )}
+        )}
+      </div>
+
+      <RecapModal
+        isOpen={showRecapModal}
+        onClose={() => setShowRecapModal(false)}
+        stats={stats}
+        history={history}
+        roomCode={roomCode}
+        mode={mode}
+        defaultVariant="host"
+      />
 
       {tab === 'skilled' && hasSkilled && (
         <>
