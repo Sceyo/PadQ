@@ -226,7 +226,13 @@ export function useSession(): SessionState & SessionActions {
       // onError: Firestore connection dropped — show "Reconnecting…"
       (err) => {
         console.error('[useSession] onSnapshot error:', err);
-        setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
+        const code = (err as { code?: string })?.code ?? '';
+        if (code.includes('permission-denied')) {
+          clearHostFromStorage();
+          setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+        } else {
+          setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
+        }
       },
       // onDeleted: TTL fired or document deleted — mark as expired
       () => {
@@ -240,9 +246,15 @@ export function useSession(): SessionState & SessionActions {
     );
 
     // History subcollection — match results, ordered newest-first
-    unsubHistoryRef.current = subscribeToHistory(sessionId, (entries) => {
-      setState(prev => ({ ...prev, matchHistory: entries }));
-    });
+    unsubHistoryRef.current = subscribeToHistory(
+      sessionId,
+      (entries) => {
+        setState(prev => ({ ...prev, matchHistory: entries }));
+      },
+      (err) => {
+        console.warn('[useSession] subscribeToHistory error:', err);
+      },
+    );
   }, []);
 
   // ── Heartbeat: prevent TTL deletion while host is active ───
@@ -317,6 +329,10 @@ export function useSession(): SessionState & SessionActions {
       }));
 
       attachListeners(sessionId);
+    }).catch(err => {
+      console.warn('[useSession] Failed to resume session from storage:', err);
+      clearHostFromStorage();
+      setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
     });
 
     return () => {
