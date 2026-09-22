@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const isDevelopment = process.env.NODE_ENV === "development";
 const developmentFirebaseConnections = isDevelopment
-  ? " http://127.0.0.1:8180 http://127.0.0.1:9199 ws://127.0.0.1:8180"
+  ? " http://127.0.0.1:8080 http://127.0.0.1:9099 ws://127.0.0.1:8080 http://127.0.0.1:8180 http://127.0.0.1:9199 ws://127.0.0.1:8180"
   : "";
 const contentSecurityPolicy = [
   "default-src 'self'",
