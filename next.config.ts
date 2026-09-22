@@ -6,13 +6,13 @@ const developmentFirebaseConnections = isDevelopment
   : "";
 const contentSecurityPolicy = [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""} https://www.google.com https://www.gstatic.com`,
+  `script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ""} https://www.google.com https://www.gstatic.com https://apis.google.com`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data:",
   "font-src 'self' data:",
   "media-src 'self' blob:",
   `connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://www.google.com https://www.gstatic.com https://www.recaptcha.net${developmentFirebaseConnections}`,
-  "frame-src https://www.google.com https://recaptcha.google.com https://www.recaptcha.net",
+  "frame-src 'self' https://www.google.com https://recaptcha.google.com https://www.recaptcha.net https://*.firebaseapp.com https://apis.google.com",
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
