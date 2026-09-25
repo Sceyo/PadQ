@@ -48,7 +48,8 @@ describe('RecapModal component', () => {
 
     expect(getByText('Shareable Session Recap')).toBeTruthy();
     expect(getByText(/1080×1080/)).toBeTruthy();
-    expect(getByText(/ROOM99/)).toBeTruthy();
+    // ROOM99 renders in both the visible preview card and the off-screen capture card
+    expect(container.querySelectorAll('.recap-room-code').length).toBe(2);
 
     // Check variant buttons
     const podiumBtn = getByText('Podium Edition');
@@ -56,8 +57,9 @@ describe('RecapModal component', () => {
     expect(podiumBtn.classList.contains('active')).toBe(true);
     expect(standingsBtn.classList.contains('active')).toBe(false);
 
-    // Host variant has podium cards
-    expect(container.querySelector('.recap-podium-row')).toBeTruthy();
+    // Host variant has podium cards in both preview and capture containers
+    expect(container.querySelector('.recap-preview-scaler .recap-podium-row')).toBeTruthy();
+    expect(container.querySelector('.recap-capture-container .recap-podium-row')).toBeTruthy();
   });
 
   it('allows switching to viewer full standings variant', () => {

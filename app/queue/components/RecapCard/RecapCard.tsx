@@ -21,7 +21,7 @@ export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function Rec
 ) {
   const recap = computeSessionRecap(stats, history);
   const dateStr = formatRecapDate();
-  const permanentUrl = 'https://padq.app?utm_source=recap_card';
+  const permanentUrl = 'https://pad-q.vercel.app?utm_source=recap_card';
 
   return (
     <div className="recap-card-root" ref={ref} data-variant={variant}>
@@ -215,7 +215,7 @@ export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function Rec
             <span>VERIFIED PADQ COURT SESSION</span>
           </div>
           <div className="recap-tagline">
-            Fair Live Matchmaking &amp; Court Rotations • padq.app
+            Fair Live Matchmaking &amp; Court Rotations • pad-q.vercel.app
           </div>
         </div>
 

@@ -205,7 +205,6 @@ export const RecapModal: React.FC<RecapModalProps> = ({
         <div className="recap-preview-viewport">
           <div className="recap-preview-scaler">
             <RecapCard
-              ref={cardRef}
               stats={stats}
               history={history}
               roomCode={roomCode}
@@ -213,6 +212,18 @@ export const RecapModal: React.FC<RecapModalProps> = ({
               variant={variant}
             />
           </div>
+        </div>
+
+        {/* Off-screen unscaled 1080x1080 container for high-DPI rasterization */}
+        <div className="recap-capture-container" aria-hidden="true">
+          <RecapCard
+            ref={cardRef}
+            stats={stats}
+            history={history}
+            roomCode={roomCode}
+            mode={mode}
+            variant={variant}
+          />
         </div>
 
         {/* Feedback notification toast */}

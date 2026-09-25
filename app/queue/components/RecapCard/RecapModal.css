@@ -162,6 +162,19 @@
   }
 }
 
+/* ── Off-screen Capture Container ───────────────────── */
+/* True 1080x1080 with NO CSS transforms so html-to-image captures full-frame */
+.recap-capture-container {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  width: 1080px;
+  height: 1080px;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -9999;
+}
+
 /* ── Feedback Toast ─────────────────────────────────── */
 .recap-toast {
   background: rgba(16, 185, 129, 0.2);
