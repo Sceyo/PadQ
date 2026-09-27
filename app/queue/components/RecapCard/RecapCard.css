@@ -54,11 +54,19 @@
 .recap-logo-pill {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
   padding: 8px 18px;
   border-radius: 9999px;
+}
+
+.recap-logo-img {
+  height: 28px;
+  width: auto;
+  max-height: 32px;
+  object-fit: contain;
+  display: block;
 }
 
 .recap-brand-title {

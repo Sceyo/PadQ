@@ -34,7 +34,13 @@ export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function Rec
       <header className="recap-header">
         <div className="recap-brand-group">
           <div className="recap-logo-pill">
-            <span className="recap-brand-title">PAD<span className="recap-brand-accent">Q</span></span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/padq-logo.png"
+              alt="PADQ"
+              className="recap-logo-img"
+              crossOrigin="anonymous"
+            />
             <span className="recap-brand-dot" />
             <span className="recap-brand-subtitle">SESSION RECAP</span>
           </div>

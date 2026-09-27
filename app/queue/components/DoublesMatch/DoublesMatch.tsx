@@ -31,10 +31,51 @@ export const DoublesMatch: React.FC<{
       ? (suggestedTeamB ? [...suggestedTeamB] : [firstFour[2], firstFour[3]])
       : []
   );
-  const [winner, setWinner] = useState<'A' | 'B' | null>(null);
-  const [pendingScore, setPendingScore] = useState<string | undefined>(undefined);
+  const [winner, setWinner] = useState<'A' | 'B' | null>(() => {
+    if (persistedScore && persistedScore.active) {
+      if (persistedScore.scoreA >= persistedScore.limit && persistedScore.scoreA > persistedScore.scoreB) return 'A';
+      if (persistedScore.scoreB >= persistedScore.limit && persistedScore.scoreB > persistedScore.scoreA) return 'B';
+    }
+    return null;
+  });
+  const [pendingScore, setPendingScore] = useState<string | undefined>(() => {
+    if (persistedScore && persistedScore.active) {
+      if (
+        (persistedScore.scoreA >= persistedScore.limit && persistedScore.scoreA > persistedScore.scoreB) ||
+        (persistedScore.scoreB >= persistedScore.limit && persistedScore.scoreB > persistedScore.scoreA)
+      ) {
+        return `${persistedScore.scoreA} – ${persistedScore.scoreB}`;
+      }
+    }
+    return undefined;
+  });
+  const [currentScore, setCurrentScore] = useState<LiveScoreState | null>(() => persistedScore ?? null);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+
+  React.useEffect(() => {
+    if (persistedScore !== undefined) {
+      setCurrentScore(persistedScore);
+      if (persistedScore && persistedScore.active) {
+        if (persistedScore.scoreA >= persistedScore.limit && persistedScore.scoreA > persistedScore.scoreB) {
+          setWinner('A');
+          setPendingScore(`${persistedScore.scoreA} – ${persistedScore.scoreB}`);
+        } else if (persistedScore.scoreB >= persistedScore.limit && persistedScore.scoreB > persistedScore.scoreA) {
+          setWinner('B');
+          setPendingScore(`${persistedScore.scoreA} – ${persistedScore.scoreB}`);
+        }
+      }
+    }
+  }, [persistedScore]);
+
+  const scoreWinner: 'A' | 'B' | null =
+    currentScore && currentScore.active
+      ? currentScore.scoreA >= currentScore.limit && currentScore.scoreA > currentScore.scoreB
+        ? 'A'
+        : currentScore.scoreB >= currentScore.limit && currentScore.scoreB > currentScore.scoreA
+          ? 'B'
+          : null
+      : null;
 
   const toggle = (p: string) => {
     if (!isHost) return;
@@ -49,6 +90,7 @@ export const DoublesMatch: React.FC<{
     if (!isHost || submittingRef.current) return;
     if (teamA.length !== 2 || teamB.length !== 2) { alert('Assign all 4 players first'); return; }
     if (!winner) { alert('Select the winning team'); return; }
+    if (scoreWinner && winner !== scoreWinner) return;
     // Lock synchronously. State alone would not stop a second click dispatched
     // before React replaces this match card with the next pairing.
     submittingRef.current = true;
@@ -62,11 +104,24 @@ export const DoublesMatch: React.FC<{
   };
 
   const handleScoreChange = (score: LiveScoreState | null) => {
-    // If the host corrects a score after selecting its winner, require the
-    // corrected result to be reviewed again before the match is submitted.
-    if (pendingScore) {
-      setWinner(null);
-      setPendingScore(undefined);
+    setCurrentScore(score);
+    if (score && score.active) {
+      if (score.scoreA >= score.limit && score.scoreA > score.scoreB) {
+        setWinner('A');
+        setPendingScore(`${score.scoreA} – ${score.scoreB}`);
+      } else if (score.scoreB >= score.limit && score.scoreB > score.scoreA) {
+        setWinner('B');
+        setPendingScore(`${score.scoreA} – ${score.scoreB}`);
+      } else if (pendingScore) {
+        // If score was corrected below limit, clear auto-selection
+        setWinner(null);
+        setPendingScore(undefined);
+      }
+    } else {
+      if (pendingScore) {
+        setWinner(null);
+        setPendingScore(undefined);
+      }
     }
     onScoreChange?.(score);
   };
@@ -118,10 +173,22 @@ export const DoublesMatch: React.FC<{
       />
       <div className="winning-team">
         <span className="winning-label">Winner:</span>
-        <button onClick={() => isHost && setWinner('A')} className={winner === 'A' ? 'selected-winner' : ''} disabled={teamA.length !== 2 || !isHost}>
+        <button
+          type="button"
+          onClick={() => isHost && (!scoreWinner || scoreWinner === 'A') && setWinner('A')}
+          className={winner === 'A' ? 'selected-winner' : ''}
+          disabled={teamA.length !== 2 || !isHost || (scoreWinner !== null && scoreWinner !== 'A')}
+          title={scoreWinner === 'B' ? `${teamB.join(' & ') || 'Team B'} won by score` : undefined}
+        >
           <Trophy size={12} /> Team A {winner === 'A' && pendingScore && `(${pendingScore})`}
         </button>
-        <button onClick={() => isHost && setWinner('B')} className={winner === 'B' ? 'selected-winner' : ''} disabled={teamB.length !== 2 || !isHost}>
+        <button
+          type="button"
+          onClick={() => isHost && (!scoreWinner || scoreWinner === 'B') && setWinner('B')}
+          className={winner === 'B' ? 'selected-winner' : ''}
+          disabled={teamB.length !== 2 || !isHost || (scoreWinner !== null && scoreWinner !== 'B')}
+          title={scoreWinner === 'A' ? `${teamA.join(' & ') || 'Team A'} won by score` : undefined}
+        >
           <Trophy size={12} /> Team B {winner === 'B' && pendingScore && `(${pendingScore})`}
         </button>
       </div>

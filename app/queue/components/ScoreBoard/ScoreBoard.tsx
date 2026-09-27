@@ -6,6 +6,52 @@ import type { LiveScoreState } from '@/lib/sessionService';
 
 const SCORE_PRESETS = [11, 21] as const;
 
+export const SCORING_ENABLED_STORAGE_KEY = 'padq_scoring_enabled';
+export const SCORING_LIMIT_STORAGE_KEY = 'padq_scoring_limit';
+
+export function getStoredScoringEnabled(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    const val = localStorage.getItem(SCORING_ENABLED_STORAGE_KEY);
+    if (val !== null) return val === 'true';
+  } catch {
+    // Ignore storage errors in restricted contexts
+  }
+  return true;
+}
+
+export function setStoredScoringEnabled(enabled: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SCORING_ENABLED_STORAGE_KEY, String(enabled));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export function getStoredScoringLimit(): number {
+  if (typeof window === 'undefined') return 11;
+  try {
+    const val = localStorage.getItem(SCORING_LIMIT_STORAGE_KEY);
+    if (val !== null) {
+      const num = parseInt(val, 10);
+      if (!isNaN(num) && num > 1) return num;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+  return 11;
+}
+
+export function setStoredScoringLimit(limit: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(SCORING_LIMIT_STORAGE_KEY, String(limit));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
 type ScoreBoardProps = {
   labelA:         string;
   labelB:         string;
@@ -23,11 +69,14 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
     ? persistedScore
     : null;
 
-  const [active,      setActive]      = useState(true);
+  const [active,      setActive]      = useState<boolean>(() => {
+    if (savedScore) return savedScore.active;
+    return getStoredScoringEnabled();
+  });
   const [scoreA,      setScoreA]      = useState(savedScore?.scoreA ?? 0);
   const [scoreB,      setScoreB]      = useState(savedScore?.scoreB ?? 0);
-  const [baseLimit,   setBaseLimit]   = useState(savedScore?.baseLimit ?? 11);
-  const [limit,       setLimit]       = useState(savedScore?.limit ?? 11);
+  const [baseLimit,   setBaseLimit]   = useState(savedScore?.baseLimit ?? getStoredScoringLimit());
+  const [limit,       setLimit]       = useState(savedScore?.limit ?? getStoredScoringLimit());
   const [customLimit, setCustomLimit] = useState('');
   const [showCustom,  setShowCustom]  = useState(false);
   const [finished,    setFinished]    = useState(
@@ -40,15 +89,25 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
   const reset = (newBase?: number) => {
     const b = newBase ?? baseLimit;
     setScoreA(0); setScoreB(0); setFinished(false); setInDeuce(false); setLimit(b);
-    if (newBase !== undefined) setBaseLimit(b);
+    if (newBase !== undefined) {
+      setBaseLimit(b);
+      setStoredScoringLimit(b);
+    }
     submittingResultRef.current = false;
     setSubmittingResult(false);
     onScoreChange?.({ scoreA: 0, scoreB: 0, limit: b, baseLimit: b, labelA, labelB, deuce: false, active });
   };
 
   const toggleActive = () => {
-    if (active) { reset(); onScoreChange?.(null); } else { onScoreChange?.({ scoreA: 0, scoreB: 0, limit, baseLimit, labelA, labelB, deuce: false, active: true }); }
-    setActive(a => !a);
+    const nextActive = !active;
+    setStoredScoringEnabled(nextActive);
+    if (active) {
+      reset();
+      onScoreChange?.(null);
+    } else {
+      onScoreChange?.({ scoreA: 0, scoreB: 0, limit, baseLimit, labelA, labelB, deuce: false, active: true });
+    }
+    setActive(nextActive);
   };
 
   const increment = (side: 'A' | 'B') => {
