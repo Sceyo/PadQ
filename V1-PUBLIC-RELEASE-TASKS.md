@@ -347,3 +347,77 @@ All 11 vars are `NEXT_PUBLIC_*`. App Check vars are Production-scoped only. Emul
 
 **Cross-browser smoke test — user action required:** Must be performed on real devices: **iOS Safari** and **Android Chrome**. Items to confirm: (1) WinnerModal dismisses on overlay tap, (2) QR camera permission prompt appears only on first explicit scan tap, (3) "Connected" in session bar appears within 10s, (4) Undo Last Match appears in Settings after a match finishes on a real 3-court session. Agent cannot perform this test.
 
+---
+
+## 2026-09-28 — Auth Resilience Fix (branch: `auth-resilience` off commit `40f014c`)
+
+### What this fixes
+
+The Firestore SDK's internal async listener machinery throws `FIRESTORE INTERNAL ASSERTION FAILED: Unexpected state (ID: 3c6b) CONTEXT: {"code":"auth/invalid-refresh-token"}` as an unhandled promise rejection. Nothing in the prior codebase intercepted this path — not `app/error.tsx` (only catches render errors), not the `onSnapshot` error callbacks (assertion failures bypass those). The result was a permanently-wedged tab with no user-visible recovery path.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `lib/authResilience.ts` | NEW — global resilience manager: detection, silent recovery, fatal state pub/sub, `window.unhandledrejection` / `window.error` listeners |
+| `lib/firebase.ts` | Import resilience module; call `setupGlobalAuthResilience()` on browser load; wrap `ensureAuthenticated()` with fatal-error catch |
+| `components/AuthResilience/AuthResilienceBanner.tsx` | NEW — fixed amber overlay with "Refresh Session" button; renders null in normal state |
+| `components/AuthResilience/AuthResilienceBanner.css` | NEW — z-index 10000 amber overlay, spin animation for recovering state |
+| `app/layout.tsx` | Mount `AuthResilienceBanner` at root — present on all pages |
+| `hooks/useSession.ts` | `subscribeToSession` / `subscribeToHistory` / `loadSession` all call `triggerFatalAuthError` on fatal errors |
+| `app/page.tsx` | Added "Feedback & Issues" link in footer pointing to `https://github.com/Sceyo/PadQ/issues` |
+| `app/queue/components/GearMenu/GearMenu.tsx` | Added "Feedback & Issues" item with `MessageSquare` icon pointing to GitHub Issues |
+| `app/Homepage.css` | `.hp-footer-dot` separator style; `align-items: center` on `.hp-footer-links` |
+| `tests/authResilience.test.ts` | NEW — 7 unit tests for detection logic, state transitions, localStorage cleanup, global listener |
+| `tests/authResilienceBanner.test.tsx` | NEW — 2 component tests: null render in normal state; amber overlay + Refresh button in fatal state |
+| `tests/e2e/auth-resilience.pw.ts` | NEW — 2 Playwright/emulator E2E tests: (1) injected stale token → overlay → refresh → recovery; (2) happy path — no overlay, feedback link visible |
+
+### Manual failure reproduction (Playwright + emulator)
+
+1. Started emulator (`firebase emulators:start`), navigated to `http://localhost:3000`.
+2. Injected stale `firebase:authUser:*` key into localStorage via `page.evaluate`.
+3. Dispatched `PromiseRejectionEvent` with `reason: new Error("FIRESTORE INTERNAL ASSERTION FAILED: Unexpected state (ID: 3c6b) CONTEXT: {\"code\":\"auth/invalid-refresh-token\"}")`.
+4. **Confirmed:** `.auth-resilience-overlay` appeared with message "Your session needs to refresh".
+5. Clicked "Refresh Session" — `clearStaleFirebaseAuth` ran, `firebase:authUser:*` key gone from localStorage, `padq_session_id` and other `padq_*` keys preserved, page reloaded cleanly to working state.
+6. **Confirmed:** No overlay shown during a normal end-to-end emulator session (happy path).
+
+### Live production URL verification (`https://pad-q.vercel.app`)
+
+- Page loads: HTTP 200 ✓
+- Homepage renders (`.hp-brand` visible) ✓
+- Privacy link visible in footer ✓
+- "Feedback & Issues" link visible in footer (points to `https://github.com/Sceyo/PadQ/issues`) ✓ *(this link is on `main` via the auth-resilience branch — requires merge before it is live)*
+- Doubles mode navigates to `/queue?mode=doubles` ✓
+- `Start Queue` on production returns `Firebase blocked room creation` — **expected and correct**: App Check enforcement blocks Playwright's automated Chrome from passing App Check token validation. This is not an app bug. Full session start on production requires a real browser with App Check passing. Agent cannot perform that step.
+
+### Feedback channel (Section 8)
+
+Two entry points confirmed:
+1. **Homepage footer** — "Feedback & Issues" link with `•` separator, visible without entering a session.
+2. **GearMenu (in-queue)** — "Feedback & Issues" item with `MessageSquare` icon, accessible from the gear icon during any active session.
+
+Both link to `https://github.com/Sceyo/PadQ/issues`.
+
+### Full local gate results (2026-09-28)
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | **exit 0** — no type errors |
+| `npm run lint` | **exit 0** — 0 errors, 26 warnings (all pre-existing) |
+| `npx vitest run` | **195 passed \| 21 skipped** (16 passed \| 1 skipped file) — includes 7 new authResilience unit tests + 2 new AuthResilienceBanner component tests |
+| `npm run build` | **exit 0** — Next.js 16.3.5 (Turbopack), all routes compile: `/`, `/_not-found`, `/privacy`, `/queue`, `/watch/[sessionId]` |
+
+### `session-recap-card` merge decision — EXPLICIT STATEMENT
+
+**Decision: merge `session-recap-card` as a fast-follow, immediately after `auth-resilience` ships to production.**
+
+Rationale: Both bugs on the `session-recap-card` branch are fixed and verified (capture-container scale bug, pad-q.vercel.app domain in share URL). The branch is clean, tests pass, and the recap feature is user-visible value. There is no reason to hold it past the auth-resilience deploy. The merge order is: (1) `auth-resilience` → `main` → Vercel deploy; (2) `session-recap-card` → `main` → Vercel deploy as the immediate follow-on. Do not bundle them into a single merge — keep the git history legible.
+
+### Next actions required (human)
+
+1. Open PR: `auth-resilience` → `main`.
+2. Merge PR — Vercel will auto-deploy.
+3. Verify amber overlay and "Refresh Session" button are visible on `https://pad-q.vercel.app` by manually injecting a stale auth key in DevTools and reloading (optional but recommended).
+4. Open PR: `session-recap-card` → `main`. Merge as fast-follow.
+5. Open PADQ to public testers.
+

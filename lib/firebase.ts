@@ -81,15 +81,43 @@ if (typeof window !== 'undefined' && useFirebaseEmulators && !emulatorGlobal.__p
   emulatorGlobal.__padqFirebaseEmulatorsConnected = true;
 }
 
+// Initialize global unhandledrejection and error listeners early in browser
+import {
+  setupGlobalAuthResilience,
+  isAuthOrFirestoreFatalError,
+  attemptSilentAuthRecovery,
+} from './authResilience';
+
+if (typeof window !== 'undefined') {
+  setupGlobalAuthResilience();
+}
+
 let signInPromise: Promise<User> | null = null;
 
 /** Ensure every client has an identity before it accesses Firestore. */
 export async function ensureAuthenticated(): Promise<User> {
-  await auth.authStateReady();
+  try {
+    await auth.authStateReady();
+  } catch (err) {
+    if (isAuthOrFirestoreFatalError(err)) {
+      await attemptSilentAuthRecovery();
+    }
+  }
+
   if (auth.currentUser) return auth.currentUser;
+
   if (!signInPromise) {
     signInPromise = signInAnonymously(auth)
       .then(credential => credential.user)
+      .catch(async (err) => {
+        if (isAuthOrFirestoreFatalError(err)) {
+          const recovered = await attemptSilentAuthRecovery();
+          if (recovered && auth.currentUser) {
+            return auth.currentUser;
+          }
+        }
+        throw err;
+      })
       .finally(() => { signInPromise = null; });
   }
   return signInPromise;
