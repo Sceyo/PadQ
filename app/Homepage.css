@@ -106,9 +106,10 @@
   position:absolute; width:1px; height:1px; padding:0; margin:-1px;
   overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0;
 }
-.hp-footer-links { display:flex; justify-content:center; font-size:.72rem; }
+.hp-footer-links { display:flex; justify-content:center; align-items:center; font-size:.72rem; }
 .hp-footer-links a { color:#6b7280; text-decoration:none; }
 .hp-footer-links a:hover, .hp-footer-links a:focus-visible { color:#c4b5fd; text-decoration:underline; }
+.hp-footer-dot { color:#4b5563; margin:0 8px; }
 
 /* ═══════════════════════════════════════════════════════════
    WATCH MODAL

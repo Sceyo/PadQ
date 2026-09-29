@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { auth } from '@/lib/firebase';
+import { isAuthOrFirestoreFatalError, triggerFatalAuthError } from '@/lib/authResilience';
 import {
   createSession,
   loadSession,
@@ -233,6 +234,10 @@ export function useSession(): SessionState & SessionActions {
         } else {
           setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
         }
+        if (isAuthOrFirestoreFatalError(err)) {
+          triggerFatalAuthError(err);
+        }
+        setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
       },
       // onDeleted: TTL fired or document deleted — mark as expired
       () => {
@@ -252,7 +257,10 @@ export function useSession(): SessionState & SessionActions {
         setState(prev => ({ ...prev, matchHistory: entries }));
       },
       (err) => {
-        console.warn('[useSession] subscribeToHistory error:', err);
+        console.error('[useSession] history onSnapshot error:', err);
+        if (isAuthOrFirestoreFatalError(err)) {
+          triggerFatalAuthError(err);
+        }
       },
     );
   }, []);
@@ -333,6 +341,10 @@ export function useSession(): SessionState & SessionActions {
       console.warn('[useSession] Failed to resume session from storage:', err);
       clearHostFromStorage();
       setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+      console.error('[useSession] loadSession mount error:', err);
+      if (isAuthOrFirestoreFatalError(err)) {
+        triggerFatalAuthError(err);
+      }
     });
 
     return () => {

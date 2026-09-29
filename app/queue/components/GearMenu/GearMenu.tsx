@@ -6,6 +6,7 @@ import {
   Settings, RotateCcw, HelpCircle, Copy, Check,
   QrCode, LayoutGrid, Undo2, KeyRound, LogIn, ShieldCheck,
   Share2,
+  MessageSquare,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -264,6 +265,17 @@ export function GearMenu({
           >
             <ShieldCheck size={14} /> Privacy &amp; Data
           </Link>
+
+          <a
+            className="gear-menu-item"
+            role="menuitem"
+            href="https://github.com/Sceyo/PadQ/issues"
+            target="_blank"
+            rel="noreferrer"
+            onClick={closeMenu}
+          >
+            <MessageSquare size={14} /> Feedback &amp; Issues
+          </a>
 
           <button
             className="gear-menu-item"
