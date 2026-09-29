@@ -285,6 +285,14 @@ export default function HomePage() {
           >
             Privacy &amp; Data Retention
           </Link>
+          <span className="hp-footer-dot">•</span>
+          <a
+            href="https://github.com/Sceyo/PadQ/issues"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Feedback &amp; Issues
+          </a>
         </div>
       </div>
 

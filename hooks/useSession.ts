@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { auth } from '@/lib/firebase';
+import { isAuthOrFirestoreFatalError, triggerFatalAuthError } from '@/lib/authResilience';
 import {
   createSession,
   loadSession,
@@ -226,6 +227,9 @@ export function useSession(): SessionState & SessionActions {
       // onError: Firestore connection dropped — show "Reconnecting…"
       (err) => {
         console.error('[useSession] onSnapshot error:', err);
+        if (isAuthOrFirestoreFatalError(err)) {
+          triggerFatalAuthError(err);
+        }
         setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
       },
       // onDeleted: TTL fired or document deleted — mark as expired
@@ -240,9 +244,18 @@ export function useSession(): SessionState & SessionActions {
     );
 
     // History subcollection — match results, ordered newest-first
-    unsubHistoryRef.current = subscribeToHistory(sessionId, (entries) => {
-      setState(prev => ({ ...prev, matchHistory: entries }));
-    });
+    unsubHistoryRef.current = subscribeToHistory(
+      sessionId,
+      (entries) => {
+        setState(prev => ({ ...prev, matchHistory: entries }));
+      },
+      (err) => {
+        console.error('[useSession] history onSnapshot error:', err);
+        if (isAuthOrFirestoreFatalError(err)) {
+          triggerFatalAuthError(err);
+        }
+      },
+    );
   }, []);
 
   // ── Heartbeat: prevent TTL deletion while host is active ───
@@ -317,6 +330,11 @@ export function useSession(): SessionState & SessionActions {
       }));
 
       attachListeners(sessionId);
+    }).catch(err => {
+      console.error('[useSession] loadSession mount error:', err);
+      if (isAuthOrFirestoreFatalError(err)) {
+        triggerFatalAuthError(err);
+      }
     });
 
     return () => {
