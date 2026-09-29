@@ -34,6 +34,9 @@ export const DoublesMatch: React.FC<{
   const [winner, setWinner] = useState<'A' | 'B' | null>(null);
   const [pendingScore, setPendingScore] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
+  // scoreWinner: set by ScoreBoard when a team reaches the score limit.
+  // While set, the losing team's winner button is locked out.
+  const [scoreWinner, setScoreWinner] = useState<'A' | 'B' | null>(null);
   const submittingRef = useRef(false);
 
   const toggle = (p: string) => {
@@ -62,13 +65,37 @@ export const DoublesMatch: React.FC<{
   };
 
   const handleScoreChange = (score: LiveScoreState | null) => {
-    // If the host corrects a score after selecting its winner, require the
-    // corrected result to be reviewed again before the match is submitted.
-    if (pendingScore) {
-      setWinner(null);
-      setPendingScore(undefined);
+    if (score !== null) {
+      if (score.scoreA >= score.limit) {
+        setScoreWinner('A');
+        setWinner('A');
+        setPendingScore(`${score.scoreA} – ${score.scoreB}`);
+      } else if (score.scoreB >= score.limit) {
+        setScoreWinner('B');
+        setWinner('B');
+        setPendingScore(`${score.scoreA} – ${score.scoreB}`);
+      } else {
+        setScoreWinner(null);
+        if (pendingScore) {
+          setWinner(null);
+          setPendingScore(undefined);
+        }
+      }
+    } else {
+      setScoreWinner(null);
+      if (pendingScore) {
+        setWinner(null);
+        setPendingScore(undefined);
+      }
     }
     onScoreChange?.(score);
+  };
+
+  // Called by ScoreBoard when a team reaches the score limit.
+  const handleScoreWin = (side: 'A' | 'B', sA: number, sB: number) => {
+    setScoreWinner(side);
+    setWinner(side);
+    setPendingScore(`${sA} – ${sB}`);
   };
 
   return (
@@ -109,7 +136,7 @@ export const DoublesMatch: React.FC<{
       <ScoreBoard
         labelA={teamA.length ? teamA.join(' & ') : 'Team A'}
         labelB={teamB.length ? teamB.join(' & ') : 'Team B'}
-        onWin={(side, sA, sB) => { setWinner(side); setPendingScore(`${sA} – ${sB}`); }}
+        onWin={handleScoreWin}
         disabled={!isHost}
         onScoreChange={isHost ? handleScoreChange : undefined}
         viewerScore={!isHost ? viewerScore : null}
@@ -118,10 +145,18 @@ export const DoublesMatch: React.FC<{
       />
       <div className="winning-team">
         <span className="winning-label">Winner:</span>
-        <button onClick={() => isHost && setWinner('A')} className={winner === 'A' ? 'selected-winner' : ''} disabled={teamA.length !== 2 || !isHost}>
+        <button
+          onClick={() => isHost && !scoreWinner && setWinner('A')}
+          className={winner === 'A' ? 'selected-winner' : ''}
+          disabled={teamA.length !== 2 || !isHost || scoreWinner === 'B'}
+        >
           <Trophy size={12} /> Team A {winner === 'A' && pendingScore && `(${pendingScore})`}
         </button>
-        <button onClick={() => isHost && setWinner('B')} className={winner === 'B' ? 'selected-winner' : ''} disabled={teamB.length !== 2 || !isHost}>
+        <button
+          onClick={() => isHost && !scoreWinner && setWinner('B')}
+          className={winner === 'B' ? 'selected-winner' : ''}
+          disabled={teamB.length !== 2 || !isHost || scoreWinner === 'A'}
+        >
           <Trophy size={12} /> Team B {winner === 'B' && pendingScore && `(${pendingScore})`}
         </button>
       </div>
