@@ -6,6 +6,8 @@ import type { LiveScoreState } from '@/lib/sessionService';
 
 const SCORE_PRESETS = [11, 21] as const;
 
+export const SCORING_ENABLED_STORAGE_KEY = 'padq_scoring_enabled';
+
 type ScoreBoardProps = {
   labelA:         string;
   labelB:         string;
@@ -23,7 +25,13 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
     ? persistedScore
     : null;
 
-  const [active,      setActive]      = useState(true);
+  const [active,      setActive]      = useState(() => {
+    try {
+      const stored = localStorage.getItem(SCORING_ENABLED_STORAGE_KEY);
+      return stored === null ? true : stored !== 'false';
+    } catch { return true; }
+  });
+
   const [scoreA,      setScoreA]      = useState(savedScore?.scoreA ?? 0);
   const [scoreB,      setScoreB]      = useState(savedScore?.scoreB ?? 0);
   const [baseLimit,   setBaseLimit]   = useState(savedScore?.baseLimit ?? 11);
@@ -47,8 +55,10 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
   };
 
   const toggleActive = () => {
+    const next = !active;
+    try { localStorage.setItem(SCORING_ENABLED_STORAGE_KEY, String(next)); } catch { /* ignore */ }
     if (active) { reset(); onScoreChange?.(null); } else { onScoreChange?.({ scoreA: 0, scoreB: 0, limit, baseLimit, labelA, labelB, deuce: false, active: true }); }
-    setActive(a => !a);
+    setActive(next);
   };
 
   const increment = (side: 'A' | 'B') => {
@@ -63,7 +73,10 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
     setScoreA(nextA); setScoreB(nextB);
     const state: LiveScoreState = { scoreA: nextA, scoreB: nextB, limit: nextLimit, baseLimit, labelA, labelB, deuce: nextDeuce, active: true };
     onScoreChange?.(state);
-    if (nextA >= nextLimit || nextB >= nextLimit) setFinished(true);
+    if (nextA >= nextLimit || nextB >= nextLimit) {
+      setFinished(true);
+      onWin(nextA >= nextLimit ? 'A' : 'B', nextA, nextB);
+    }
   };
 
   const decrement = (side: 'A' | 'B') => {
