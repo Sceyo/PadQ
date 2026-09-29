@@ -75,7 +75,6 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
     onScoreChange?.(state);
     if (nextA >= nextLimit || nextB >= nextLimit) {
       setFinished(true);
-      onWin(nextA >= nextLimit ? 'A' : 'B', nextA, nextB);
     }
   };
 

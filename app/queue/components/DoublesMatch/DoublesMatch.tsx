@@ -65,20 +65,28 @@ export const DoublesMatch: React.FC<{
   };
 
   const handleScoreChange = (score: LiveScoreState | null) => {
-    // Score corrected below the limit — clear the score-determined winner lockout.
     if (score !== null) {
-      const reachedLimit = score.scoreA >= score.limit || score.scoreB >= score.limit;
-      if (!reachedLimit) {
+      if (score.scoreA >= score.limit) {
+        setScoreWinner('A');
+        setWinner('A');
+        setPendingScore(`${score.scoreA} – ${score.scoreB}`);
+      } else if (score.scoreB >= score.limit) {
+        setScoreWinner('B');
+        setWinner('B');
+        setPendingScore(`${score.scoreA} – ${score.scoreB}`);
+      } else {
         setScoreWinner(null);
+        if (pendingScore) {
+          setWinner(null);
+          setPendingScore(undefined);
+        }
       }
     } else {
       setScoreWinner(null);
-    }
-    // If the host corrects a score after selecting its winner, require the
-    // corrected result to be reviewed again before the match is submitted.
-    if (pendingScore) {
-      setWinner(null);
-      setPendingScore(undefined);
+      if (pendingScore) {
+        setWinner(null);
+        setPendingScore(undefined);
+      }
     }
     onScoreChange?.(score);
   };

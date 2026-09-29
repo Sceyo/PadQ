@@ -26,7 +26,7 @@ import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
   Wifi, Check,
   BarChart2, TrendingUp, Activity, AlertCircle,
-  Loader2,
+  Loader2, Share2,
 } from 'lucide-react';
 import {
   subscribeToSession,
@@ -42,6 +42,7 @@ import { RankBadge } from '@/app/queue/components/atoms/RankBadge';
 import { StreakBadge } from '@/app/queue/components/atoms/StreakBadge';
 import { buildPlayerStats } from '@/app/queue/lib/playerUtils';
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
+import { RecapModal } from '@/app/queue/components/RecapCard';
 import { LiveCourtStatus } from './LiveCourtStatus';
 import './watch.css';
 
@@ -134,6 +135,7 @@ function WatchPageContent() {
   const selectedCourtStorageKey = `padq_watch_selected_court_${sessionId}`;
   const [showHistory,     setShowHistory]     = useState(false);
   const [showAllHistory,  setShowAllHistory]  = useState(false);
+  const [showRecapModal,  setShowRecapModal]  = useState(false);
   const [selectedCourtId, setSelectedCourtId] = useState(() => {
     if (typeof window === 'undefined') return '';
     try {
@@ -760,7 +762,18 @@ function WatchPageContent() {
             ══════════════════════════════════════════════════ */}
         {showHistory && stats.length > 0 && (
           <div className="w-section">
-            <h2 className="w-section-title"><BarChart2 size={15} /> Player Performance</h2>
+            <div className="w-stats-hdr">
+              <h2 className="w-section-title" style={{ margin: 0 }}><BarChart2 size={15} /> Player Performance</h2>
+              <button
+                type="button"
+                className="w-share-recap-btn"
+                onClick={() => setShowRecapModal(true)}
+                title="Share Session Standings Card"
+              >
+                <Share2 size={13} />
+                Share Standings Card
+              </button>
+            </div>
             <div className="w-stats-table-wrap">
               <table className="w-stats-table">
                 <thead>
@@ -835,6 +848,16 @@ function WatchPageContent() {
               )
           )}
         </div>
+
+        <RecapModal
+          isOpen={showRecapModal}
+          onClose={() => setShowRecapModal(false)}
+          stats={stats}
+          history={history}
+          roomCode={sessionId}
+          mode={session?.gameMode ?? 'doubles'}
+          defaultVariant="viewer"
+        />
       </div>
     </div>
   );
