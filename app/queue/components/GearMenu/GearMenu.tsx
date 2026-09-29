@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   Settings, RotateCcw, HelpCircle, Copy, Check,
   QrCode, LayoutGrid, Undo2, KeyRound, LogIn, ShieldCheck,
-  MessageSquare,
+  MessageSquare, Share2,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -22,6 +22,7 @@ export interface GearMenuProps {
   canUndo?:           boolean;
   onUndo?:            () => void;
   onRecoverHost?:     (token: string) => Promise<boolean>;
+  onShowRecap?:       () => void;
 }
 
 export function GearMenu({
@@ -30,6 +31,7 @@ export function GearMenu({
   hasMultipleCourts, onShowCoordinator,
   canUndo, onUndo,
   onRecoverHost,
+  onShowRecap,
 }: GearMenuProps) {
   const [open,          setOpen]          = useState(false);
   const [copied,        setCopied]        = useState(false);
@@ -236,6 +238,16 @@ export function GearMenu({
               onClick={() => { closeMenu(); onHardReset(); }}
             >
               <RotateCcw size={14} /> End & Delete Event
+            </button>
+          )}
+
+          {onShowRecap && (
+            <button
+              className="gear-menu-item"
+              role="menuitem"
+              onClick={() => { closeMenu(); onShowRecap(); }}
+            >
+              <Share2 size={14} /> Session Recap Card
             </button>
           )}
 

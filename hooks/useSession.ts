@@ -230,7 +230,13 @@ export function useSession(): SessionState & SessionActions {
         if (isAuthOrFirestoreFatalError(err)) {
           triggerFatalAuthError(err);
         }
-        setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
+        const code = (err as { code?: string })?.code ?? '';
+        if (code.includes('permission-denied')) {
+          clearHostFromStorage();
+          setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+        } else {
+          setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
+        }
       },
       // onDeleted: TTL fired or document deleted — mark as expired
       () => {
@@ -334,6 +340,9 @@ export function useSession(): SessionState & SessionActions {
       console.error('[useSession] loadSession mount error:', err);
       if (isAuthOrFirestoreFatalError(err)) {
         triggerFatalAuthError(err);
+      } else {
+        clearHostFromStorage();
+        setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
       }
     });
 

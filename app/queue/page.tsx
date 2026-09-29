@@ -81,6 +81,7 @@ import { CoordinatorOverlay } from './components/CoordinatorOverlay/CoordinatorO
 import { SetupView } from './components/SetupView/SetupView';
 import { SitOutPanel } from './components/SitOutPanel/SitOutPanel';
 import { SkilledView, type SkilledBrackets } from './components/SkilledView/SkilledView';
+import { RecapModal } from './components/RecapCard';
 
 // ── Undo snapshot type ────────────────────────────────────────
 interface UndoSnapshot {
@@ -181,6 +182,7 @@ function QueueSystemContent() {
   const [isLiveLocal,  setIsLiveLocal]  = useState(false);
   const [showGuide,       setShowGuide]       = useState(false);
   const [showCoordinator, setShowCoordinator] = useState(false);
+  const [showRecapModal,   setShowRecapModal]   = useState(false);
 
   // ── Career stats (persists across sessions) ───────────────
   const [careerStats, setCareerStats] = useState<CareerStatsMap>(() => loadCareerStats());
@@ -1531,6 +1533,7 @@ function QueueSystemContent() {
     onShowCoordinator: () => setShowCoordinator(true),
     canUndo,
     onUndo: handleUndoLastMatch,
+    onShowRecap: activeHistory.length > 0 ? () => setShowRecapModal(true) : undefined,
   };
 
   // ── RENDER B — Tournament ─────────────────────────────────
@@ -1549,7 +1552,15 @@ function QueueSystemContent() {
         {restorationWarning && (<div className="session-alert session-alert--warn">⚠ Queue state could not be restored (browser storage was corrupted). Your player list is empty — please re-enter it. <button onClick={dismissRestorationWarning}>Dismiss</button></div>)}
         {modeSelector}{elimSelector}{uiControls}{tabBar}
         {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
-        {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} /> : (
+        {activeTab === 'analytics' ? (
+          <AnalyticsDashboard
+            stats={statsList}
+            careerStats={careerStats}
+            history={activeHistory}
+            roomCode={session.sessionId}
+            mode={gameMode ?? 'doubles'}
+          />
+        ) : (
           <div className="main-layout">
             <div className="queue-area">
               <h1 className="queue-title"><Trophy size={20} />{gameMode === 'singles' ? 'Singles' : 'Doubles'} Tournament</h1>
@@ -1572,12 +1583,67 @@ function QueueSystemContent() {
                         <div className="tourn-team-block"><span className="tourn-team-label tourn-team-label--b">Team B</span><span className="team-chip team-chip--b">{pendingMatch.player2}</span></div>
                       </div>
                       <ScoreBoard labelA={pendingMatch.player1!} labelB={pendingMatch.player2!} disabled={!session.isHost} onScoreChange={session.isHost ? handleScoreChange : undefined} viewerScore={!session.isHost ? (session.liveScore ?? null) : null} onWin={(side) => { if (!session.isHost) return; handleTournamentMatch(pendingMatch.id, side === 'A' ? pendingMatch.player1! : pendingMatch.player2!); }} />
-                      {session.isHost && (<div className="winning-team"><span className="winning-label">Winner:</span><button onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player1!)}><Trophy size={12} /> {pendingMatch.player1}</button><button onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player2!)}><Trophy size={12} /> {pendingMatch.player2}</button></div>)}
+                      {session.isHost && (() => {
+                        const tScore = session.liveScore;
+                        const tWinner = tScore && tScore.active
+                          ? tScore.scoreA >= tScore.limit && tScore.scoreA > tScore.scoreB
+                            ? 'A'
+                            : tScore.scoreB >= tScore.limit && tScore.scoreB > tScore.scoreA
+                              ? 'B'
+                              : null
+                          : null;
+                        return (
+                          <div className="winning-team">
+                            <span className="winning-label">Winner:</span>
+                            <button
+                              onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player1!)}
+                              disabled={tWinner === 'B'}
+                              title={tWinner === 'B' ? `${pendingMatch.player2} won by score` : undefined}
+                            >
+                              <Trophy size={12} /> {pendingMatch.player1}
+                            </button>
+                            <button
+                              onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player2!)}
+                              disabled={tWinner === 'A'}
+                              title={tWinner === 'A' ? `${pendingMatch.player1} won by score` : undefined}
+                            >
+                              <Trophy size={12} /> {pendingMatch.player2}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </>
                   ) : (
                     <>
                       <ScoreBoard labelA={pendingMatch.player1!} labelB={pendingMatch.player2!} disabled={!session.isHost} onScoreChange={session.isHost ? handleScoreChange : undefined} viewerScore={!session.isHost ? (session.liveScore ?? null) : null} onWin={(side) => { if (!session.isHost) return; handleTournamentMatch(pendingMatch.id, side === 'A' ? pendingMatch.player1! : pendingMatch.player2!); }} />
-                      {session.isHost && (<div className="match-buttons" style={{ marginTop: 14 }}><button onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player1!)}><Trophy size={12} /> {pendingMatch.player1}</button><button onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player2!)}><Trophy size={12} /> {pendingMatch.player2}</button></div>)}
+                      {session.isHost && (() => {
+                        const tScore = session.liveScore;
+                        const tWinner = tScore && tScore.active
+                          ? tScore.scoreA >= tScore.limit && tScore.scoreA > tScore.scoreB
+                            ? 'A'
+                            : tScore.scoreB >= tScore.limit && tScore.scoreB > tScore.scoreA
+                              ? 'B'
+                              : null
+                          : null;
+                        return (
+                          <div className="match-buttons" style={{ marginTop: 14 }}>
+                            <button
+                              onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player1!)}
+                              disabled={tWinner === 'B'}
+                              title={tWinner === 'B' ? `${pendingMatch.player2} won by score` : undefined}
+                            >
+                              <Trophy size={12} /> {pendingMatch.player1}
+                            </button>
+                            <button
+                              onClick={() => handleTournamentMatch(pendingMatch.id, pendingMatch.player2!)}
+                              disabled={tWinner === 'A'}
+                              title={tWinner === 'A' ? `${pendingMatch.player1} won by score` : undefined}
+                            >
+                              <Trophy size={12} /> {pendingMatch.player2}
+                            </button>
+                          </div>
+                        );
+                      })()}
                     </>
                   )}
                 </div>
@@ -1601,6 +1667,15 @@ function QueueSystemContent() {
           ) : null;
         })()}
         <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
+        <RecapModal
+          isOpen={showRecapModal}
+          onClose={() => setShowRecapModal(false)}
+          stats={statsList}
+          history={activeHistory}
+          roomCode={session.sessionId}
+          mode={gameMode ?? 'doubles'}
+          defaultVariant="host"
+        />
         {V1_RELEASE.showLegacyCourtCoordinator && showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
         {toastMsg && (
           <div className="toast-notification" role="alert">
@@ -1649,7 +1724,16 @@ function QueueSystemContent() {
       {modeSelector}{uiControls}{tabBar}
       {!session.isHost && session.sessionId && (<div className="viewer-banner"><Wifi size={13} /> Watching live — only the host can make changes.</div>)}
 
-      {activeTab === 'analytics' ? <AnalyticsDashboard stats={statsList} careerStats={careerStats} skilledBrackets={isSkilled ? skilledBrackets : undefined} /> : (
+      {activeTab === 'analytics' ? (
+        <AnalyticsDashboard
+          stats={statsList}
+          careerStats={careerStats}
+          skilledBrackets={isSkilled ? skilledBrackets : undefined}
+          history={activeHistory}
+          roomCode={session.sessionId}
+          mode={gameMode ?? 'doubles'}
+        />
+      ) : (
         <div className="main-layout">
           <div className="queue-area">
             <h1 className="queue-title">
@@ -1919,7 +2003,34 @@ function QueueSystemContent() {
                   persistedScore={canControl ? (session.liveScore ?? null) : null}
                   scoreReady={!session.sessionId || session.isConnected}
                   onWin={(side, sA, sB) => { if (!canControl) return; handleSinglesMatch(side === 'A' ? queue[0] : queue[1], `${sA} – ${sB}`); }} />
-                {canControl && (<div className="match-buttons" style={{ marginTop: 14 }}><button onClick={() => handleSinglesMatch(queue[0])}><Trophy size={12} /> <PlayerLabel name={queue[0]} statsMap={statsMap} /> wins</button><button onClick={() => handleSinglesMatch(queue[1])}><Trophy size={12} /> <PlayerLabel name={queue[1]} statsMap={statsMap} /> wins</button></div>)}
+                {canControl && (() => {
+                  const sScore = session.liveScore;
+                  const sWinner = sScore && sScore.active
+                    ? sScore.scoreA >= sScore.limit && sScore.scoreA > sScore.scoreB
+                      ? 'A'
+                      : sScore.scoreB >= sScore.limit && sScore.scoreB > sScore.scoreA
+                        ? 'B'
+                        : null
+                    : null;
+                  return (
+                    <div className="match-buttons" style={{ marginTop: 14 }}>
+                      <button
+                        onClick={() => handleSinglesMatch(queue[0])}
+                        disabled={sWinner === 'B'}
+                        title={sWinner === 'B' ? `${queue[1]} won by score` : undefined}
+                      >
+                        <Trophy size={12} /> <PlayerLabel name={queue[0]} statsMap={statsMap} /> wins
+                      </button>
+                      <button
+                        onClick={() => handleSinglesMatch(queue[1])}
+                        disabled={sWinner === 'A'}
+                        title={sWinner === 'A' ? `${queue[0]} won by score` : undefined}
+                      >
+                        <Trophy size={12} /> <PlayerLabel name={queue[1]} statsMap={statsMap} /> wins
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             )}
             {/* Multi-court shared-queue view */}
@@ -2044,6 +2155,15 @@ function QueueSystemContent() {
         ) : null;
       })()}
       <UserGuide isOpen={showGuide} onClose={() => setShowGuide(false)} />
+      <RecapModal
+        isOpen={showRecapModal}
+        onClose={() => setShowRecapModal(false)}
+        stats={statsList}
+        history={activeHistory}
+        roomCode={session.sessionId}
+        mode={gameMode ?? 'doubles'}
+        defaultVariant="host"
+      />
       {V1_RELEASE.showLegacyCourtCoordinator && showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
       {toastMsg && (
         <div className="toast-notification" role="alert">
