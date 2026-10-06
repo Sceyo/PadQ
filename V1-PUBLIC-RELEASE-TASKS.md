@@ -421,3 +421,47 @@ Rationale: Both bugs on the `session-recap-card` branch are fixed and verified (
 4. Open PR: `session-recap-card` → `main`. Merge as fast-follow.
 5. Open PADQ to public testers.
 
+---
+
+## 2026-10-01 — Singles Pool-Rotation Engine (Single-Court Default Format)
+
+### What this adds
+
+Implements the Singles Pool-Rotation format as the default singles engine for single-court sessions, alongside King-of-the-Court as an explicit alternate setup choice:
+- **Pool-rotation lifecycle (`INIT` -> `WINNERS` -> `LOSERS`)** in `app/queue/lib/singlesPoolEngine.ts`.
+- **Fair pairing model**: Anti-repeat match penalties (`PENALTY_REPEAT_MATCH = 5`), fatigue penalties (`PENALTY_FATIGUE = 2`), and skill balancing (`PENALTY_SKILL_IMBALANCE = 1`).
+- **Dynamic pool balancing**: Re-balances `w1` and `l1` when exceeding `MAX_POOL_SIZE` (8), cleanly overflowing into `waitingQueue` without deadlock or starvation.
+- **Single-court scope guard**: Multi-court singles remains explicitly King-of-the-Court; speculative incomplete multi-court rotation functions were purged.
+- **Zero regression on King-of-the-Court**: `app/queue/lib/singleEngine.ts` kept 100% untouched; all 29 King engine tests pass green.
+- **Firestore security schema tag**: Discriminated `singlesEngineState` schema in `firestore.rules` supporting `format: 'pool'` (12 fields) and `format: 'king'` (or legacy untagged state up to 7 fields), protected by emulator test suite.
+- **UI Integration**:
+  - `SetupView.tsx`: Format selector when `gameMode === 'singles'` and `courtCount === 1` ("Pool Rotation (Default)" vs "King of the Court").
+  - `QueueSystem.css`: Dedicated styling for `.singles-format-selector`, `.format-option-btn`, and dark mode variants.
+  - `PoolSinglesStatusPanel.tsx`: New status widget showing active phase, `w1`/`l1` pool chips, waiting queue, and unplayed indicators.
+  - `app/queue/page.tsx`: Full wiring into state initialization, match advancement (`advancePoolSinglesState`), undo snapshots/rollback, live player addition/removal, and session rehydration.
+
+### Files changed
+
+| File | Change |
+|---|---|
+| `app/queue/lib/singlesPoolEngine.ts` | NEW — Core singles pool rotation engine: `freshPoolSinglesState`, `buildNextPoolSinglesMatch`, `advancePoolSinglesState`, `smartSelectPair`, `balancePools`, serialization |
+| `app/queue/components/PoolSinglesStatusPanel/PoolSinglesStatusPanel.tsx` | NEW — Status panel rendering phase label, W1/L1 pools, and unplayed indicators |
+| `app/queue/components/SetupView/SetupView.tsx` | Added `singlesFormat` format toggle when `gameMode === 'singles'` and `courtCount === 1` |
+| `app/queue/QueueSystem.css` | Added styles for `.singles-format-selector` and `.format-option-btn` with dark mode support |
+| `app/queue/page.tsx` | Wired `singlesFormat` state, pool engine initialization, advance, undo/rollback, live management, and rehydration |
+| `firestore.rules` | Added `validSinglesPoolEngine` / `validSinglesKingEngine` discriminator; relaxed revisioned map size limit for pool state |
+| `tests/firestore.rules.test.ts` | Added 6 emulator tests for pool format validation, king format validation, legacy untagged, and rejection of cross-pollinated payloads |
+| `tests/singlesPoolEngine.test.ts` | NEW — 18 unit tests covering smart pairing, balancePools, 2-5 player cycles, starvation prevention, serialization, and add/remove |
+| `tests/v1ScenarioMatrix.test.ts` | Added 8-10 player single-court scenario matrix test running 50 matches per count with zero self-matches or starvation |
+
+### Full local gate results (2026-10-01)
+
+| Check | Result |
+|---|---|
+| `npx tsc --noEmit` | **exit 0** — no type errors |
+| `npm run lint -- --quiet` | **exit 0** — 0 errors |
+| `npx vitest run` | **229 passed \| 22 skipped** (20 passed \| 1 skipped file) — all singles, doubles, skilled, and scenario tests pass |
+| `npm run test:rules` | **22 passed (22)** — all Firestore security rules tests pass in emulator |
+| `npm run build` | **exit 0** — Next.js 16.3.5 (Turbopack), all routes compile cleanly |
+
+

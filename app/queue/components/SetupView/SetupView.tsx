@@ -40,6 +40,8 @@ export interface SetupViewProps {
   isSaving:            boolean;
   onBack:              () => void;
   errorMsg?:           string;
+  singlesFormat?:      'pool' | 'king';
+  onSinglesFormatChange?: (format: 'pool' | 'king') => void;
 }
 
 export function SetupView({
@@ -53,6 +55,8 @@ export function SetupView({
   onAddPlayer, onRemoveTempPlayer, onAddFromPaste,
   onStartQueue, isSaving, onBack, errorMsg,
   onSetRosterSkill,
+  singlesFormat = 'pool',
+  onSinglesFormatChange,
 }: SetupViewProps) {
   const minPlayers = gameMode === 'doubles' && courtCount > 1
     ? courtCount * 4
@@ -112,6 +116,34 @@ export function SetupView({
                 {courtCount} courts · shared queue · 2 player per court
               </span>
             )}
+          </div>
+        )}
+
+        {/* Singles format selector (single-court only) */}
+        {gameMode === 'singles' && courtCount === 1 && (
+          <div className="setup-field-row">
+            <label className="setup-field-label">Singles Format</label>
+            <div className="singles-format-selector">
+              <button
+                type="button"
+                className={`format-option-btn ${singlesFormat === 'pool' ? 'format-option-btn--active' : ''}`}
+                onClick={() => onSinglesFormatChange?.('pool')}
+              >
+                Pool Rotation <span className="format-default-badge">(Default)</span>
+              </button>
+              <button
+                type="button"
+                className={`format-option-btn ${singlesFormat === 'king' ? 'format-option-btn--active' : ''}`}
+                onClick={() => onSinglesFormatChange?.('king')}
+              >
+                King of the Court
+              </button>
+            </div>
+            <span className="setup-field-hint">
+              {singlesFormat === 'pool'
+                ? 'Balanced winners & losers pools · Fair court time for everyone'
+                : 'Winner stays on · Challenger comes from queue (max 3-streak)'}
+            </span>
           </div>
         )}
 

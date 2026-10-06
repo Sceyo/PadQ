@@ -3845,3 +3845,64 @@ body.dark-mode .sit-next-section { background: rgba(0,0,0,.22); }
   font-weight: 500;
   text-align: left;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   Singles format selector (setup form)
+   ═══════════════════════════════════════════════════════════ */
+.singles-format-selector {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.format-option-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  background: var(--btn);
+  color: var(--txt-2);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.format-option-btn:hover {
+  background: var(--btn-hover);
+  color: var(--txt-1);
+}
+
+.format-option-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.format-option-btn--active:hover {
+  background: var(--accent-h);
+  color: #fff;
+}
+
+.format-default-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+body.dark-mode .format-option-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #9ca3af;
+}
+
+body.dark-mode .format-option-btn--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+

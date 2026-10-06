@@ -5,6 +5,11 @@ import {
   type LockedPartnerPair,
 } from '@/app/queue/lib/doublesEngine';
 import { planMultiCourtResult } from '@/app/queue/lib/multiCourtResult';
+import {
+  freshPoolSinglesState,
+  buildNextPoolSinglesMatch,
+  advancePoolSinglesState,
+} from '@/app/queue/lib/singlesPoolEngine';
 import { getMaxPartnerPairs } from '@/app/queue/components/LiveManagement/LiveManagement';
 import { estimateV1EventCapacity } from '@/lib/v1CapacityModel';
 
@@ -128,6 +133,53 @@ describe('V1 court, player, and viewer scenario matrix', () => {
         }
 
         expect(seen).toEqual(new Set(roster));
+      }
+    }
+  });
+
+  it('rotates single-court singles pool rotation fairly across 8-10 players without self-matches or starvation', () => {
+    for (const count of [8, 10]) {
+      const roster = players(count, `SP-${count}`);
+      let state = freshPoolSinglesState();
+      const playCounts: Record<string, number> = Object.fromEntries(roster.map(p => [p, 0]));
+
+      for (let result = 0; result < 50; result += 1) {
+        const match = buildNextPoolSinglesMatch(state, roster);
+        expect(match.playerA).toBeTruthy();
+        expect(match.playerB).toBeTruthy();
+        expect(match.playerA).not.toBe(match.playerB);
+        expect(roster).toContain(match.playerA);
+        expect(roster).toContain(match.playerB);
+
+        const winner = result % 3 === 0 ? match.playerA : match.playerB;
+        const loser = winner === match.playerA ? match.playerB : match.playerA;
+
+        playCounts[winner] += 1;
+        playCounts[loser] += 1;
+
+        const { nextState, newQueue } = advancePoolSinglesState(
+          state,
+          winner,
+          loser,
+          roster,
+        );
+
+        // Verify queue integrity
+        expect(newQueue).toHaveLength(roster.length);
+        expect(new Set(newQueue)).toEqual(new Set(roster));
+        expect(newQueue[0]).toBe(buildNextPoolSinglesMatch(nextState, roster).playerA);
+        expect(newQueue[1]).toBe(buildNextPoolSinglesMatch(nextState, roster).playerB);
+
+        // Verify pool boundaries
+        expect(nextState.w1.length).toBeLessThanOrEqual(8);
+        expect(nextState.l1.length).toBeLessThanOrEqual(8);
+
+        state = nextState;
+      }
+
+      // No player should be starved across 50 matches (100 player-slots)
+      for (const p of roster) {
+        expect(playCounts[p]).toBeGreaterThanOrEqual(6);
       }
     }
   });
