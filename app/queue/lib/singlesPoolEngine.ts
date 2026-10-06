@@ -16,8 +16,6 @@ export interface PoolSinglesState {
   playedThisCycle: Set<string>;
   recentMatches: string[];
   lastPlayedMap: Record<string, number>;
-  winnersPool: string[];
-  losersPool: string[];
 }
 
 const RECENT_MATCHES_CAP = 6;
@@ -148,8 +146,6 @@ export function freshPoolSinglesState(): PoolSinglesState {
     playedThisCycle: new Set(),
     recentMatches: [],
     lastPlayedMap: {},
-    winnersPool: [],
-    losersPool: [],
   };
 }
 
@@ -303,8 +299,6 @@ export function advancePoolSinglesState(
     playedThisCycle:   nextPlayedThisCycle,
     recentMatches:     updatedRecentMatches,
     lastPlayedMap:     updatedLastPlayedMap,
-    winnersPool:       [...nextW1],
-    losersPool:        [...nextL1],
   };
 
   const nextMatch = buildNextPoolSinglesMatch(nextState, allPlayers, skillMap);
@@ -337,8 +331,6 @@ export function removePlayerFromPoolSinglesState(state: PoolSinglesState, player
     w1: state.w1.filter(p => p !== playerName),
     l1: state.l1.filter(p => p !== playerName),
     waitingQueue: state.waitingQueue.filter(p => p !== playerName),
-    winnersPool: state.winnersPool.filter(p => p !== playerName),
-    losersPool: state.losersPool.filter(p => p !== playerName),
     playedThisCycle: newPlayed,
     lastPlayedMap: newLastPlayed,
   };
@@ -365,7 +357,5 @@ export function deserializePoolSinglesState(s: SerializablePoolSinglesState): Po
     waitingQueue: s.waitingQueue ?? [],
     recentMatches: s.recentMatches ?? [],
     lastPlayedMap: s.lastPlayedMap ?? {},
-    winnersPool: s.winnersPool ?? [],
-    losersPool: s.losersPool ?? [],
   };
 }

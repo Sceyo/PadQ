@@ -139,8 +139,6 @@ function clonePoolSinglesState(s: PoolSinglesState): PoolSinglesState {
     playedThisCycle: new Set(s.playedThisCycle),
     recentMatches:   [...s.recentMatches],
     lastPlayedMap:   { ...s.lastPlayedMap },
-    winnersPool:     [...s.winnersPool],
-    losersPool:      [...s.losersPool],
   };
 }
 

@@ -386,8 +386,6 @@ suite('Firestore V1 production rules', () => {
       playedThisCycle: [],
       recentMatches: [],
       lastPlayedMap: {},
-      winnersPool: [],
-      losersPool: [],
     };
     await assertSucceeds(setDoc(poolRef, sessionData('host-singles-formats', {
       gameMode: 'singles', players, queue: players, lockedPartners: [],
@@ -435,7 +433,7 @@ suite('Firestore V1 production rules', () => {
 
     // 5. Reject malformed: pool state with missing required field
     const incompletePool: Record<string, unknown> = { ...validPoolState };
-    delete incompletePool.winnersPool;
+    delete incompletePool.w1;
     await assertFails(setDoc(doc(host, 'sessions', 'B2BAD8'), sessionData('host-singles-formats', {
       gameMode: 'singles', players, queue: players, lockedPartners: [],
       singlesEngineState: incompletePool,

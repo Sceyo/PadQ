@@ -173,8 +173,8 @@ service cloud.firestore {
     }
 
     function validSinglesPoolEngine(state, players) {
-      return state.keys().hasAll(['format', 'phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentMatches', 'lastPlayedMap', 'winnersPool', 'losersPool']) &&
-        state.keys().hasOnly(['format', 'phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentMatches', 'lastPlayedMap', 'winnersPool', 'losersPool']) &&
+      return state.keys().hasAll(['format', 'phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentMatches', 'lastPlayedMap']) &&
+        state.keys().hasOnly(['format', 'phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentMatches', 'lastPlayedMap']) &&
         state.format == 'pool' &&
         state.phase in ['INIT', 'WINNERS', 'LOSERS'] &&
         state.matchIndexInPhase is int && state.matchIndexInPhase >= 0 && state.matchIndexInPhase <= 100000 &&
@@ -182,8 +182,7 @@ service cloud.firestore {
         validPlayerSubset(state.w1, players) && validPlayerSubset(state.l1, players) &&
         validPlayerSubset(state.waitingQueue, players) && validPlayerSubset(state.playedThisCycle, players) &&
         validShortStringList(state.recentMatches, 6, 260) &&
-        validMetricMap(state.lastPlayedMap, players) &&
-        validPlayerSubset(state.winnersPool, players) && validPlayerSubset(state.losersPool, players);
+        validMetricMap(state.lastPlayedMap, players);
     }
 
     function validSinglesEngine(state, players) {
@@ -222,8 +221,8 @@ service cloud.firestore {
     }
 
     function validSinglesPoolEngineUpdate(state, players) {
-      return state.keys().hasAll(['format', 'phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentMatches', 'lastPlayedMap', 'winnersPool', 'losersPool']) &&
-        state.keys().hasOnly(['format', 'phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentMatches', 'lastPlayedMap', 'winnersPool', 'losersPool']) &&
+      return state.keys().hasAll(['format', 'phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentMatches', 'lastPlayedMap']) &&
+        state.keys().hasOnly(['format', 'phase', 'matchIndexInPhase', 'matchCount', 'w1', 'l1', 'waitingQueue', 'playedThisCycle', 'recentMatches', 'lastPlayedMap']) &&
         state.format == 'pool' &&
         state.phase in ['INIT', 'WINNERS', 'LOSERS'] &&
         state.matchIndexInPhase is int && state.matchIndexInPhase >= 0 && state.matchIndexInPhase <= 100000 &&
@@ -231,8 +230,7 @@ service cloud.firestore {
         validPlayerSubset(state.w1, players) && validPlayerSubset(state.l1, players) &&
         validPlayerSubset(state.waitingQueue, players) && validPlayerSubset(state.playedThisCycle, players) &&
         state.recentMatches is list && state.recentMatches.size() <= 6 &&
-        state.lastPlayedMap is map && state.lastPlayedMap.size() <= 30 &&
-        validPlayerSubset(state.winnersPool, players) && validPlayerSubset(state.losersPool, players);
+        state.lastPlayedMap is map && state.lastPlayedMap.size() <= 30;
     }
 
     function validSinglesEngineUpdate(state, players) {

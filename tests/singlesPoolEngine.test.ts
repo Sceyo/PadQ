@@ -223,16 +223,13 @@ describe('singlesPoolEngine — player add and remove', () => {
   it('removes player cleanly across all pools, queues, and stats', () => {
     const s = freshPoolSinglesState();
     s.w1 = ['P1', 'P2'];
-    s.winnersPool = ['P1', 'P2'];
     s.l1 = ['P3'];
-    s.losersPool = ['P3'];
     s.waitingQueue = ['P4'];
     s.playedThisCycle = new Set(['P1', 'P3']);
     s.lastPlayedMap = { P1: 1, P3: 2 };
 
     const next = removePlayerFromPoolSinglesState(s, 'P1');
     expect(next.w1).toEqual(['P2']);
-    expect(next.winnersPool).toEqual(['P2']);
     expect(next.playedThisCycle.has('P1')).toBe(false);
     expect(next.lastPlayedMap['P1']).toBeUndefined();
   });
@@ -251,8 +248,6 @@ describe('singlesPoolEngine — serialization and deserialization', () => {
       playedThisCycle: new Set(['P1', 'P3']),
       recentMatches: ['P1|P2', 'P3|P4'],
       lastPlayedMap: { P1: 3, P2: 3, P3: 4, P4: 4 },
-      winnersPool: ['P1', 'P2'],
-      losersPool: ['P3', 'P4'],
     };
 
     const serialized = serializePoolSinglesState(original);
