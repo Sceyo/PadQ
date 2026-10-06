@@ -237,6 +237,110 @@
 .w-bar-track { height: 4px; background: rgba(255,255,255,.08); border-radius: 99px; overflow: hidden; }
 .w-bar-fill  { height: 100%; border-radius: 99px; transition: width .4s ease; }
 
+/* ── Desktop vs Mobile Standings ──────────────────────────── */
+.w-stats-desktop-only { display: block; }
+.w-stats-mobile-cards { display: none; }
+
+.w-player-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  transition: border-color .15s ease;
+}
+.w-player-card--top {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.35);
+}
+.w-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.w-card-player {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+.w-card-rank-num {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #9ca3af;
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 6px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.w-player-card--top .w-card-rank-num {
+  background: rgba(99, 102, 241, 0.25);
+  color: #a5b4fc;
+}
+.w-card-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #f0f4ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.w-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.w-card-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.w-card-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.w-card-stat-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #6b7280;
+}
+.w-card-stat-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #f0f4ff;
+  font-variant-numeric: tabular-nums;
+}
+.w-card-stat-val.w-wr-cell {
+  gap: 3px;
+  min-width: 0;
+}
+.w-card-stat-val.w-wr-cell span {
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.w-streak-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #f59e0b;
+}
+.w-col-streak-zero {
+  color: #6b7280;
+}
+
 /* ── History ──────────────────────────────────────────────── */
 .w-history-toggle {
   display: inline-flex; align-items: center; gap: 6px;
@@ -315,6 +419,10 @@
 @keyframes wSpin { to { transform: rotate(360deg); } }
 
 /* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .w-stats-desktop-only { display: none !important; }
+  .w-stats-mobile-cards { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+}
 @media (max-width: 600px) {
   .w-body          { padding: 16px 14px 36px; gap: 20px; }
   .w-section       { padding: 16px; }
