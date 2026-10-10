@@ -369,6 +369,83 @@ suite('Firestore V1 production rules', () => {
     }));
   });
 
+  it('validates singles format discriminator (pool, king, untagged legacy, and rejects malformed)', async () => {
+    const host = env.authenticatedContext('host-singles-formats').firestore();
+    const players = Array.from({ length: 6 }, (_, i) => `SP${i + 1}`);
+
+    // 1. Valid tagged pool format
+    const poolRef = doc(host, 'sessions', 'P2PEL7');
+    const validPoolState = {
+      format: 'pool',
+      phase: 'INIT',
+      matchIndexInPhase: 0,
+      matchCount: 0,
+      w1: [],
+      l1: [],
+      waitingQueue: [],
+      playedThisCycle: [],
+      recentMatches: [],
+      lastPlayedMap: {},
+    };
+    await assertSucceeds(setDoc(poolRef, sessionData('host-singles-formats', {
+      gameMode: 'singles', players, queue: players, lockedPartners: [],
+      singlesEngineState: validPoolState,
+    })));
+
+    // 2. Valid tagged king format
+    const kingRef = doc(host, 'sessions', 'K2KNG7');
+    const validKingState = {
+      format: 'king',
+      queue: players,
+      king: null,
+      matchIndex: 0,
+      lastPlayedMap: {},
+      winStreak: {},
+      playedThisCycle: [],
+      waitingQueue: [],
+    };
+    await assertSucceeds(setDoc(kingRef, sessionData('host-singles-formats', {
+      gameMode: 'singles', players, queue: players, lockedPartners: [],
+      singlesEngineState: validKingState,
+    })));
+
+    // 3. Untagged legacy state (no format field) accepted under King shape
+    const legacyRef = doc(host, 'sessions', 'L2LEG7');
+    const legacyKingState = {
+      queue: players,
+      king: null,
+      matchIndex: 0,
+      lastPlayedMap: {},
+      winStreak: {},
+      playedThisCycle: [],
+      waitingQueue: [],
+    };
+    await assertSucceeds(setDoc(legacyRef, sessionData('host-singles-formats', {
+      gameMode: 'singles', players, queue: players, lockedPartners: [],
+      singlesEngineState: legacyKingState,
+    })));
+
+    // 4. Reject malformed: unknown format
+    await assertFails(setDoc(doc(host, 'sessions', 'B2BAD7'), sessionData('host-singles-formats', {
+      gameMode: 'singles', players, queue: players, lockedPartners: [],
+      singlesEngineState: { ...validPoolState, format: 'unknown_format' },
+    })));
+
+    // 5. Reject malformed: pool state with missing required field
+    const incompletePool: Record<string, unknown> = { ...validPoolState };
+    delete incompletePool.w1;
+    await assertFails(setDoc(doc(host, 'sessions', 'B2BAD8'), sessionData('host-singles-formats', {
+      gameMode: 'singles', players, queue: players, lockedPartners: [],
+      singlesEngineState: incompletePool,
+    })));
+
+    // 6. Reject malformed: king format containing pool fields
+    await assertFails(setDoc(doc(host, 'sessions', 'B2BAD9'), sessionData('host-singles-formats', {
+      gameMode: 'singles', players, queue: players, lockedPartners: [],
+      singlesEngineState: { ...validKingState, phase: 'WINNERS' },
+    })));
+  });
+
   it('requires an atomic revision increment for an immutable history entry', async () => {
     const host = env.authenticatedContext('host-8').firestore();
     const viewer = env.authenticatedContext('viewer-8').firestore();

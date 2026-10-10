@@ -774,7 +774,7 @@ function WatchPageContent() {
                 Share Standings Card
               </button>
             </div>
-            <div className="w-stats-table-wrap">
+            <div className="w-stats-table-wrap w-stats-desktop-only">
               <table className="w-stats-table">
                 <thead>
                   <tr>
@@ -803,6 +803,51 @@ function WatchPageContent() {
                   ))}
                 </tbody>
               </table>
+            </div>
+            <div className="w-stats-mobile-cards">
+              {[...stats].sort((a, b) => b.wins - a.wins).map((s, i) => (
+                <div key={s.name} className={`w-player-card ${i === 0 ? 'w-player-card--top' : ''}`}>
+                  <div className="w-card-header">
+                    <div className="w-card-player">
+                      <span className="w-card-rank-num">#{i + 1}</span>
+                      <strong className="w-card-name">{s.name}</strong>
+                    </div>
+                    <div className="w-card-badges">
+                      <RankBadge rank={s.rank} className="w-rank-badge" />
+                      {s.streak >= 2 && (
+                        <span className="w-streak-badge"><Flame size={11} />{s.streak}</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="w-card-stats">
+                    <div className="w-card-stat-item">
+                      <span className="w-card-stat-label">W - L</span>
+                      <span className="w-card-stat-val">
+                        <span className="w-col-win">{s.wins}</span> - <span className="w-col-loss">{s.losses}</span>
+                      </span>
+                    </div>
+                    <div className="w-card-stat-item">
+                      <span className="w-card-stat-label">GP</span>
+                      <span className="w-card-stat-val">{s.gamesPlayed}</span>
+                    </div>
+                    <div className="w-card-stat-item">
+                      <span className="w-card-stat-label">Win %</span>
+                      <div className="w-card-stat-val w-wr-cell">
+                        <span>{s.winRate}%</span>
+                        <StatBar value={s.winRate} max={100} color="#22c55e" />
+                      </div>
+                    </div>
+                    <div className="w-card-stat-item">
+                      <span className="w-card-stat-label">Streak</span>
+                      <span className="w-card-stat-val">
+                        {s.streak >= 2 ? (
+                          <span className="w-streak-inline"><Flame size={11} />{s.streak}</span>
+                        ) : <span className="w-col-streak-zero">{s.streak}</span>}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

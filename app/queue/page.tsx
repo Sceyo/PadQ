@@ -50,6 +50,15 @@ import {
 } from './lib/doublesEngine';
 import type { SinglesState, SerializableSinglesState } from './lib/singleEngine';
 import { freshSinglesState, advanceSinglesState, addPlayerToSinglesWaiting, serializeSinglesState, deserializeSinglesState } from './lib/singleEngine';
+import type { PoolSinglesState, SerializablePoolSinglesState } from './lib/singlesPoolEngine';
+import {
+  freshPoolSinglesState,
+  advancePoolSinglesState,
+  addPlayerToPoolSinglesWaiting,
+  removePlayerFromPoolSinglesState,
+  serializePoolSinglesState,
+  deserializePoolSinglesState,
+} from './lib/singlesPoolEngine';
 import { V1_RELEASE } from './lib/releaseConfig';
 import { planMultiCourtResult } from './lib/multiCourtResult';
 
@@ -63,6 +72,7 @@ import { WinnerModal } from './components/WinnerModal/WinnerModal';
 import { UserGuide } from './components/UserGuideModal/UserGuideModal';
 import { PaddleStatusPanel } from './components/PaddleStatusPanel/PaddleStatusPanel';
 import { SinglesStatusPanel } from './components/SinglesStatusPanel/SinglesStatusPanel';
+import { PoolSinglesStatusPanel } from './components/PoolSinglesStatusPanel/PoolSinglesStatusPanel';
 import { AnalyticsDashboard } from './components/AnalyticsDashboard/AnalyticsDashboard';
 import {
   AddPlayerPanel,
@@ -85,10 +95,12 @@ import { RecapModal } from './components/RecapCard';
 
 // ── Undo snapshot type ────────────────────────────────────────
 interface UndoSnapshot {
-  queue:        string[];
-  paddleState:  PaddleState;
-  singlesState: SinglesState;
-  courtSlots?:  CourtSlot[];
+  queue:             string[];
+  paddleState:       PaddleState;
+  singlesState:      SinglesState;
+  poolSinglesState?: PoolSinglesState;
+  singlesFormat?:    'pool' | 'king';
+  courtSlots?:       CourtSlot[];
 }
 
 // Deep-copy helpers so undo doesn't share references with live state
@@ -115,6 +127,18 @@ function cloneSinglesState(s: SinglesState): SinglesState {
     lastPlayedMap:   { ...s.lastPlayedMap },
     winStreak:       { ...s.winStreak },
     playedThisCycle: new Set(s.playedThisCycle),
+  };
+}
+
+function clonePoolSinglesState(s: PoolSinglesState): PoolSinglesState {
+  return {
+    ...s,
+    w1:              [...s.w1],
+    l1:              [...s.l1],
+    waitingQueue:    [...s.waitingQueue],
+    playedThisCycle: new Set(s.playedThisCycle),
+    recentMatches:   [...s.recentMatches],
+    lastPlayedMap:   { ...s.lastPlayedMap },
   };
 }
 
@@ -226,14 +250,23 @@ function QueueSystemContent() {
     setPaddleStateUI(fresh);
   }, []);
 
-  // ── Singles King-of-the-Court state ───────────────────────
-  const singlesStateRef                         = useRef<SinglesState>(freshSinglesState([]));
-  const [singlesStateUI, setSinglesStateUI]     = useState<SinglesState>(freshSinglesState([]));
+  // ── Singles King-of-the-Court & Pool-Rotation state ───────
+  const [singlesFormat, setSinglesFormat]             = useState<'pool' | 'king'>('pool');
+  const singlesStateRef                               = useRef<SinglesState>(freshSinglesState([]));
+  const [singlesStateUI, setSinglesStateUI]           = useState<SinglesState>(freshSinglesState([]));
+  const poolSinglesStateRef                           = useRef<PoolSinglesState>(freshPoolSinglesState());
+  const [poolSinglesStateUI, setPoolSinglesStateUI]   = useState<PoolSinglesState>(freshPoolSinglesState());
 
   const resetSinglesState = useCallback((playerList: string[]) => {
     const fresh = freshSinglesState(playerList);
     singlesStateRef.current = fresh;
     setSinglesStateUI(fresh);
+  }, []);
+
+  const resetPoolSinglesState = useCallback(() => {
+    const fresh = freshPoolSinglesState();
+    poolSinglesStateRef.current = fresh;
+    setPoolSinglesStateUI(fresh);
   }, []);
 
   // Rehydrate engine refs once when the host resumes a persisted session
@@ -253,19 +286,32 @@ function QueueSystemContent() {
       setPaddleStateUI(s);
     }
     if (session.singlesEngineState) {
-      const s = deserializeSinglesState(session.singlesEngineState as unknown as SerializableSinglesState);
-      singlesStateRef.current = s;
-      setSinglesStateUI(s);
+      const raw = session.singlesEngineState as Record<string, unknown>;
+      if (raw.format === 'pool') {
+        setSinglesFormat('pool');
+        const s = deserializePoolSinglesState(raw as unknown as SerializablePoolSinglesState);
+        poolSinglesStateRef.current = s;
+        setPoolSinglesStateUI(s);
+      } else {
+        setSinglesFormat('king');
+        const s = deserializeSinglesState(raw as unknown as SerializableSinglesState);
+        singlesStateRef.current = s;
+        setSinglesStateUI(s);
+      }
     } else if (gameMode === 'singles') {
-      // Older rooms may have a queue but no initial engine document. Seed the
-      // engine from that persisted order so the first result after reload has
-      // real players instead of empty placeholders.
-      const s = freshSinglesState(session.queue.length ? session.queue : session.players);
-      singlesStateRef.current = s;
-      setSinglesStateUI(s);
+      // Older rooms may have a queue but no initial engine document.
+      if (courtCount === 1 && singlesFormat === 'pool') {
+        const s = freshPoolSinglesState();
+        poolSinglesStateRef.current = s;
+        setPoolSinglesStateUI(s);
+      } else {
+        const s = freshSinglesState(session.queue.length ? session.queue : session.players);
+        singlesStateRef.current = s;
+        setSinglesStateUI(s);
+      }
     }
 
-  }, [session.isHost, session.doublesEngineState, session.singlesEngineState, session.queue, session.players, gameMode]);
+  }, [session.isHost, session.doublesEngineState, session.singlesEngineState, session.queue, session.players, gameMode, courtCount, singlesFormat]);
 
   // ── Undo snapshot ──────────────────────────────────────────
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
@@ -554,6 +600,11 @@ function QueueSystemContent() {
       courtName,
       lockedPartners: [],
       ...(initialCourtSlots ? { courtSlots: initialCourtSlots } : {}),
+      ...(gameMode === 'singles' && courtCount === 1 ? {
+        singlesEngineState: singlesFormat === 'pool'
+          ? (serializePoolSinglesState(freshPoolSinglesState()) as unknown as Record<string, unknown>)
+          : (serializeSinglesState(freshSinglesState(orderedPlayers)) as unknown as Record<string, unknown>),
+      } : {}),
     });
     if (!startResult.ok) {
       setIsLiveLocal(false);
@@ -564,6 +615,7 @@ function QueueSystemContent() {
     // Enter the host UI only after Firebase has created and authenticated the room.
     resetPaddleState();
     resetSinglesState(orderedPlayers);
+    resetPoolSinglesState();
     setPlayers(orderedPlayers);
     setTempPlayers([]);
     setLocalHistory([]);
@@ -641,19 +693,31 @@ function QueueSystemContent() {
     setQueue(newQueue);
 
     if (gameMode === 'singles') {
-      if (isSittingOut) {
-        const ns = addPlayerToSinglesWaiting(singlesStateRef.current, name);
-        singlesStateRef.current = ns;
-        setSinglesStateUI(ns);
+      if (singlesFormat === 'pool') {
+        if (isSittingOut) {
+          const ns = addPlayerToPoolSinglesWaiting(poolSinglesStateRef.current, name);
+          poolSinglesStateRef.current = ns;
+          setPoolSinglesStateUI(ns);
+        } else {
+          const ns = removePlayerFromPoolSinglesState(poolSinglesStateRef.current, name);
+          poolSinglesStateRef.current = ns;
+          setPoolSinglesStateUI(ns);
+        }
       } else {
-        const ns: SinglesState = {
-          ...singlesStateRef.current,
-          king: singlesStateRef.current.king === name ? null : singlesStateRef.current.king,
-          queue: singlesStateRef.current.queue.filter(p => p !== name),
-          waitingQueue: singlesStateRef.current.waitingQueue.filter(p => p !== name),
-        };
-        singlesStateRef.current = ns;
-        setSinglesStateUI(ns);
+        if (isSittingOut) {
+          const ns = addPlayerToSinglesWaiting(singlesStateRef.current, name);
+          singlesStateRef.current = ns;
+          setSinglesStateUI(ns);
+        } else {
+          const ns: SinglesState = {
+            ...singlesStateRef.current,
+            king: singlesStateRef.current.king === name ? null : singlesStateRef.current.king,
+            queue: singlesStateRef.current.queue.filter(p => p !== name),
+            waitingQueue: singlesStateRef.current.waitingQueue.filter(p => p !== name),
+          };
+          singlesStateRef.current = ns;
+          setSinglesStateUI(ns);
+        }
       }
     } else if (gameMode === 'doubles') {
       if (isSittingOut) {
@@ -691,6 +755,10 @@ function QueueSystemContent() {
     setPaddleStateUI(snap.paddleState);
     singlesStateRef.current = snap.singlesState;
     setSinglesStateUI(snap.singlesState);
+    if (snap.poolSinglesState) {
+      poolSinglesStateRef.current = snap.poolSinglesState;
+      setPoolSinglesStateUI(snap.poolSinglesState);
+    }
     if (snap.courtSlots) {
       setLocalCourtSlots(snap.courtSlots);
       courtSlotsRef.current = snap.courtSlots;
@@ -704,7 +772,11 @@ function QueueSystemContent() {
         ...(snap.courtSlots ? { courtSlots: snap.courtSlots } : {}),
         ...(gameMode === 'doubles'
           ? { doublesEngineState: serializePaddleState(snap.paddleState) as unknown as Record<string, unknown> }
-          : { singlesEngineState: serializeSinglesState(snap.singlesState) as unknown as Record<string, unknown> }),
+          : {
+              singlesEngineState: (snap.singlesFormat === 'pool' && snap.poolSinglesState)
+                ? (serializePoolSinglesState(snap.poolSinglesState) as unknown as Record<string, unknown>)
+                : (serializeSinglesState(snap.singlesState) as unknown as Record<string, unknown>),
+            }),
       });
     }
     undoSnapshotRef.current = null;
@@ -728,18 +800,25 @@ function QueueSystemContent() {
     setLocalSittingOut(newSittingOut);
 
     if (gameMode === 'singles') {
-      const wasKing = singlesStateRef.current.king === absent;
-      const ns: SinglesState = {
-        ...singlesStateRef.current,
-        king: wasKing ? replacement : singlesStateRef.current.king,
-        // If absent was in engine queue (challenger), replace them; remove replacement from wherever they sat
-        queue: singlesStateRef.current.queue
-          .filter(p => p !== replacement)
-          .map(p => p === absent ? replacement : p),
-        waitingQueue: singlesStateRef.current.waitingQueue.filter(p => p !== absent && p !== replacement),
-      };
-      singlesStateRef.current = ns;
-      setSinglesStateUI(ns);
+      if (singlesFormat === 'pool') {
+        let ns = removePlayerFromPoolSinglesState(poolSinglesStateRef.current, absent);
+        ns = addPlayerToPoolSinglesWaiting(ns, replacement);
+        poolSinglesStateRef.current = ns;
+        setPoolSinglesStateUI(ns);
+      } else {
+        const wasKing = singlesStateRef.current.king === absent;
+        const ns: SinglesState = {
+          ...singlesStateRef.current,
+          king: wasKing ? replacement : singlesStateRef.current.king,
+          // If absent was in engine queue (challenger), replace them; remove replacement from wherever they sat
+          queue: singlesStateRef.current.queue
+            .filter(p => p !== replacement)
+            .map(p => p === absent ? replacement : p),
+          waitingQueue: singlesStateRef.current.waitingQueue.filter(p => p !== absent && p !== replacement),
+        };
+        singlesStateRef.current = ns;
+        setSinglesStateUI(ns);
+      }
     } else if (gameMode === 'doubles') {
       const ns: PaddleState = {
         ...paddleStateRef.current,
@@ -885,10 +964,13 @@ function QueueSystemContent() {
     const previousQueue = [...queue];
     const previousPaddleState = clonePaddleState(paddleStateRef.current);
     const previousSinglesState = cloneSinglesState(singlesStateRef.current);
+    const previousPoolSinglesState = clonePoolSinglesState(poolSinglesStateRef.current);
     undoSnapshotRef.current = {
       queue: previousQueue,
       paddleState: previousPaddleState,
       singlesState: previousSinglesState,
+      poolSinglesState: previousPoolSinglesState,
+      singlesFormat,
     };
     setHasUndo(true);
     if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
@@ -896,10 +978,32 @@ function QueueSystemContent() {
 
     if (activeQueueMode === 'default' && gameMode === 'singles') {
       const activePlayers = players.filter(p => !activeSittingOut.includes(p));
-      const { nextState, newQueue: singlesQueue } = advanceSinglesState(singlesStateRef.current, winner, activePlayers);
-      singlesStateRef.current = nextState;
-      setSinglesStateUI(nextState);
-      newQueue = singlesQueue;
+      if (singlesFormat === 'pool') {
+        const loser = winner === p1 ? p2 : p1;
+        const skillMap = Object.fromEntries(
+          Object.entries(statsMap).map(([name, stat]) => [
+            name,
+            (stat as PlayerStat).gamesPlayed >= 3
+              ? (stat as PlayerStat).winRate
+              : bracketSkillValue(rosterSkillMap[name]),
+          ])
+        );
+        const { nextState, newQueue: poolQueue } = advancePoolSinglesState(
+          poolSinglesStateRef.current,
+          winner,
+          loser,
+          activePlayers,
+          skillMap,
+        );
+        poolSinglesStateRef.current = nextState;
+        setPoolSinglesStateUI(nextState);
+        newQueue = poolQueue;
+      } else {
+        const { nextState, newQueue: singlesQueue } = advanceSinglesState(singlesStateRef.current, winner, activePlayers);
+        singlesStateRef.current = nextState;
+        setSinglesStateUI(nextState);
+        newQueue = singlesQueue;
+      }
     } else {
       const rest = queue.slice(2);
       const loser = winner === p1 ? p2 : p1;
@@ -928,7 +1032,11 @@ function QueueSystemContent() {
     }
 
     const enginePatch = activeQueueMode === 'default'
-      ? { singlesEngineState: serializeSinglesState(singlesStateRef.current) as unknown as Record<string, unknown> }
+      ? {
+          singlesEngineState: singlesFormat === 'pool'
+            ? (serializePoolSinglesState(poolSinglesStateRef.current) as unknown as Record<string, unknown>)
+            : (serializeSinglesState(singlesStateRef.current) as unknown as Record<string, unknown>),
+        }
       : {};
     void session.commitMatchResult(
       { queue: newQueue, liveScore: null, ...enginePatch },
@@ -946,6 +1054,8 @@ function QueueSystemContent() {
       setPaddleStateUI(previousPaddleState);
       singlesStateRef.current = previousSinglesState;
       setSinglesStateUI(previousSinglesState);
+      poolSinglesStateRef.current = previousPoolSinglesState;
+      setPoolSinglesStateUI(previousPoolSinglesState);
       setHasUndo(false);
       showToast(message);
     }).finally(() => {
@@ -959,11 +1069,14 @@ function QueueSystemContent() {
     const previousQueue = [...queue];
     const previousPaddleState = clonePaddleState(paddleStateRef.current);
     const previousSinglesState = cloneSinglesState(singlesStateRef.current);
+    const previousPoolSinglesState = clonePoolSinglesState(poolSinglesStateRef.current);
     // Save undo snapshot before mutating state
     undoSnapshotRef.current = {
       queue: previousQueue,
       paddleState: previousPaddleState,
       singlesState: previousSinglesState,
+      poolSinglesState: previousPoolSinglesState,
+      singlesFormat,
     };
     setHasUndo(true);
     if (activeQueueMode === 'playall') recordPlayAllDoubles(a, b);
@@ -1032,6 +1145,8 @@ function QueueSystemContent() {
       setPaddleStateUI(previousPaddleState);
       singlesStateRef.current = previousSinglesState;
       setSinglesStateUI(previousSinglesState);
+      poolSinglesStateRef.current = previousPoolSinglesState;
+      setPoolSinglesStateUI(previousPoolSinglesState);
       setHasUndo(false);
       showToast(message);
       return false;
@@ -1207,9 +1322,15 @@ function QueueSystemContent() {
       paddleStateRef.current = newPaddleState;
       setPaddleStateUI(newPaddleState);
     } else if (activeQueueMode === 'default' && gameMode === 'singles') {
-      const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, trimmedName);
-      singlesStateRef.current = newSinglesState;
-      setSinglesStateUI(newSinglesState);
+      if (singlesFormat === 'pool') {
+        const newPoolState = addPlayerToPoolSinglesWaiting(poolSinglesStateRef.current, trimmedName);
+        poolSinglesStateRef.current = newPoolState;
+        setPoolSinglesStateUI(newPoolState);
+      } else {
+        const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, trimmedName);
+        singlesStateRef.current = newSinglesState;
+        setSinglesStateUI(newSinglesState);
+      }
     } else if (activeQueueMode === 'skilled' && skilledState) {
       const activeCount = np.filter(p => !activeSittingOut.includes(p)).length;
       setSkilledState(prev => {
@@ -1516,6 +1637,8 @@ function QueueSystemContent() {
         isSaving={session.isSaving}
         onBack={() => router.push('/')}
         errorMsg={setupErrorMsg ?? undefined}
+        singlesFormat={singlesFormat}
+        onSinglesFormatChange={setSinglesFormat}
       />
     );
   }
@@ -1748,7 +1871,11 @@ function QueueSystemContent() {
             )}
             {activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
               <p className="mode-description">
-                <Trophy size={11} className="mode-desc-icon" /> King of the Court · Winner stays on · Challenger from queue
+                {singlesFormat === 'pool' ? (
+                  <><Trophy size={11} className="mode-desc-icon" /> Pool Rotation · Winners &amp; Losers cycles · Balanced play</>
+                ) : (
+                  <><Trophy size={11} className="mode-desc-icon" /> King of the Court · Winner stays on · Challenger from queue</>
+                )}
               </p>
             )}
             {activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length > 0 && (
@@ -1799,7 +1926,13 @@ function QueueSystemContent() {
             )}
 
             {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />}
-            {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />}
+            {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
+              singlesFormat === 'pool' ? (
+                <PoolSinglesStatusPanel poolState={poolSinglesStateUI} allPlayers={players} />
+              ) : (
+                <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
+              )
+            )}
             {/* ═══════════════════════════════════════════════════
                 SKILLED MODE LAYOUT
                 ═══════════════════════════════════════════════════ */}

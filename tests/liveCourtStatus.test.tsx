@@ -6,7 +6,11 @@ import {
   LiveCourtStatus,
   resolveSelectedCourt,
 } from '@/app/watch/[sessionId]/LiveCourtStatus';
-import type { CourtSlot } from '@/lib/sessionService';
+import {
+  isSessionExpired,
+  SESSION_INACTIVITY_LIMIT_MS,
+  type CourtSlot,
+} from '@/lib/sessionService';
 
 const courts: CourtSlot[] = [
   { id: 'court-1', name: 'Court 1', onCourt: ['A', 'B', 'C', 'D'] },
@@ -67,8 +71,7 @@ describe('Live Court Status', () => {
     expect(isCorrupted({ players: ['A', 'B'], queue: ['A', 'B'], gameMode: 'doubles' })).toBe(false);
   });
 
-  it('verifies application-level 30-minute inactivity session expiration (isSessionExpired)', async () => {
-    const { isSessionExpired, SESSION_INACTIVITY_LIMIT_MS } = await import('@/lib/sessionService');
+  it('verifies application-level 30-minute inactivity session expiration (isSessionExpired)', () => {
     expect(SESSION_INACTIVITY_LIMIT_MS).toBe(30 * 60 * 1000);
 
     const activeSession = {

@@ -130,30 +130,64 @@ export const AnalyticsDashboard: React.FC<{
                   {bracketStats.length === 0 ? (
                     <p className="muted-hint" style={{ padding: '12px 14px', margin: 0 }}>No matches played yet.</p>
                   ) : (
-                    <div className="analytics-table-scroll">
-                      <table className="analytics-table">
-                        <thead>
-                          <tr><th>#</th><th>Player</th><th><TrendingUp size={11} /> W</th><th>L</th><th><Activity size={11} /> GP</th><th>Win %</th></tr>
-                        </thead>
-                        <tbody>
-                          {bracketStats.map((s, i) => (
-                            <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
-                              <td className="col-rank-num">{i + 1}</td>
-                              <td><strong>{s.name}</strong></td>
-                              <td className="col-wins">{s.wins}</td>
-                              <td className="col-losses">{s.losses}</td>
-                              <td>{s.gamesPlayed}</td>
-                              <td>
-                                <div className="winrate-cell">
+                    <>
+                      <div className="analytics-table-scroll analytics-desktop-only">
+                        <table className="analytics-table">
+                          <thead>
+                            <tr><th>#</th><th>Player</th><th><TrendingUp size={11} /> W</th><th>L</th><th><Activity size={11} /> GP</th><th>Win %</th></tr>
+                          </thead>
+                          <tbody>
+                            {bracketStats.map((s, i) => (
+                              <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
+                                <td className="col-rank-num">{i + 1}</td>
+                                <td><strong>{s.name}</strong></td>
+                                <td className="col-wins">{s.wins}</td>
+                                <td className="col-losses">{s.losses}</td>
+                                <td>{s.gamesPlayed}</td>
+                                <td>
+                                  <div className="winrate-cell">
+                                    <span>{s.winRate}%</span>
+                                    <StatBar value={s.winRate} max={100} color={meta.barColor} />
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="analytics-mobile-cards">
+                        {bracketStats.map((s, i) => (
+                          <div key={s.name} className={`analytics-player-card ${i === 0 ? 'analytics-top-card' : ''}`}>
+                            <div className="analytics-card-header">
+                              <div className="analytics-card-player">
+                                <span className="analytics-card-rank-num">#{i + 1}</span>
+                                <strong className="analytics-card-name">{s.name}</strong>
+                              </div>
+                              <span className={`skill-badge skill-badge--${level}`}>{meta.letter}</span>
+                            </div>
+                            <div className="analytics-card-stats analytics-card-stats--3col">
+                              <div className="analytics-stat-item">
+                                <span className="analytics-stat-label">W - L</span>
+                                <span className="analytics-stat-val">
+                                  <span className="col-wins">{s.wins}</span> - <span className="col-losses">{s.losses}</span>
+                                </span>
+                              </div>
+                              <div className="analytics-stat-item">
+                                <span className="analytics-stat-label">GP</span>
+                                <span className="analytics-stat-val">{s.gamesPlayed}</span>
+                              </div>
+                              <div className="analytics-stat-item">
+                                <span className="analytics-stat-label">Win %</span>
+                                <div className="analytics-stat-val winrate-cell">
                                   <span>{s.winRate}%</span>
                                   <StatBar value={s.winRate} max={100} color={meta.barColor} />
                                 </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
                   )}
                 </div>
               );
@@ -169,7 +203,7 @@ export const AnalyticsDashboard: React.FC<{
             : (
               <>
                 <div className="analytics-section-label"><BarChart2 size={13} /> Leaderboard</div>
-                <div className="analytics-table-scroll">
+                <div className="analytics-table-scroll analytics-desktop-only">
                   <table className="analytics-table">
                     <thead>
                       <tr><th>#</th><th>Player</th><th>Rank</th><th><TrendingUp size={11} /> W</th><th>L</th><th><Activity size={11} /> GP</th><th>Win %</th><th>Streak</th></tr>
@@ -190,13 +224,58 @@ export const AnalyticsDashboard: React.FC<{
                     </tbody>
                   </table>
                 </div>
+                <div className="analytics-mobile-cards">
+                  {sorted.map((s, i) => (
+                    <div key={s.name} className={`analytics-player-card ${i === 0 ? 'analytics-top-card' : ''}`}>
+                      <div className="analytics-card-header">
+                        <div className="analytics-card-player">
+                          <span className="analytics-card-rank-num">#{i + 1}</span>
+                          <strong className="analytics-card-name">{s.name}</strong>
+                        </div>
+                        <div className="analytics-card-badges">
+                          <RankBadge rank={s.rank} />
+                          {s.streak >= 2 && (
+                            <span className="streak-badge"><Flame size={11} />{s.streak}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="analytics-card-stats analytics-card-stats--4col">
+                        <div className="analytics-stat-item">
+                          <span className="analytics-stat-label">W - L</span>
+                          <span className="analytics-stat-val">
+                            <span className="col-wins">{s.wins}</span> - <span className="col-losses">{s.losses}</span>
+                          </span>
+                        </div>
+                        <div className="analytics-stat-item">
+                          <span className="analytics-stat-label">GP</span>
+                          <span className="analytics-stat-val">{s.gamesPlayed}</span>
+                        </div>
+                        <div className="analytics-stat-item">
+                          <span className="analytics-stat-label">Win %</span>
+                          <div className="analytics-stat-val winrate-cell">
+                            <span>{s.winRate}%</span>
+                            <StatBar value={s.winRate} max={100} color="#22c55e" />
+                          </div>
+                        </div>
+                        <div className="analytics-stat-item">
+                          <span className="analytics-stat-label">Streak</span>
+                          <span className={`analytics-stat-val ${s.streak === 0 ? 'col-streak-zero' : ''}`}>
+                            {s.streak >= 2 ? (
+                              <span className="streak-badge"><Flame size={11} />{s.streak}</span>
+                            ) : s.streak}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
                 <div className="analytics-section-label" style={{ marginTop: 24 }}><Clock size={13} /> Play Frequency</div>
                 <div className="frequency-chart">
                   {sorted.map(s => (
                     <div key={s.name} className="freq-row">
-                      <span className="freq-name">{s.name}</span>
+                      <span className="freq-name" title={s.name}>{s.name}</span>
                       <StatBar value={s.gamesPlayed} max={maxGP} color="#818cf8" />
-                      <span className="freq-count">{s.gamesPlayed}</span>
+                      <span className="freq-count">{s.gamesPlayed} <span className="freq-unit">GP</span></span>
                     </div>
                   ))}
                 </div>
@@ -211,25 +290,58 @@ export const AnalyticsDashboard: React.FC<{
           {careerList.length === 0
             ? <p className="muted-hint">No career data yet.</p>
             : (
-              <div className="analytics-table-scroll">
-                <table className="analytics-table">
-                  <thead>
-                    <tr><th>#</th><th>Player</th><th><TrendingUp size={11} /> W</th><th>L</th><th><Activity size={11} /> GP</th><th>Win %</th></tr>
-                  </thead>
-                  <tbody>
-                    {careerList.map((s, i) => (
-                      <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
-                        <td className="col-rank-num">{i + 1}</td>
-                        <td><strong>{s.name}</strong></td>
-                        <td className="col-wins">{s.wins}</td>
-                        <td className="col-losses">{s.losses}</td>
-                        <td>{s.gamesPlayed}</td>
-                        <td><div className="winrate-cell"><span>{s.winRate}%</span><StatBar value={s.winRate} max={100} color="#22c55e" /></div></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <div className="analytics-table-scroll analytics-desktop-only">
+                  <table className="analytics-table">
+                    <thead>
+                      <tr><th>#</th><th>Player</th><th><TrendingUp size={11} /> W</th><th>L</th><th><Activity size={11} /> GP</th><th>Win %</th></tr>
+                    </thead>
+                    <tbody>
+                      {careerList.map((s, i) => (
+                        <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
+                          <td className="col-rank-num">{i + 1}</td>
+                          <td><strong>{s.name}</strong></td>
+                          <td className="col-wins">{s.wins}</td>
+                          <td className="col-losses">{s.losses}</td>
+                          <td>{s.gamesPlayed}</td>
+                          <td><div className="winrate-cell"><span>{s.winRate}%</span><StatBar value={s.winRate} max={100} color="#22c55e" /></div></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="analytics-mobile-cards">
+                  {careerList.map((s, i) => (
+                    <div key={s.name} className={`analytics-player-card ${i === 0 ? 'analytics-top-card' : ''}`}>
+                      <div className="analytics-card-header">
+                        <div className="analytics-card-player">
+                          <span className="analytics-card-rank-num">#{i + 1}</span>
+                          <strong className="analytics-card-name">{s.name}</strong>
+                        </div>
+                      </div>
+                      <div className="analytics-card-stats analytics-card-stats--3col">
+                        <div className="analytics-stat-item">
+                          <span className="analytics-stat-label">W - L</span>
+                          <span className="analytics-stat-val">
+                            <span className="col-wins">{s.wins}</span> - <span className="col-losses">{s.losses}</span>
+                          </span>
+                        </div>
+                        <div className="analytics-stat-item">
+                          <span className="analytics-stat-label">GP</span>
+                          <span className="analytics-stat-val">{s.gamesPlayed}</span>
+                        </div>
+                        <div className="analytics-stat-item">
+                          <span className="analytics-stat-label">Win %</span>
+                          <div className="analytics-stat-val winrate-cell">
+                            <span>{s.winRate}%</span>
+                            <StatBar value={s.winRate} max={100} color="#22c55e" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
         </>
       )}
