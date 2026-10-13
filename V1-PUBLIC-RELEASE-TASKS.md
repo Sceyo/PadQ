@@ -464,4 +464,36 @@ Implements the Singles Pool-Rotation format as the default singles engine for si
 | `npm run test:rules` | **22 passed (22)** — all Firestore security rules tests pass in emulator |
 | `npm run build` | **exit 0** — Next.js 16.3.5 (Turbopack), all routes compile cleanly |
 
+---
+
+## 2026-10-12 — Rules Test-First Review, Lint Visibility Baseline & Matchup Differential Design
+
+### 1. Firestore Rules Test-First Empirical Review
+- **Background:** Compared Rule Version A (`ec9f4d0`, PR #15 tip) and Rule Version B (`16d6d2c`, current `main` tip). Version B had relaxed checks on `validDoublesEngineUpdate`/`validSinglesEngineUpdate` (removed roster subset checks), relaxed `validCourt` on single courts (removed uniqueness check allowing duplicates like `[A, A, B, C]`), and defaulted `lastActiveAt` to `request.time` (failing open on missing timestamps).
+- **Test Matrix Results (34 tests run in Firestore Emulator):**
+  - **Rule Version A (`ec9f4d0`): 34 / 34 PASSED (100%)** — All positive tests (T1-T5d) and negative tests (N1-N4) passed without hitting the 1,000 expression ceiling on valid payloads.
+  - **Rule Version B (`16d6d2c`): 30 / 34 PASSED (4 FAILED: N1, N2, N3, N4)** — N1 and N2 allowed invalid engine lists on update; N3 allowed duplicate players `[A, A, B, C]` on single courts; N4 allowed substantive updates on legacy docs lacking `lastActiveAt`.
+- **Verdict:** Rule Version B's loosenings were empirically unjustified. Restored Rule Version A (`ec9f4d0`) with full security validation intact.
+
+### 2. Lint Visibility & React Hooks Warning Baseline
+- In `eslint.config.mjs`, transitioned the 5 experimental React Compiler hooks rules from `"off"` to `"warn"` to prevent hidden regressions while keeping `npm run lint -- --quiet` exiting with code 0.
+- **Exact Baseline Warning Breakdown (27 total):**
+  - `react-hooks/set-state-in-effect`: 11
+  - `react-hooks/refs`: 5
+  - `react-hooks/immutability`: 5
+  - `react-hooks/purity`: 5
+  - `react-hooks/preserve-manual-memoization`: 1
+- **Follow-up Item (Post-Launch / Dedicated PR):** Investigate `courtSlotsRef.current` read during render in `app/queue/page.tsx` (near line 1781 in swap-modal block), which is the only `refs` finding capable of causing a subtle render race. The remaining findings are cosmetic/idiomatic.
+
+### 3. Matchup Strength & Point Differential Specification (Option A: Opponent Win Percentage)
+- **Agreed Tiebreaker Design:** Adopted **Option A (Opponent Win Percentage / OWP)** to break standings ties alongside point differential in both single court and multi-court formats:
+  - **Point Differential:** Points scored minus points conceded across all completed matches in the session.
+  - **Matchup Strength (OWP):** Average win percentage of all opponents faced by the player (excluding matches against each other).
+  - **Tiebreaker Hierarchy:**
+    1. Wins / Win Rate
+    2. Head-to-Head (if applicable)
+    3. Matchup Strength (OWP)
+    4. Point Differential
+  - **Implementation Branch:** Development and implementation are scheduled on branch `matchup-differential` per `DESIGN_MATCHUP_DIFFERENTIAL.md`.
+
 
