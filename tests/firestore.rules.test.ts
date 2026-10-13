@@ -654,4 +654,353 @@ suite('Firestore V1 production rules', () => {
       lastActiveAt: serverTimestamp(),
     }));
   });
+
+  describe('Rules Test-First Review (T1-T5, N1-N4)', () => {
+    const p30 = Array.from({ length: 30 }, (_, i) => `P${String(i + 1).padStart(2, '0')}`);
+    const p29 = p30.slice(0, 29);
+
+    function doublesEngineFull(players: string[]) {
+      return {
+        phase: 'WINNERS',
+        matchIndexInPhase: 5,
+        matchCount: 10,
+        w1: [players[0], players[1]],
+        l1: [players[2], players[3]],
+        waitingQueue: players.slice(4),
+        playedThisCycle: players.slice(0, 10),
+        recentPairs: [
+          `${players[0]} & ${players[1]}`,
+          `${players[2]} & ${players[3]}`,
+          `${players[4]} & ${players[5]}`,
+          `${players[6]} & ${players[7]}`,
+          `${players[8]} & ${players[9]}`,
+          `${players[10]} & ${players[11]}`,
+        ],
+        recentMatches: [
+          `${players[0]} & ${players[1]} vs ${players[2]} & ${players[3]}`,
+          `${players[4]} & ${players[5]} vs ${players[6]} & ${players[7]}`,
+          `${players[8]} & ${players[9]} vs ${players[10]} & ${players[11]}`,
+          `${players[12]} & ${players[13]} vs ${players[14]} & ${players[15]}`,
+        ],
+        lastPlayedMap: Object.fromEntries(players.map((p, idx) => [p, idx + 1])),
+        winnersPool: Array.from({ length: 8 }, (_, i) => ({
+          a: players[i * 2],
+          b: players[i * 2 + 1],
+        })),
+        losersPool: Array.from({ length: 8 }, (_, i) => ({
+          a: players[i * 2 + 2],
+          b: players[i * 2 + 3],
+        })),
+      };
+    }
+
+    function singlesKingFull(players: string[]) {
+      return {
+        format: 'king',
+        king: players[0],
+        queue: players.slice(1),
+        matchIndex: 12,
+        lastPlayedMap: Object.fromEntries(players.map((p, idx) => [p, idx + 1])),
+        winStreak: Object.fromEntries(players.map((p, idx) => [p, idx === 0 ? 3 : 0])),
+        playedThisCycle: players.slice(0, 15),
+        waitingQueue: players.slice(15),
+      };
+    }
+
+    function singlesPoolFull(players: string[]) {
+      return {
+        format: 'pool',
+        phase: 'WINNERS',
+        matchIndexInPhase: 3,
+        matchCount: 8,
+        w1: [players[0]],
+        l1: [players[1]],
+        waitingQueue: players.slice(2),
+        playedThisCycle: players.slice(0, 10),
+        recentMatches: [
+          `${players[0]} vs ${players[1]}`,
+          `${players[2]} vs ${players[3]}`,
+          `${players[4]} vs ${players[5]}`,
+          `${players[6]} vs ${players[7]}`,
+          `${players[8]} vs ${players[9]}`,
+          `${players[10]} vs ${players[11]}`,
+        ],
+        lastPlayedMap: Object.fromEntries(players.map((p, idx) => [p, idx + 1])),
+      };
+    }
+
+    it('T1: positive — 30-player doubles session update adding 30th player (29->30) with full engine state', async () => {
+      const host = env.authenticatedContext('host-t1').firestore();
+      const ref = doc(host, 'sessions', 'T2DUBB');
+      await assertSucceeds(setDoc(ref, sessionData('host-t1', {
+        players: p29,
+        queue: p29,
+      })));
+
+      await assertSucceeds(updateDoc(ref, {
+        players: p30,
+        queue: p30,
+        doublesEngineState: doublesEngineFull(p30),
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('T2: positive — 30-player singles King session update changing players with full King state', async () => {
+      const host = env.authenticatedContext('host-t2').firestore();
+      const ref = doc(host, 'sessions', 'T2SNGK');
+      await assertSucceeds(setDoc(ref, sessionData('host-t2', {
+        gameMode: 'singles',
+        players: p29,
+        queue: p29,
+        doublesEngineState: null,
+      })));
+
+      await assertSucceeds(updateDoc(ref, {
+        players: p30,
+        queue: p30,
+        singlesEngineState: singlesKingFull(p30),
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('T3: positive — 30-player singles Pool session update changing players with full Pool state', async () => {
+      const host = env.authenticatedContext('host-t3').firestore();
+      const ref = doc(host, 'sessions', 'T3PULL');
+      await assertSucceeds(setDoc(ref, sessionData('host-t3', {
+        gameMode: 'singles',
+        players: p29,
+        queue: p29,
+        doublesEngineState: null,
+      })));
+
+      await assertSucceeds(updateDoc(ref, {
+        players: p30,
+        queue: p30,
+        singlesEngineState: singlesPoolFull(p30),
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('T4: positive — 30-player doubles with 15 locked pairs updating lockedPartners and sittingOut', async () => {
+      const host = env.authenticatedContext('host-t4').firestore();
+      const ref = doc(host, 'sessions', 'T4LCKK');
+      const pairs15 = Array.from({ length: 15 }, (_, i) => ({ a: p30[i * 2], b: p30[i * 2 + 1] }));
+
+      await assertSucceeds(setDoc(ref, sessionData('host-t4', {
+        players: p30,
+        queue: p30,
+      })));
+
+      await assertSucceeds(updateDoc(ref, {
+        lockedPartners: pairs15,
+        sittingOut: [p30[0], p30[1]],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('T5a: positive — distinct write site updateLiveScore on 30-player session', async () => {
+      const host = env.authenticatedContext('host-t5a').firestore();
+      const ref = doc(host, 'sessions', 'T5ALVE');
+      await assertSucceeds(setDoc(ref, sessionData('host-t5a', {
+        players: p30,
+        queue: p30,
+      })));
+
+      await assertSucceeds(updateDoc(ref, {
+        liveScore: {
+          scoreA: 11,
+          scoreB: 9,
+          limit: 11,
+          baseLimit: 11,
+          deuce: false,
+          active: true,
+          labelA: `${p30[0]} & ${p30[1]}`,
+          labelB: `${p30[2]} & ${p30[3]}`,
+        },
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('T5b: positive — distinct write site updateSessionHeartbeat on 30-player session', async () => {
+      const host = env.authenticatedContext('host-t5b').firestore();
+      const ref = doc(host, 'sessions', 'T5BHBT');
+      await assertSucceeds(setDoc(ref, sessionData('host-t5b', {
+        players: p30,
+        queue: p30,
+      })));
+
+      await assertSucceeds(updateDoc(ref, {
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('T5c: positive — distinct write site multi-court batchCourtResult at 30 players / 3 courts', async () => {
+      const host = env.authenticatedContext('host-t5c').firestore();
+      const ref = doc(host, 'sessions', 'T5CMUL');
+      const courts = [
+        { id: 'c1', name: 'Court 1', onCourt: p30.slice(0, 4) },
+        { id: 'c2', name: 'Court 2', onCourt: p30.slice(4, 8) },
+        { id: 'c3', name: 'Court 3', onCourt: p30.slice(8, 12) },
+      ];
+      await assertSucceeds(setDoc(ref, sessionData('host-t5c', {
+        players: p30,
+        queue: p30.slice(12),
+        courtSlots: courts,
+      })));
+
+      const commandId = '66666666-6666-4666-8666-666666666666';
+      const historyRef = doc(host, 'sessions', 'T5CMUL', 'history', commandId);
+      await assertSucceeds(runTransaction(host, async tx => {
+        tx.update(ref, {
+          queue: [...p30.slice(16), ...p30.slice(0, 4)],
+          courtSlots: [
+            { id: 'c1', name: 'Court 1', onCourt: p30.slice(12, 16) },
+            courts[1],
+            courts[2],
+          ],
+          revision: 1,
+          updatedAt: serverTimestamp(),
+          lastActiveAt: serverTimestamp(),
+        });
+        tx.set(historyRef, {
+          id: 101,
+          mode: 'Doubles (Court 1)',
+          players: `${p30[0]} & ${p30[1]} vs ${p30[2]} & ${p30[3]}`,
+          winner: `${p30[0]} & ${p30[1]}`,
+          timestamp: '9:00 PM',
+          commandId,
+          revision: 1,
+        });
+      }));
+    });
+
+    it('T5d: positive — distinct write site batchMatchResult (single court with history) at 30 players', async () => {
+      const host = env.authenticatedContext('host-t5d').firestore();
+      const ref = doc(host, 'sessions', 'T5DSNG');
+      await assertSucceeds(setDoc(ref, sessionData('host-t5d', {
+        players: p30,
+        queue: p30,
+      })));
+
+      const commandId = '77777777-7777-4777-8777-777777777777';
+      const historyRef = doc(host, 'sessions', 'T5DSNG', 'history', commandId);
+      const nextEngine = doublesEngineFull(p30);
+      nextEngine.matchCount = 11;
+
+      await assertSucceeds(runTransaction(host, async tx => {
+        tx.update(ref, {
+          queue: [...p30.slice(4), ...p30.slice(0, 4)],
+          doublesEngineState: nextEngine,
+          revision: 1,
+          updatedAt: serverTimestamp(),
+          lastActiveAt: serverTimestamp(),
+        });
+        tx.set(historyRef, {
+          id: 102,
+          mode: 'Doubles',
+          players: `${p30[0]} & ${p30[1]} vs ${p30[2]} & ${p30[3]}`,
+          winner: `${p30[0]} & ${p30[1]}`,
+          score: '11 – 7',
+          timestamp: '9:05 PM',
+          commandId,
+          revision: 1,
+        });
+      }));
+    });
+
+    it('N1: negative — update with an engine list containing a name not in the roster is denied', async () => {
+      const host = env.authenticatedContext('host-n1').firestore();
+      const ref = doc(host, 'sessions', 'N2ENGN');
+      await assertSucceeds(setDoc(ref, sessionData('host-n1', {
+        players: p29,
+        queue: p29,
+      })));
+
+      const badEngine = doublesEngineFull(p30);
+      badEngine.w1 = ['UNKNOWN_PLAYER', p30[1]];
+
+      await assertFails(updateDoc(ref, {
+        players: p30,
+        queue: p30,
+        doublesEngineState: badEngine,
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('N2: negative — update with duplicate names inside an engine list is denied', async () => {
+      const host = env.authenticatedContext('host-n2').firestore();
+      const ref = doc(host, 'sessions', 'N2DUPP');
+      await assertSucceeds(setDoc(ref, sessionData('host-n2', {
+        players: p29,
+        queue: p29,
+      })));
+
+      const badEngine = doublesEngineFull(p30);
+      badEngine.w1 = [p30[0], p30[0]];
+
+      await assertFails(updateDoc(ref, {
+        players: p30,
+        queue: p30,
+        doublesEngineState: badEngine,
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('N3: negative — one-court session with onCourt = [A, A, B, C] is denied on create and on update', async () => {
+      const host = env.authenticatedContext('host-n3').firestore();
+      const refCreate = doc(host, 'sessions', 'N3CRTE');
+      const badCourt = [{ id: 'c1', name: 'Court 1', onCourt: ['A', 'A', 'B', 'C'] }];
+
+      // On create
+      await assertFails(setDoc(refCreate, sessionData('host-n3', {
+        courtSlots: badCourt,
+      })));
+
+      // On update
+      const refUpdate = doc(host, 'sessions', 'N3UPDT');
+      await assertSucceeds(setDoc(refUpdate, sessionData('host-n3', {
+        courtSlots: [{ id: 'c1', name: 'Court 1', onCourt: ['A', 'B', 'C', 'D'] }],
+      })));
+
+      await assertFails(updateDoc(refUpdate, {
+        courtSlots: badCourt,
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('N4: negative — legacy doc missing lastActiveAt then substantive update is denied (fail-closed)', async () => {
+      const host = env.authenticatedContext('host-n4').firestore();
+      const ref = doc(host, 'sessions', 'N4LEGC');
+
+      await env.withSecurityRulesDisabled(async context => {
+        const adminDb = context.firestore();
+        const base = sessionData('host-n4');
+        delete (base as Record<string, unknown>).lastActiveAt;
+        await setDoc(doc(adminDb, 'sessions', 'N4LEGC'), base);
+      });
+
+      await assertFails(updateDoc(ref, {
+        queue: ['B', 'A', 'C', 'D', 'E', 'F'],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+  });
 });
