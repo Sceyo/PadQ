@@ -213,7 +213,7 @@ before protected `main` can accept a pull request. ESLint has no errors; existin
 warnings remain tracked as non-blocking development limitations.
 
 The detailed persona assessment is recorded in
-[`V1-PERSONA-ACCEPTANCE-MATRIX.md`](V1-PERSONA-ACCEPTANCE-MATRIX.md).
+[`V1-PERSONA-ACCEPTANCE-MATRIX.md`](docs/V1-PERSONA-ACCEPTANCE-MATRIX.md).
 
 ## Local setup
 
@@ -313,12 +313,12 @@ running, stop and restart it. The local Emulator UI is available at
 ## Deployment
 
 The authoritative public-release register is
-[`V1-PUBLIC-RELEASE-TASKS.md`](V1-PUBLIC-RELEASE-TASKS.md). RC6 has completed
+[`V1-PUBLIC-RELEASE-TASKS.md`](docs/V1-PUBLIC-RELEASE-TASKS.md). RC6 has completed
 the automated, security, capacity, clean-CI, merge, tag, and production
 deployment work. The final go/no-go activity is the supervised event described
-in [`V1-SUPERVISED-EVENT-RUNBOOK.md`](V1-SUPERVISED-EVENT-RUNBOOK.md). The
+in [`V1-SUPERVISED-EVENT-RUNBOOK.md`](docs/V1-SUPERVISED-EVENT-RUNBOOK.md). The
 planned scope after launch, including multi-host sessions, is maintained in
-[`PADQ-RELEASE-ROADMAP.md`](PADQ-RELEASE-ROADMAP.md).
+[`PADQ-RELEASE-ROADMAP.md`](docs/PADQ-RELEASE-ROADMAP.md).
 
 The live application is hosted on Vercel at [pad-q.vercel.app](https://pad-q.vercel.app).
 A production deployment requires the six Firebase web configuration variables
