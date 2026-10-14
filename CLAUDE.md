@@ -31,6 +31,8 @@ app/
   page.tsx                    # Homepage — game mode selector, room code entry
   layout.tsx
   globals.css
+  Homepage.css                # Landing page styling
+  privacy/                    # Privacy policy & data retention page
   queue/
     page.tsx                  # Main queue manager (host + viewer) — single large file
     QueueSystem.css           # All queue page styles (gear menu, setup, layout)
@@ -56,7 +58,7 @@ app/
       QueueTable/             # SinglesTable + DoublesTable upcoming matches
       ScoreBoard/             # Live score tracking with deuce logic
       SessionBar/             # Room code display + connection status
-      ShareButton/            # (Legacy — replaced by GearMenu inline share)
+      ShareButton/            # Session share popover (link, QR, native share)
       SinglesStatusPanel/     # Singles king + queue visualizer
       SmartSuggestions/       # AI-style hints (overuse, hot streak, imbalance)
       UserGuideModal/         # In-app how-to guide
@@ -64,12 +66,11 @@ app/
     context/
       CourtProvider.tsx
       useCourt.ts
-    styles/
-      globals.css
-      layout.module.css
   watch/
     [sessionId]/
       page.tsx                # Viewer-only page — read-only live session view
+components/
+  AuthResilience/             # Global auth/firestore failure banner
 hooks/
   useSession.ts               # Firebase session lifecycle (create, join, sync, listen)
   useQueue.ts                 # Local queue state + match suggestion logic
@@ -77,6 +78,10 @@ hooks/
 lib/
   firebase.ts                 # Firebase app + Firestore `db` init
   sessionService.ts           # ALL Firestore operations — UI never imports firebase directly
+docs/                         # Architecture, release gates, security audits, and runbooks
+tests/                        # Vitest unit/component/simulation tests and Playwright E2E
+legacy/                       # Archived obsolete prototypes and legacy stylesheets
+archives/                     # Tracked historical zip archives
 ```
 
 ---
