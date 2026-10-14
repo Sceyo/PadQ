@@ -43,6 +43,31 @@ describe('AnalyticsDashboard component', () => {
     expect(firstCard?.textContent).toContain('GP');
     expect(firstCard?.textContent).toContain('Win %');
     expect(firstCard?.textContent).toContain('Streak');
+    expect(firstCard?.textContent).toContain('Diff');
+    expect(firstCard?.textContent).toContain('Matchup');
+  });
+
+  it('renders Point Differential (Diff) and Matchup Strength (MS) columns in desktop table and mobile cards', () => {
+    const statsWithDiff: PlayerStat[] = [
+      { name: 'Alice', rank: 'Diamond', wins: 5, losses: 1, gamesPlayed: 6, winRate: 83, streak: 3, pointDiff: 14, pointsScored: 60, pointsConceded: 46, scoredGames: 6, matchupStrength: 58 },
+      { name: 'Bob', rank: 'Gold', wins: 4, losses: 2, gamesPlayed: 6, winRate: 67, streak: 2, pointDiff: -4, pointsScored: 45, pointsConceded: 49, scoredGames: 6, matchupStrength: 45 },
+    ];
+    const { container } = render(<AnalyticsDashboard stats={statsWithDiff} />);
+    const ths = Array.from(container.querySelectorAll('.analytics-table th')).map(th => th.textContent);
+    expect(ths).toContain('Diff');
+    expect(ths).toContain('MS');
+
+    // Values in desktop row
+    const firstRow = container.querySelector('.analytics-table tbody tr');
+    expect(firstRow?.textContent).toContain('+14');
+    expect(firstRow?.textContent).toContain('58%');
+
+    // Values in mobile card
+    const firstCard = container.querySelector('.analytics-mobile-cards .analytics-player-card');
+    expect(firstCard?.textContent).toContain('Diff');
+    expect(firstCard?.textContent).toContain('+14');
+    expect(firstCard?.textContent).toContain('Matchup');
+    expect(firstCard?.textContent).toContain('58%');
   });
 
   it('renders frequency chart with clear GP units', () => {

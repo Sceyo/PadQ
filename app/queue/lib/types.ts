@@ -5,6 +5,11 @@ export interface MatchHistoryEntry {
 export interface PlayerStat {
   name: string; wins: number; losses: number;
   gamesPlayed: number; winRate: number; streak: number; rank: RankTier;
+  pointDiff?: number;
+  pointsScored?: number;
+  pointsConceded?: number;
+  scoredGames?: number;
+  matchupStrength?: number;
 }
 export type RankTier        = 'Bronze' | 'Silver' | 'Gold' | 'Platinum' | 'Diamond';
 export type EliminationType = 'single' | 'double';
