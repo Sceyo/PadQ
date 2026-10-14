@@ -1,4 +1,5 @@
 import type { PlayerStat, MatchHistoryEntry } from './types';
+import { comparePlayerStats } from './playerUtils';
 
 export interface StandoutHighlight {
   label: string;
@@ -25,13 +26,8 @@ export function computeSessionRecap(
   const totalMatches = history.length;
   const totalPlayers = stats.length;
 
-  // Sort players by: wins DESC, then winRate DESC, then gamesPlayed DESC, then name ASC
-  const sortedPlayers = [...stats].sort((a, b) => {
-    if (b.wins !== a.wins) return b.wins - a.wins;
-    if (b.winRate !== a.winRate) return b.winRate - a.winRate;
-    if (b.gamesPlayed !== a.gamesPlayed) return b.gamesPlayed - a.gamesPlayed;
-    return a.name.localeCompare(b.name);
-  });
+  // Sort players using standard tiebreaker hierarchy: wins -> winRate -> pointDiff -> matchupStrength -> gamesPlayed -> name
+  const sortedPlayers = [...stats].sort(comparePlayerStats);
 
   const podium = sortedPlayers.slice(0, 3);
   const runnersUp = sortedPlayers.slice(3);

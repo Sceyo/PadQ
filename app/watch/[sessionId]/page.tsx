@@ -40,7 +40,7 @@ import { useSessionAccess } from '@/hooks/useSessionAccess';
 import AccessCodeModal from '@/app/queue/components/atoms/AccessCodeModal';
 import { RankBadge } from '@/app/queue/components/atoms/RankBadge';
 import { StreakBadge } from '@/app/queue/components/atoms/StreakBadge';
-import { buildPlayerStats } from '@/app/queue/lib/playerUtils';
+import { buildPlayerStats, comparePlayerStats, formatPointDiff, formatMatchupStrength } from '@/app/queue/lib/playerUtils';
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
 import { RecapModal } from '@/app/queue/components/RecapCard';
 import { LiveCourtStatus } from './LiveCourtStatus';
@@ -780,74 +780,103 @@ function WatchPageContent() {
                   <tr>
                     <th>#</th><th>Player</th><th>Rank</th>
                     <th><TrendingUp size={11} /> W</th><th>L</th>
-                    <th><Activity size={11} /> GP</th><th>Win%</th><th>🔥</th>
+                    <th><Activity size={11} /> GP</th><th>Win%</th>
+                    <th title="Point Differential (Points Scored - Conceded)">Diff</th>
+                    <th title="Matchup Strength (Opponent Win %)">MS</th>
+                    <th>🔥</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {[...stats].sort((a, b) => b.wins - a.wins).map((s, i) => (
-                    <tr key={s.name}>
-                      <td className="w-col-num">{i + 1}</td>
-                      <td><strong>{s.name}</strong></td>
-                      <td><RankBadge rank={s.rank} className="w-rank-badge" /></td>
-                      <td className="w-col-win">{s.wins}</td>
-                      <td className="w-col-loss">{s.losses}</td>
-                      <td>{s.gamesPlayed}</td>
-                      <td>
-                        <div className="w-wr-cell">
-                          <span>{s.winRate}%</span>
-                          <StatBar value={s.winRate} max={100} color="#22c55e" />
-                        </div>
-                      </td>
-                      <td>{s.streak >= 2 ? <span className="w-streak-badge"><Flame size={11} />{s.streak}</span> : '—'}</td>
-                    </tr>
-                  ))}
+                  {[...stats].sort(comparePlayerStats).map((s, i) => {
+                    const diff = s.pointDiff ?? 0;
+                    const diffClass = diff > 0 ? 'w-col-diff-pos' : diff < 0 ? 'w-col-diff-neg' : 'w-col-diff-zero';
+                    return (
+                      <tr key={s.name}>
+                        <td className="w-col-num">{i + 1}</td>
+                        <td><strong>{s.name}</strong></td>
+                        <td><RankBadge rank={s.rank} className="w-rank-badge" /></td>
+                        <td className="w-col-win">{s.wins}</td>
+                        <td className="w-col-loss">{s.losses}</td>
+                        <td>{s.gamesPlayed}</td>
+                        <td>
+                          <div className="w-wr-cell">
+                            <span>{s.winRate}%</span>
+                            <StatBar value={s.winRate} max={100} color="#22c55e" />
+                          </div>
+                        </td>
+                        <td className={diffClass} title={`Points: ${s.pointsScored ?? 0} scored, ${s.pointsConceded ?? 0} conceded`}>
+                          {formatPointDiff(s.pointDiff)}
+                        </td>
+                        <td title={`Opponent Win %: ${Math.round(s.matchupStrength ?? 50)}% (Quality of competition)`}>
+                          {formatMatchupStrength(s.matchupStrength, s.gamesPlayed)}
+                        </td>
+                        <td>{s.streak >= 2 ? <span className="w-streak-badge"><Flame size={11} />{s.streak}</span> : '—'}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
             <div className="w-stats-mobile-cards">
-              {[...stats].sort((a, b) => b.wins - a.wins).map((s, i) => (
-                <div key={s.name} className={`w-player-card ${i === 0 ? 'w-player-card--top' : ''}`}>
-                  <div className="w-card-header">
-                    <div className="w-card-player">
-                      <span className="w-card-rank-num">#{i + 1}</span>
-                      <strong className="w-card-name">{s.name}</strong>
-                    </div>
-                    <div className="w-card-badges">
-                      <RankBadge rank={s.rank} className="w-rank-badge" />
-                      {s.streak >= 2 && (
-                        <span className="w-streak-badge"><Flame size={11} />{s.streak}</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="w-card-stats">
-                    <div className="w-card-stat-item">
-                      <span className="w-card-stat-label">W - L</span>
-                      <span className="w-card-stat-val">
-                        <span className="w-col-win">{s.wins}</span> - <span className="w-col-loss">{s.losses}</span>
-                      </span>
-                    </div>
-                    <div className="w-card-stat-item">
-                      <span className="w-card-stat-label">GP</span>
-                      <span className="w-card-stat-val">{s.gamesPlayed}</span>
-                    </div>
-                    <div className="w-card-stat-item">
-                      <span className="w-card-stat-label">Win %</span>
-                      <div className="w-card-stat-val w-wr-cell">
-                        <span>{s.winRate}%</span>
-                        <StatBar value={s.winRate} max={100} color="#22c55e" />
+              {[...stats].sort(comparePlayerStats).map((s, i) => {
+                const diff = s.pointDiff ?? 0;
+                const diffClass = diff > 0 ? 'w-col-diff-pos' : diff < 0 ? 'w-col-diff-neg' : 'w-col-diff-zero';
+                return (
+                  <div key={s.name} className={`w-player-card ${i === 0 ? 'w-player-card--top' : ''}`}>
+                    <div className="w-card-header">
+                      <div className="w-card-player">
+                        <span className="w-card-rank-num">#{i + 1}</span>
+                        <strong className="w-card-name">{s.name}</strong>
+                      </div>
+                      <div className="w-card-badges">
+                        <RankBadge rank={s.rank} className="w-rank-badge" />
+                        {s.streak >= 2 && (
+                          <span className="w-streak-badge"><Flame size={11} />{s.streak}</span>
+                        )}
                       </div>
                     </div>
-                    <div className="w-card-stat-item">
-                      <span className="w-card-stat-label">Streak</span>
-                      <span className="w-card-stat-val">
-                        {s.streak >= 2 ? (
-                          <span className="w-streak-inline"><Flame size={11} />{s.streak}</span>
-                        ) : <span className="w-col-streak-zero">{s.streak}</span>}
-                      </span>
+                    <div className="w-card-stats w-card-stats--3col">
+                      <div className="w-card-stat-item">
+                        <span className="w-card-stat-label">W - L</span>
+                        <span className="w-card-stat-val">
+                          <span className="w-col-win">{s.wins}</span> - <span className="w-col-loss">{s.losses}</span>
+                        </span>
+                      </div>
+                      <div className="w-card-stat-item">
+                        <span className="w-card-stat-label">GP</span>
+                        <span className="w-card-stat-val">{s.gamesPlayed}</span>
+                      </div>
+                      <div className="w-card-stat-item">
+                        <span className="w-card-stat-label">Win %</span>
+                        <div className="w-card-stat-val w-wr-cell">
+                          <span>{s.winRate}%</span>
+                          <StatBar value={s.winRate} max={100} color="#22c55e" />
+                        </div>
+                      </div>
+                      <div className="w-card-stat-item">
+                        <span className="w-card-stat-label">Diff</span>
+                        <span className={`w-card-stat-val ${diffClass}`}>
+                          {formatPointDiff(s.pointDiff)}
+                        </span>
+                      </div>
+                      <div className="w-card-stat-item">
+                        <span className="w-card-stat-label">Matchup</span>
+                        <span className="w-card-stat-val">
+                          {formatMatchupStrength(s.matchupStrength, s.gamesPlayed)}
+                        </span>
+                      </div>
+                      <div className="w-card-stat-item">
+                        <span className="w-card-stat-label">Streak</span>
+                        <span className="w-card-stat-val">
+                          {s.streak >= 2 ? (
+                            <span className="w-streak-inline"><Flame size={11} />{s.streak}</span>
+                          ) : <span className="w-col-streak-zero">{s.streak}</span>}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

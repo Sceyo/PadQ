@@ -340,6 +340,12 @@
 .w-col-streak-zero {
   color: #6b7280;
 }
+.w-col-diff-pos { color: #22c55e; font-weight: 700; font-variant-numeric: tabular-nums; }
+.w-col-diff-neg { color: #f87171; font-weight: 700; font-variant-numeric: tabular-nums; }
+.w-col-diff-zero { color: #6b7280; font-weight: 600; font-variant-numeric: tabular-nums; }
+.w-card-stats--3col {
+  grid-template-columns: repeat(3, 1fr);
+}
 
 /* ── History ──────────────────────────────────────────────── */
 .w-history-toggle {

@@ -150,7 +150,7 @@ test('single-court live scoring, management, stats, history, and undo stay consi
 
     await host.getByRole('button', { name: 'Stats' }).click();
     await expect(host.getByText('Leaderboard', { exact: true })).toBeVisible();
-    await expect(host.getByRole('row', { name: /Score Player 01 Bronze 1 0 1 100% 1/ }))
+    await expect(host.getByRole('row', { name: /Score Player 01 Bronze 1 0 1 100% \+2 50% 1/ }))
       .toBeVisible();
     await host.getByRole('button', { name: 'Queue' }).click();
 

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { bracketSkillValue, calcRank, buildPlayerStats, generateSuggestions } from '@/app/queue/lib/playerUtils';
-import type { MatchHistoryEntry } from '@/app/queue/lib/types';
+import { bracketSkillValue, calcRank, buildPlayerStats, generateSuggestions, comparePlayerStats, parseMatchScore, formatPointDiff, formatMatchupStrength } from '@/app/queue/lib/playerUtils';
+import type { MatchHistoryEntry, PlayerStat } from '@/app/queue/lib/types';
 
 describe('playerUtils — bracketSkillValue', () => {
   it('maps beginner/intermediate/advanced to 25/50/75', () => {
@@ -103,6 +103,206 @@ describe('playerUtils — buildPlayerStats', () => {
     const history = [entry('P1', 'P1 vs P2', 1), entry('P1', 'P1 vs P2', 2), entry('P1', 'P1 vs P2', 3)];
     const stats = buildPlayerStats(['P1', 'P2'], history);
     expect(stats.find(s => s.name === 'P1')!.rank).toBe('Diamond'); // 100% over 3 games
+  });
+
+  it('computes point differential in singles for scored matches', () => {
+    const history: MatchHistoryEntry[] = [
+      { id: 1, mode: 'singles', players: 'P1 vs P2', winner: 'P1', score: '11 – 7', timestamp: '2026-01-01' },
+      { id: 2, mode: 'singles', players: 'P1 vs P3', winner: 'P3', score: '9 – 11', timestamp: '2026-01-02' },
+    ];
+    const stats = buildPlayerStats(['P1', 'P2', 'P3'], history);
+    const p1 = stats.find(s => s.name === 'P1')!;
+    const p2 = stats.find(s => s.name === 'P2')!;
+    const p3 = stats.find(s => s.name === 'P3')!;
+
+    expect(p1.pointsScored).toBe(20);
+    expect(p1.pointsConceded).toBe(18);
+    expect(p1.pointDiff).toBe(2);
+    expect(p1.scoredGames).toBe(2);
+
+    expect(p2.pointsScored).toBe(7);
+    expect(p2.pointsConceded).toBe(11);
+    expect(p2.pointDiff).toBe(-4);
+    expect(p2.scoredGames).toBe(1);
+
+    expect(p3.pointsScored).toBe(11);
+    expect(p3.pointsConceded).toBe(9);
+    expect(p3.pointDiff).toBe(2);
+    expect(p3.scoredGames).toBe(1);
+  });
+
+  it('computes point differential in doubles crediting both teammates', () => {
+    const history: MatchHistoryEntry[] = [
+      { id: 1, mode: 'doubles', players: 'P1 & P2 vs P3 & P4', winner: 'P1 & P2', score: '21 – 15', timestamp: '2026-01-01' },
+    ];
+    const stats = buildPlayerStats(['P1', 'P2', 'P3', 'P4'], history);
+    const p1 = stats.find(s => s.name === 'P1')!;
+    const p2 = stats.find(s => s.name === 'P2')!;
+    const p3 = stats.find(s => s.name === 'P3')!;
+    const p4 = stats.find(s => s.name === 'P4')!;
+
+    expect(p1.pointDiff).toBe(6);
+    expect(p2.pointDiff).toBe(6);
+    expect(p3.pointDiff).toBe(-6);
+    expect(p4.pointDiff).toBe(-6);
+  });
+
+  it('handles unscored matches gracefully without affecting pointDiff', () => {
+    const history: MatchHistoryEntry[] = [
+      { id: 1, mode: 'doubles', players: 'P1 & P2 vs P3 & P4', winner: 'P1 & P2', timestamp: '2026-01-01' },
+    ];
+    const stats = buildPlayerStats(['P1', 'P2', 'P3', 'P4'], history);
+    const p1 = stats.find(s => s.name === 'P1')!;
+    expect(p1.wins).toBe(1);
+    expect(p1.gamesPlayed).toBe(1);
+    expect(p1.scoredGames).toBe(0);
+    expect(p1.pointsScored).toBe(0);
+    expect(p1.pointsConceded).toBe(0);
+    expect(p1.pointDiff).toBe(0);
+  });
+
+  it('computes Matchup Strength (OWP) excluding matches against the player', () => {
+    const history: MatchHistoryEntry[] = [
+      { id: 1, mode: 'singles', players: 'P1 vs P2', winner: 'P1', timestamp: '2026-01-01' },
+      { id: 2, mode: 'singles', players: 'P2 vs P3', winner: 'P2', timestamp: '2026-01-02' },
+      { id: 3, mode: 'singles', players: 'P3 vs P4', winner: 'P3', timestamp: '2026-01-03' },
+    ];
+    const stats = buildPlayerStats(['P1', 'P2', 'P3', 'P4'], history);
+    const p1 = stats.find(s => s.name === 'P1')!;
+    expect(p1.matchupStrength).toBe(100);
+  });
+
+  it('defaults Matchup Strength (OWP) to 50 for players with zero games or whose opponents have no other games', () => {
+    const history: MatchHistoryEntry[] = [
+      { id: 1, mode: 'singles', players: 'P1 vs P2', winner: 'P1', timestamp: '2026-01-01' },
+    ];
+    const stats = buildPlayerStats(['P1', 'P2', 'P3'], history);
+    const p1 = stats.find(s => s.name === 'P1')!;
+    const p3 = stats.find(s => s.name === 'P3')!;
+    expect(p1.matchupStrength).toBe(50);
+    expect(p3.matchupStrength).toBe(50);
+  });
+
+  it('correctly maps opponents in doubles (partner is not opponent)', () => {
+    const history: MatchHistoryEntry[] = [
+      { id: 1, mode: 'doubles', players: 'P1 & P2 vs P3 & P4', winner: 'P1 & P2', timestamp: '2026-01-01' },
+      { id: 2, mode: 'singles', players: 'P3 vs P5', winner: 'P3', timestamp: '2026-01-02' },
+      { id: 3, mode: 'singles', players: 'P4 vs P5', winner: 'P5', timestamp: '2026-01-03' },
+    ];
+    const stats = buildPlayerStats(['P1', 'P2', 'P3', 'P4', 'P5'], history);
+    const p1 = stats.find(s => s.name === 'P1')!;
+    expect(p1.matchupStrength).toBe(50);
+  });
+
+  it('safely handles prototype keys as player names without crashing or polluting prototype', () => {
+    const specialPlayers = ['constructor', 'toString', '__proto__', 'Bob'];
+    const history: MatchHistoryEntry[] = [
+      { id: 1, mode: 'singles', players: 'constructor vs Bob', winner: 'constructor', score: '11 – 9', timestamp: '2026-01-01' },
+    ];
+    const stats = buildPlayerStats(specialPlayers, history);
+    expect(stats).toHaveLength(4);
+    const ctor = stats.find(s => s.name === 'constructor');
+    expect(ctor?.wins).toBe(1);
+    expect(ctor?.pointDiff).toBe(2);
+    expect(Object.prototype.hasOwnProperty('constructor')).toBe(true);
+  });
+});
+
+describe('playerUtils — comparePlayerStats', () => {
+  const baseStat = (name: string, partial: Partial<PlayerStat>): PlayerStat => ({
+    name, wins: 0, losses: 0, gamesPlayed: 0, winRate: 0, streak: 0, rank: 'Bronze',
+    pointDiff: 0, pointsScored: 0, pointsConceded: 0, scoredGames: 0, matchupStrength: 50,
+    ...partial,
+  });
+
+  it('ranks higher wins first', () => {
+    const a = baseStat('A', { wins: 3 });
+    const b = baseStat('B', { wins: 4 });
+    expect(comparePlayerStats(a, b)).toBeGreaterThan(0);
+  });
+
+  it('breaks ties by win rate when wins are equal', () => {
+    const a = baseStat('A', { wins: 3, winRate: 60 });
+    const b = baseStat('B', { wins: 3, winRate: 75 });
+    expect(comparePlayerStats(a, b)).toBeGreaterThan(0);
+  });
+
+  it('breaks ties by point differential when wins and win rate are equal', () => {
+    const a = baseStat('A', { wins: 3, winRate: 75, pointDiff: 5 });
+    const b = baseStat('B', { wins: 3, winRate: 75, pointDiff: 12 });
+    expect(comparePlayerStats(a, b)).toBeGreaterThan(0);
+  });
+
+  it('breaks ties by matchup strength when wins, win rate, and pointDiff are equal', () => {
+    const a = baseStat('A', { wins: 3, winRate: 75, pointDiff: 5, matchupStrength: 45 });
+    const b = baseStat('B', { wins: 3, winRate: 75, pointDiff: 5, matchupStrength: 60 });
+    expect(comparePlayerStats(a, b)).toBeGreaterThan(0);
+  });
+
+  it('breaks ties by games played when prior metrics are equal', () => {
+    const a = baseStat('A', { wins: 3, winRate: 75, pointDiff: 5, matchupStrength: 50, gamesPlayed: 4 });
+    const b = baseStat('B', { wins: 3, winRate: 75, pointDiff: 5, matchupStrength: 50, gamesPlayed: 6 });
+    expect(comparePlayerStats(a, b)).toBeGreaterThan(0);
+  });
+
+  it('breaks ties alphabetically when all metrics are equal', () => {
+    const a = baseStat('Alice', { wins: 3, winRate: 75, pointDiff: 5, matchupStrength: 50, gamesPlayed: 4 });
+    const b = baseStat('Bob', { wins: 3, winRate: 75, pointDiff: 5, matchupStrength: 50, gamesPlayed: 4 });
+    expect(comparePlayerStats(a, b)).toBeLessThan(0);
+  });
+});
+
+describe('playerUtils — parseMatchScore', () => {
+  it('parses en-dash scores correctly', () => {
+    expect(parseMatchScore('11 – 7')).toEqual({ sA: 11, sB: 7 });
+  });
+
+  it('parses hyphen scores with or without spaces', () => {
+    expect(parseMatchScore('21 - 15')).toEqual({ sA: 21, sB: 15 });
+    expect(parseMatchScore('15-10')).toEqual({ sA: 15, sB: 10 });
+  });
+
+  it('parses colon scores and em-dash scores', () => {
+    expect(parseMatchScore('11:9')).toEqual({ sA: 11, sB: 9 });
+    expect(parseMatchScore('11—8')).toEqual({ sA: 11, sB: 8 });
+  });
+
+  it('returns null for undefined, empty, or invalid score strings', () => {
+    expect(parseMatchScore(undefined)).toBeNull();
+    expect(parseMatchScore('')).toBeNull();
+    expect(parseMatchScore('forfeit')).toBeNull();
+    expect(parseMatchScore('11')).toBeNull();
+    expect(parseMatchScore('11 - abc')).toBeNull();
+  });
+});
+
+describe('playerUtils — formatPointDiff', () => {
+  it('formats positive differential with + prefix', () => {
+    expect(formatPointDiff(12)).toBe('+12');
+    expect(formatPointDiff(1)).toBe('+1');
+  });
+
+  it('formats zero or undefined differential as +0', () => {
+    expect(formatPointDiff(0)).toBe('+0');
+    expect(formatPointDiff(undefined)).toBe('+0');
+  });
+
+  it('formats negative differential with minus sign', () => {
+    expect(formatPointDiff(-6)).toBe('-6');
+    expect(formatPointDiff(-1)).toBe('-1');
+  });
+});
+
+describe('playerUtils — formatMatchupStrength', () => {
+  it('returns em-dash for 0 games played', () => {
+    expect(formatMatchupStrength(50, 0)).toBe('—');
+    expect(formatMatchupStrength(undefined, 0)).toBe('—');
+  });
+
+  it('returns rounded percentage for active players', () => {
+    expect(formatMatchupStrength(58.33, 4)).toBe('58%');
+    expect(formatMatchupStrength(100, 1)).toBe('100%');
+    expect(formatMatchupStrength(undefined, 2)).toBe('50%');
   });
 });
 

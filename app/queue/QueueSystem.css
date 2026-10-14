@@ -250,6 +250,7 @@ body.dark-mode {
 .analytics-table tr:last-child td{border-bottom:none;}
 .analytics-table tr.analytics-top td{background:rgba(99,102,241,.04);}
 .col-rank-num{color:var(--txt-3);font-variant-numeric:tabular-nums;width:28px;} .col-wins{color:var(--success);font-weight:700;} .col-losses{color:var(--danger);font-weight:700;} .col-streak-zero{color:var(--txt-3);}
+.col-diff-pos{color:var(--success, #22c55e);font-weight:700;font-variant-numeric:tabular-nums;} .col-diff-neg{color:var(--danger, #f87171);font-weight:700;font-variant-numeric:tabular-nums;} .col-diff-zero{color:var(--txt-3, #94a3b8);font-variant-numeric:tabular-nums;}
 .winrate-cell{display:flex;flex-direction:column;gap:4px;min-width:80px;} .winrate-cell span{font-size:.75rem;font-weight:600;}
 .stat-bar-track{height:5px;background:var(--border);border-radius:99px;overflow:hidden;min-width:60px;} .stat-bar-fill{height:100%;border-radius:99px;transition:width .4s ease;}
 
