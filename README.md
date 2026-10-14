@@ -10,18 +10,18 @@
 
 ## Project status
 
-PAD-Q is an independently developed product in **active development**. The `main` branch contains the production V1 release candidate; the complete experimental feature set is preserved on `all-features-archive`.
+PAD-Q is an independently developed product in **active development**. The `main` branch contains the production V1 release baseline; active feature development for V1.2 is underway on `Matchmaking-skill-based`.
 
-- Production candidate: **`v1.0.0-rc.6`**
+- Production baseline: **`v1.0.0-rc.6`**
 - Deployed on Vercel with Firebase Cloud Firestore and Firebase App Check enforcement
-- 173 application tests, 20 Firestore emulator tests, and 16 browser/stress scenarios passing
+- **257 application unit & scenario tests** passing across 22 test files
+- **34 Firestore Emulator security & concurrency tests** passing (0 failures)
+- Standings upgraded with **Point Differential (`+/-`)** and **Matchup Strength (`OWP` — Opponent Win Percentage)** deterministic tiebreaks
+- Active feature branch: **`Matchmaking-skill-based`** (reviving V1.2 Skill-Aware Matchmaking)
+- Zero production runtime vulnerabilities (`npm audit --omit=dev`)
 - Protected `main` branch with a required GitHub Actions quality gate
-- Designed for browser-based host and spectator experiences
 
-RC6 is deployed and has passed the clean CI, production build, security-rule,
-30-viewer, and three-court concurrency gates. The only remaining release gate is
-a supervised real pickleball event. PAD-Q must remain labeled as a release
-candidate until that event completes without a production-blocking incident.
+The V1.0 candidate is deployed and has passed the clean CI, production build, security-rule, 30-viewer, and three-court concurrency gates. Final public testing validation is underway per [Gate 8](docs/v1/V1-PUBLIC-RELEASE-TASKS.md#8-final-task--open-public-testing-validation-gate). All architectural and operational documentation is indexed in [`docs/README.md`](docs/README.md).
 
 ### V1 operating contract
 
@@ -68,10 +68,11 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 ### History and analytics
 
 - Timestamped match results and optional scores
-- Session win/loss records, win rates, streaks, and rank tiers
-- Session leaderboards and performance statistics
+- Deterministic 4-level standings hierarchy: **Wins $\to$ Win Rate $\to$ Point Differential (`+/-`) $\to$ Matchup Strength (`OWP`)**
+- Session win/loss records, point differentials, opponent win percentages, streaks, and rank tiers
+- Host session leaderboards and deep performance statistics
 - Device-local career statistics
-- Spectator match history and next-match announcements
+- Spectator match history, court-by-court results, and next-match announcements
 
 ## Product preview
 
@@ -172,33 +173,36 @@ There is no separate REST or GraphQL backend in this repository. The browser use
 - **Doubles:** an `INIT → WINNERS → LOSERS` state machine seeds the player pool and alternates between winner and loser groups.
 - Candidate doubles teams are scored to reduce repeated partners, repeated matchups, immediate replay, and skill imbalance.
 
-### Deferred modes
+### V1.2 Active Development: Skill-Aware Matchmaking
 
-Tournament, Play-All, skill-based matchmaking, viewer PIN setup, and the legacy independent-court coordinator are hidden from the V1 production interface. Their implementations and documentation remain available on `all-features-archive` for later hardening and release.
+Skill-based matchmaking is being revived and modernized for **V1.2** on the `Matchmaking-skill-based` branch (see [`docs/v1.2/SKILL_AWARE_MATCHMAKING.md`](docs/v1.2/SKILL_AWARE_MATCHMAKING.md)).
 
-The deferred skill engine groups players as Beginner, Intermediate, or Advanced. Court filling follows a priority cascade:
+The skill engine groups players as **Beginner**, **Intermediate**, or **Advanced**. Court allocation follows a strict priority cascade:
 
-1. four players from one skill group;
-2. a majority group plus an adjacent-level player;
-3. a split between adjacent skill groups; and
-4. a cross-bracket fallback when no closer match can be formed.
+1. **P1 (Pure Match):** Four players from the exact same skill bracket.
+2. **P2 (Majority + Adjacent):** Majority bracket filled by immediate neighbor (B+I or I+A; never B+A).
+3. **P3 (Split Fill):** Adjacent brackets split 2+2 or 3+1.
+4. **P3B (Cross-Bracket Snake):** When no intermediates exist, allow B+A with snake drafting (`Team A: B1 + A2`, `Team B: B2 + A1`).
 
-Wait-cycle counters provide a starvation override so a smaller skill group is not skipped indefinitely. Rest cycles are calculated from player count and available court capacity.
+Wait-cycle counters provide a **starvation override** so a smaller skill group is not skipped indefinitely. In V1.2, court assignments project directly into `courtSlots` so spectators follow live skill-bracket matches in real-time.
+
+Tournament, Play-All, viewer PIN setup, and the legacy independent-court coordinator remain sealed on `all-features-archive` for subsequent releases.
 
 ## Testing and quality assurance
 
-The RC6 automated suite includes:
+The automated test suite includes:
 
-- 173 passing application unit, simulation, scenario, and component tests;
-- 20 passing Firestore Emulator security and concurrency tests; and
-- 16 passing browser end-to-end and stress scenarios.
+- **257 passing application unit, simulation, scenario, and component tests** across 22 test files;
+- **34 passing Firestore Emulator security and concurrency tests**; and
+- **16 passing browser end-to-end and stress scenarios**.
 
 The suite focuses on deterministic domain logic and verifies:
 
 - singles king, challenger, fatigue, and forced-rotation behavior;
 - doubles phase transitions, partner selection, pool limits, and serialization;
-- skill-priority selection, rest cycles, starvation prevention, and idle-court filling;
-- player statistics and matchmaking suggestions; and
+- point differential calculations, doubles opponent win percentages (OWP), and deterministic tiebreak rankings;
+- skill-priority selection, snake-draft ordering, rest cycles, starvation prevention, and idle-court filling;
+- prototype pollution hardening and linear regex ReDoS resistance; and
 - 25- and 30-player rush scenarios, three-court concurrent completion, queue
   removal, score recovery, reconnects, and 30 simultaneous Live Watch viewers.
 
@@ -213,7 +217,7 @@ before protected `main` can accept a pull request. ESLint has no errors; existin
 warnings remain tracked as non-blocking development limitations.
 
 The detailed persona assessment is recorded in
-[`V1-PERSONA-ACCEPTANCE-MATRIX.md`](docs/V1-PERSONA-ACCEPTANCE-MATRIX.md).
+[`V1-PERSONA-ACCEPTANCE-MATRIX.md`](docs/v1/V1-PERSONA-ACCEPTANCE-MATRIX.md).
 
 ## Local setup
 
@@ -313,12 +317,12 @@ running, stop and restart it. The local Emulator UI is available at
 ## Deployment
 
 The authoritative public-release register is
-[`V1-PUBLIC-RELEASE-TASKS.md`](docs/V1-PUBLIC-RELEASE-TASKS.md). RC6 has completed
+[`V1-PUBLIC-RELEASE-TASKS.md`](docs/v1/V1-PUBLIC-RELEASE-TASKS.md). RC6 has completed
 the automated, security, capacity, clean-CI, merge, tag, and production
 deployment work. The final go/no-go activity is the supervised event described
-in [`V1-SUPERVISED-EVENT-RUNBOOK.md`](docs/V1-SUPERVISED-EVENT-RUNBOOK.md). The
-planned scope after launch, including multi-host sessions, is maintained in
-[`PADQ-RELEASE-ROADMAP.md`](docs/PADQ-RELEASE-ROADMAP.md).
+in [`V1-SUPERVISED-EVENT-RUNBOOK.md`](docs/v1/V1-SUPERVISED-EVENT-RUNBOOK.md). The
+planned scope after launch, including multi-host sessions and V1.2 features, is maintained in
+[`PADQ-RELEASE-ROADMAP.md`](docs/PADQ-RELEASE-ROADMAP.md) and [`docs/README.md`](docs/README.md).
 
 The live application is hosted on Vercel at [pad-q.vercel.app](https://pad-q.vercel.app).
 A production deployment requires the six Firebase web configuration variables
