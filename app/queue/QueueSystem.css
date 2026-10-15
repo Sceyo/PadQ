@@ -3028,6 +3028,9 @@ body.dark-mode .roster-name--added { color: #4b5563; }
 .skill-badge--beginner     { background: rgba(34,197,94,.15);  color: #22c55e; border: 1px solid rgba(34,197,94,.35); }
 .skill-badge--intermediate { background: rgba(245,158,11,.15); color: #f59e0b; border: 1px solid rgba(245,158,11,.35); }
 .skill-badge--advanced     { background: rgba(239,68,68,.15);  color: #ef4444; border: 1px solid rgba(239,68,68,.35); }
+.skill-badge--untagged     { background: rgba(148,163,184,.15); color: #94a3b8; border: 1px dashed rgba(148,163,184,.45); }
+.skill-badge--interactive  { cursor: pointer; padding: 0; outline: none; transition: transform .12s, filter .12s; }
+.skill-badge--interactive:hover { transform: scale(1.18); filter: brightness(1.2); }
 
 /* ── Skill picker (expands below the player row) ─────────── */
 .skill-picker {
@@ -3118,11 +3121,13 @@ body.dark-mode .skill-pick-btn { background: rgba(255,255,255,.05); border-color
 .skilled-level-tag--intermediate { color: #f59e0b; background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.3); }
 .skilled-level-tag--advanced     { color: #ef4444; background: rgba(239,68,68,.1);  border-color: rgba(239,68,68,.3); }
 .skilled-level-tag--mixed        { color: #9ca3af; background: rgba(156,163,175,.1); border-color: rgba(156,163,175,.3); }
+.skilled-level-tag--untagged     { color: #94a3b8; background: rgba(148,163,184,.1); border-color: rgba(148,163,184,.3); }
 
 .skilled-court-card--beginner     { border-left: 3px solid #22c55e; }
 .skilled-court-card--intermediate { border-left: 3px solid #f59e0b; }
 .skilled-court-card--advanced     { border-left: 3px solid #ef4444; }
 .skilled-court-card--mixed        { border-left: 3px solid #9ca3af; }
+.skilled-court-card--untagged     { border-left: 3px dashed #94a3b8; }
 
 .skilled-court-teams {
   display: flex; padding: 10px 14px; flex-direction: column; gap: 0;
@@ -3241,6 +3246,85 @@ body.dark-mode .skilled-rest-section { border-color: rgba(255,255,255,.06); back
 .skilled-desc {
   font-size: .78rem; color: var(--txt-3); text-align: center;
   margin: 0 0 4px; line-height: 1.5;
+}
+
+/* ── Setup player list: column layout for skill picker ── */
+.setup-player-item-col {
+  display: flex !important; flex-direction: column !important;
+  align-items: stretch !important; gap: 0 !important;
+}
+.setup-player-item-row {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+}
+.setup-player-name {
+  flex: 1; display: inline-flex; align-items: center;
+}
+
+/* ── Unassigned players card in SkilledView ── */
+.skilled-unassigned-card {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--r-md);
+  background: var(--card-alt);
+  padding: 12px 14px;
+  margin-bottom: 4px;
+}
+.skilled-unassigned-header {
+  display: flex; flex-direction: column; gap: 2px;
+  margin-bottom: 10px;
+}
+.skilled-unassigned-title {
+  font-size: .84rem; font-weight: 700; color: var(--txt-1);
+}
+.skilled-unassigned-hint {
+  font-size: .75rem; color: var(--txt-3); line-height: 1.4;
+}
+.skilled-unassigned-list {
+  display: flex; flex-direction: column; gap: 6px;
+  max-height: 220px; overflow-y: auto;
+  padding-right: 4px;
+}
+.skilled-unassigned-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 6px 10px; border-radius: var(--r-sm);
+  background: var(--bg); border: 1px solid var(--border);
+}
+.skilled-unassigned-name {
+  font-size: .84rem; font-weight: 600; color: var(--txt-1);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.skilled-quick-tag-group {
+  display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0;
+}
+.skilled-quick-tag-group--inline {
+  margin-right: 6px;
+}
+.skilled-tag-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; font-family: inherit;
+  border: 1px solid var(--border); background: var(--btn);
+  cursor: pointer; transition: all .12s;
+}
+.skilled-tag-btn:hover {
+  transform: scale(1.1);
+}
+.skilled-tag-btn--beginner {
+  color: #22c55e; border-color: rgba(34,197,94,.4); background: rgba(34,197,94,.1);
+}
+.skilled-tag-btn--beginner:hover {
+  background: #22c55e; color: #fff;
+}
+.skilled-tag-btn--intermediate {
+  color: #f59e0b; border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.1);
+}
+.skilled-tag-btn--intermediate:hover {
+  background: #f59e0b; color: #fff;
+}
+.skilled-tag-btn--advanced {
+  color: #ef4444; border-color: rgba(239,68,68,.4); background: rgba(239,68,68,.1);
+}
+.skilled-tag-btn--advanced:hover {
+  background: #ef4444; color: #fff;
 }
 
 /* ── Section shell ── */

@@ -38,7 +38,7 @@ import { buildPlayerStats, generateSuggestions, shuffleArray, bracketSkillValue 
 import {
   initSkilledState, rotatePlayers as rotatePlayersEngine, reassignCourt as reassignCourtEngine,
   addPlayerToSkilledState as addPlayerToSkilledStateEngine, retagPlayerInQueue,
-  getPlayerBracketLevel, fillIdleCourts as fillIdleCourtsEngine,
+  getPlayerBracketLevel, getPlayerSkillTag, fillIdleCourts as fillIdleCourtsEngine,
   recalculateRest as recalculateRestEngine,
   hydrateSkilledStateFromCourtSlots, projectSkilledCourtsToSlots,
   type SkilledState, type SkilledCourt, type SkillLevel, type CourtDef,
@@ -561,7 +561,17 @@ function QueueSystemContent() {
     setSetupErrorMsg(null);
     setTempPlayers(prev => [...prev, t]); setCurrentName('');
   };
-  const removeTempPlayer = (i: number) => setTempPlayers(prev => prev.filter((_, j) => j !== i));
+  const removeTempPlayer = (i: number) => {
+    const removedName = tempPlayers[i];
+    setTempPlayers(prev => prev.filter((_, j) => j !== i));
+    if (removedName) {
+      setSkilledBrackets(prev => ({
+        beginner:     prev.beginner.filter(n => n !== removedName),
+        intermediate: prev.intermediate.filter(n => n !== removedName),
+        advanced:     prev.advanced.filter(n => n !== removedName),
+      }));
+    }
+  };
 
   const addFromPaste = () => {
     const names = pasteInput.split(/[,\n]+/).map(n => n.trim()).filter(n => n.length > 0 && n.length <= 60);
@@ -1574,6 +1584,24 @@ function QueueSystemContent() {
     if (fresh.length === 0) return;
     setTempPlayers(prev => [...prev, ...fresh]);
     setRosterSelected(new Set());
+
+    // Automatically carry over any skill tags saved in the club roster
+    const rosterSkillMap = new Map(roster.map(e => [e.name, e.skill]));
+    setSkilledBrackets(prev => {
+      let next = { ...prev };
+      for (const name of fresh) {
+        const skill = rosterSkillMap.get(name);
+        if (skill) {
+          next = {
+            beginner:     next.beginner.filter(n => n !== name),
+            intermediate: next.intermediate.filter(n => n !== name),
+            advanced:     next.advanced.filter(n => n !== name),
+            [skill]:      [...next[skill].filter(n => n !== name), name],
+          };
+        }
+      }
+      return next;
+    });
   };
 
   const handleRemoveFromRosterUI = (name: string) => {
@@ -1622,6 +1650,39 @@ function QueueSystemContent() {
         return next;
       });
     }
+  };
+
+  // Set skill for a player before or during session
+  const handleSetPlayerSkill = (name: string, skill: SkillBracket | undefined) => {
+    if (!skill) {
+      setSkilledBrackets(prev => ({
+        beginner:     prev.beginner.filter(n => n !== name),
+        intermediate: prev.intermediate.filter(n => n !== name),
+        advanced:     prev.advanced.filter(n => n !== name),
+      }));
+      if (skilledState) {
+        setSkilledState(prev => {
+          if (!prev) return prev;
+          const next = retagPlayerInQueue(name, 'intermediate', prev);
+          setQueue(next.waitingQueue);
+          queueRef.current = next.waitingQueue;
+          if (session.sessionId) session.syncField({ queue: next.waitingQueue });
+          return next;
+        });
+      }
+      return;
+    }
+    handleAssignToBracket(skill, name);
+  };
+
+  // Cycle a player's skill tag on the fly: untagged/other -> beginner -> intermediate -> advanced -> beginner
+  const handleCyclePlayerSkill = (name: string) => {
+    const current = getPlayerSkillTag(name, skilledBrackets);
+    const nextBracket: SkillBracket =
+      current === 'beginner' ? 'intermediate' :
+      current === 'intermediate' ? 'advanced' : 'beginner';
+    handleAssignToBracket(nextBracket, name);
+    showToast(`${name} assigned to ${nextBracket.toUpperCase()}`);
   };
 
   // Add one or more players to the session AND assign to a bracket in one atomic update
@@ -1770,6 +1831,8 @@ function QueueSystemContent() {
         errorMsg={setupErrorMsg ?? undefined}
         singlesFormat={singlesFormat}
         onSinglesFormatChange={setSinglesFormat}
+        skilledBrackets={skilledBrackets}
+        onSetPlayerSkill={handleSetPlayerSkill}
       />
     );
   }
@@ -2072,7 +2135,7 @@ function QueueSystemContent() {
                 {!showSkillBrackets && untaggedInSkilled.size > 0 && (
                   <div className="skilled-untagged-notice">
                     <span className="skilled-untagged-dot">?</span>
-                    {[...untaggedInSkilled].join(', ')} {untaggedInSkilled.size === 1 ? 'has' : 'have'} no skill tag — treated as Intermediate.
+                    {[...untaggedInSkilled].join(', ')} {untaggedInSkilled.size === 1 ? 'has' : 'have'} no skill tag — treated as Intermediate. Tap any [?] badge or open Skill Brackets to assign.
                   </div>
                 )}
 
@@ -2081,11 +2144,15 @@ function QueueSystemContent() {
                   {skilledState.courts.map(court => {
                     const teamA = court.players.slice(0, 2);
                     const teamB = court.players.slice(2, 4);
-                    const levelLabel = court.matchLevel === 'mixed' ? 'MIXED'
+                    const hasUntagged = court.players.some(p => getPlayerSkillTag(p, skilledBrackets) === 'untagged');
+                    const allUntagged = court.players.length > 0 && court.players.every(p => getPlayerSkillTag(p, skilledBrackets) === 'untagged');
+                    const levelLabel = allUntagged ? 'UNTAGGED COURT'
+                      : court.matchLevel === 'mixed' || hasUntagged ? 'MIXED'
                       : court.matchLevel === 'beginner' ? 'BEGINNER COURT'
                       : court.matchLevel === 'intermediate' ? 'INTERMEDIATE COURT'
                       : 'ADVANCED COURT';
-                    const levelClass = court.matchLevel === 'mixed' ? 'mixed'
+                    const levelClass = allUntagged ? 'untagged'
+                      : court.matchLevel === 'mixed' || hasUntagged ? 'mixed'
                       : court.matchLevel === 'beginner' ? 'beginner'
                       : court.matchLevel === 'intermediate' ? 'intermediate'
                       : 'advanced';
@@ -2115,10 +2182,17 @@ function QueueSystemContent() {
                                 <div key={ti} className={`skilled-court-team skilled-court-team--${ti === 0 ? 'a' : 'b'}`}>
                                   <span className="skilled-team-label">Team {ti === 0 ? 'A' : 'B'}</span>
                                   {team.map(name => {
-                                    const lvl = getPlayerBracketLevel(name, skilledBrackets);
+                                    const lvl = getPlayerSkillTag(name, skilledBrackets);
                                     return (
                                       <div key={name} className="skilled-court-player">
-                                        <span className={`skill-badge skill-badge--${lvl}`}>{lvl[0].toUpperCase()}</span>
+                                        <button
+                                          type="button"
+                                          className={`skill-badge skill-badge--${lvl}${session.isHost ? ' skill-badge--interactive' : ''}`}
+                                          onClick={session.isHost ? () => handleCyclePlayerSkill(name) : undefined}
+                                          title={session.isHost ? `Skill: ${lvl} (tap to change)` : `Skill: ${lvl}`}
+                                        >
+                                          {lvl === 'untagged' ? '?' : lvl[0].toUpperCase()}
+                                        </button>
                                         {name}
                                       </div>
                                     );
@@ -2164,13 +2238,23 @@ function QueueSystemContent() {
                               <span className={`skill-badge skill-badge--${level}`}>{level[0].toUpperCase()}</span>
                               {level.charAt(0).toUpperCase() + level.slice(1)}
                             </div>
-                            {group.map((name, i) => (
-                              <div key={name} className="skilled-queue-player">
-                                <span className="skilled-queue-pos">#{i + 1}</span>
-                                <span className={`skill-badge skill-badge--${level}`}>{level[0].toUpperCase()}</span>
-                                <span className="skilled-queue-name">{name}</span>
-                              </div>
-                            ))}
+                            {group.map((name, i) => {
+                              const lvl = getPlayerSkillTag(name, skilledBrackets);
+                              return (
+                                <div key={name} className="skilled-queue-player">
+                                  <span className="skilled-queue-pos">#{i + 1}</span>
+                                  <button
+                                    type="button"
+                                    className={`skill-badge skill-badge--${lvl}${session.isHost ? ' skill-badge--interactive' : ''}`}
+                                    onClick={session.isHost ? () => handleCyclePlayerSkill(name) : undefined}
+                                    title={session.isHost ? `Skill: ${lvl} (tap to change)` : `Skill: ${lvl}`}
+                                  >
+                                    {lvl === 'untagged' ? '?' : lvl[0].toUpperCase()}
+                                  </button>
+                                  <span className="skilled-queue-name">{name}</span>
+                                </div>
+                              );
+                            })}
                           </div>
                         );
                       })}
@@ -2185,17 +2269,25 @@ function QueueSystemContent() {
                       Resting ({skilledState.restPool.length})
                     </h3>
                     <div className="skilled-rest-list">
-                      {skilledState.restPool.map(entry => (
-                        <div key={entry.name} className="skilled-rest-player">
-                          <span className={`skill-badge skill-badge--${entry.skillLevel}`}>
-                            {entry.skillLevel[0].toUpperCase()}
-                          </span>
-                          <span className="skilled-rest-name">{entry.name}</span>
-                          <span className="skilled-rest-cycles">
-                            {entry.cyclesRemaining === 1 ? '1 game left' : `${entry.cyclesRemaining} games left`}
-                          </span>
-                        </div>
-                      ))}
+                      {skilledState.restPool.map(entry => {
+                        const lvl = getPlayerSkillTag(entry.name, skilledBrackets);
+                        return (
+                          <div key={entry.name} className="skilled-rest-player">
+                            <button
+                              type="button"
+                              className={`skill-badge skill-badge--${lvl}${session.isHost ? ' skill-badge--interactive' : ''}`}
+                              onClick={session.isHost ? () => handleCyclePlayerSkill(entry.name) : undefined}
+                              title={session.isHost ? `Skill: ${lvl} (tap to change)` : `Skill: ${lvl}`}
+                            >
+                              {lvl === 'untagged' ? '?' : lvl[0].toUpperCase()}
+                            </button>
+                            <span className="skilled-rest-name">{entry.name}</span>
+                            <span className="skilled-rest-cycles">
+                              {entry.cyclesRemaining === 1 ? '1 game left' : `${entry.cyclesRemaining} games left`}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

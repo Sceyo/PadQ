@@ -42,6 +42,8 @@ export interface SetupViewProps {
   errorMsg?:           string;
   singlesFormat?:      'pool' | 'king';
   onSinglesFormatChange?: (format: 'pool' | 'king') => void;
+  skilledBrackets?:    { beginner: string[]; intermediate: string[]; advanced: string[] };
+  onSetPlayerSkill?:   (name: string, skill: SkillBracket | undefined) => void;
 }
 
 export function SetupView({
@@ -57,6 +59,8 @@ export function SetupView({
   onSetRosterSkill,
   singlesFormat = 'pool',
   onSinglesFormatChange,
+  skilledBrackets,
+  onSetPlayerSkill,
 }: SetupViewProps) {
   const minPlayers = gameMode === 'doubles' && courtCount > 1
     ? courtCount * 4
@@ -64,10 +68,18 @@ export function SetupView({
       ? Math.max(5, courtCount * 2 + 1)
       : 5;
   const [skillPickerFor, setSkillPickerFor] = useState<string | null>(null);
+  const [tempSkillPickerFor, setTempSkillPickerFor] = useState<string | null>(null);
 
   const SKILL_BRACKETS: SkillBracket[] = ['beginner', 'intermediate', 'advanced'];
   const SKILL_LABEL: Record<SkillBracket, string> = { beginner: 'B', intermediate: 'I', advanced: 'A' };
   const SKILL_TITLE: Record<SkillBracket, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
+
+  const getTempPlayerSkill = (name: string): SkillBracket | undefined => {
+    if (skilledBrackets?.beginner.includes(name)) return 'beginner';
+    if (skilledBrackets?.intermediate.includes(name)) return 'intermediate';
+    if (skilledBrackets?.advanced.includes(name)) return 'advanced';
+    return undefined;
+  };
 
   return (
     <div className={`queue-system setup-page ${darkMode ? 'dark' : ''}`}>
@@ -292,15 +304,54 @@ export function SetupView({
           <div className="players-list">
             <h3><Users size={13} /> Players ({tempPlayers.length})</h3>
             <ul>
-              {tempPlayers.map((p, i) => (
-                <li key={i}>
-                  <span className="setup-player-num">#{i + 1}</span>
-                  <span>{p}</span>
-                  <button onClick={() => onRemoveTempPlayer(i)} className="remove-btn">
-                    <Trash2 size={12} />
-                  </button>
-                </li>
-              ))}
+              {tempPlayers.map((p, i) => {
+                const playerSkill = getTempPlayerSkill(p);
+                const pickerOpen = tempSkillPickerFor === p;
+                return (
+                  <li key={i} className="setup-player-item-col">
+                    <div className="setup-player-item-row">
+                      <span className="setup-player-num">#{i + 1}</span>
+                      <span
+                        className={`setup-player-name${showSkillTagging ? ' roster-name--clickable' : ''}`}
+                        onClick={showSkillTagging ? () => setTempSkillPickerFor(pickerOpen ? null : p) : undefined}
+                        title={showSkillTagging ? 'Tap to assign skill bracket' : undefined}
+                      >
+                        {p}
+                        {showSkillTagging && (
+                          playerSkill ? (
+                            <span className={`skill-badge skill-badge--${playerSkill}`}>
+                              {SKILL_LABEL[playerSkill]}
+                            </span>
+                          ) : (
+                            <span className="skill-badge skill-badge--untagged" title="Untagged — tap to set">?</span>
+                          )
+                        )}
+                      </span>
+                      <button onClick={() => onRemoveTempPlayer(i)} className="remove-btn">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                    {showSkillTagging && pickerOpen && (
+                      <div className="skill-picker">
+                        {SKILL_BRACKETS.map(bracket => (
+                          <button
+                            key={bracket}
+                            type="button"
+                            className={`skill-pick-btn skill-pick-btn--${bracket}${playerSkill === bracket ? ' skill-pick-btn--active' : ''}`}
+                            title={SKILL_TITLE[bracket]}
+                            onClick={() => {
+                              onSetPlayerSkill?.(p, playerSkill === bracket ? undefined : bracket);
+                              setTempSkillPickerFor(null);
+                            }}
+                          >
+                            {SKILL_TITLE[bracket]}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         )}

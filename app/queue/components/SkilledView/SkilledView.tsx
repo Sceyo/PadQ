@@ -28,7 +28,7 @@ const BRACKET_META: Record<SkillBracket, { label: string; short: string; accent:
   advanced:     { label: 'Advanced',     short: 'A', accent: '#ef4444', dimBg: 'rgba(239,68,68,.08)' },
 };
 
-export function SkilledView({ brackets, players, roster, isHost, onAssign, onUnassign, onAddNew }: SkilledViewProps) {
+export function SkilledView({ brackets, players, isHost, onAssign, onUnassign, onAddNew }: SkilledViewProps) {
   const [open,       setOpen]       = useState<Record<SkillBracket, boolean>>({ beginner: false, intermediate: false, advanced: false });
   const [addingTo,   setAddingTo]   = useState<SkillBracket | null>(null);
   const [rosterPick, setRosterPick] = useState<Set<string>>(new Set());
@@ -39,6 +39,11 @@ export function SkilledView({ brackets, players, roster, isHost, onAssign, onUna
     BRACKET_ORDER.forEach(b => brackets[b].forEach(n => { map[n] = b; }));
     return map;
   }, [brackets]);
+
+  const unassignedPlayers = useMemo(
+    () => players.filter(n => assignedTo[n] === undefined),
+    [players, assignedTo]
+  );
 
   const toggle = (b: SkillBracket) => {
     setOpen(prev => ({ ...prev, [b]: !prev[b] }));
@@ -77,6 +82,55 @@ export function SkilledView({ brackets, players, roster, isHost, onAssign, onUna
         Assign session players to skill brackets. The engine pairs similar-skill players
         and fills gaps with the nearest bracket when one is short.
       </p>
+
+      {/* ── Unassigned Players Card ── */}
+      {unassignedPlayers.length > 0 && (
+        <div className="skilled-unassigned-card">
+          <div className="skilled-unassigned-header">
+            <span className="skilled-unassigned-title">
+              Unassigned Players ({unassignedPlayers.length})
+            </span>
+            <span className="skilled-unassigned-hint">
+              Untagged players default to Intermediate during rotation. Assign to a bracket with 1 click:
+            </span>
+          </div>
+          <div className="skilled-unassigned-list">
+            {unassignedPlayers.map(name => (
+              <div key={name} className="skilled-unassigned-row">
+                <span className="skilled-unassigned-name">{name}</span>
+                {isHost && (
+                  <div className="skilled-quick-tag-group">
+                    <button
+                      type="button"
+                      className="skilled-tag-btn skilled-tag-btn--beginner"
+                      title="Assign to Beginner"
+                      onClick={() => onAssign('beginner', name)}
+                    >
+                      B
+                    </button>
+                    <button
+                      type="button"
+                      className="skilled-tag-btn skilled-tag-btn--intermediate"
+                      title="Assign to Intermediate"
+                      onClick={() => onAssign('intermediate', name)}
+                    >
+                      I
+                    </button>
+                    <button
+                      type="button"
+                      className="skilled-tag-btn skilled-tag-btn--advanced"
+                      title="Assign to Advanced"
+                      onClick={() => onAssign('advanced', name)}
+                    >
+                      A
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {BRACKET_ORDER.map(bracket => {
         const { label, accent, dimBg } = BRACKET_META[bracket];
@@ -129,6 +183,19 @@ export function SkilledView({ brackets, players, roster, isHost, onAssign, onUna
                         <td className="skilled-td">{name}</td>
                         {isHost && (
                           <td className="skilled-td skilled-td--actions">
+                            <div className="skilled-quick-tag-group skilled-quick-tag-group--inline">
+                              {BRACKET_ORDER.filter(b => b !== bracket).map(targetBracket => (
+                                <button
+                                  key={targetBracket}
+                                  type="button"
+                                  className={`skilled-tag-btn skilled-tag-btn--${targetBracket}`}
+                                  title={`Move to ${BRACKET_META[targetBracket].label}`}
+                                  onClick={() => onAssign(targetBracket, name)}
+                                >
+                                  {BRACKET_META[targetBracket].short}
+                                </button>
+                              ))}
+                            </div>
                             <button
                               className="skilled-remove-btn"
                               title="Unassign (keeps player in session)"

@@ -9,6 +9,7 @@ import {
   retagPlayerInQueue,
   recalculateRest,
   getPlayerBracketLevel,
+  getPlayerSkillTag,
   fillIdleCourts,
   hydrateSkilledStateFromCourtSlots,
   projectSkilledCourtsToSlots,
@@ -341,6 +342,16 @@ describe('skilledMatchmakingEngine — getPlayerBracketLevel', () => {
     expect(getPlayerBracketLevel('B', b)).toBe('beginner');
     expect(getPlayerBracketLevel('A', b)).toBe('advanced');
     expect(getPlayerBracketLevel('Unknown', b)).toBe('intermediate');
+  });
+});
+
+describe('skilledMatchmakingEngine — getPlayerSkillTag', () => {
+  it('returns exact bracket or untagged if not explicitly assigned', () => {
+    const b = brackets(['B'], ['I'], ['A']);
+    expect(getPlayerSkillTag('B', b)).toBe('beginner');
+    expect(getPlayerSkillTag('I', b)).toBe('intermediate');
+    expect(getPlayerSkillTag('A', b)).toBe('advanced');
+    expect(getPlayerSkillTag('Unknown', b)).toBe('untagged');
   });
 });
 

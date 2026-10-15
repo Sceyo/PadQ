@@ -611,6 +611,19 @@ export function getPlayerBracketLevel(
   return 'intermediate';
 }
 
+export type PlayerDisplayLevel = SkillLevel | 'untagged';
+
+/** Utility: get the exact bracket tag or 'untagged' if not explicitly assigned. */
+export function getPlayerSkillTag(
+  name:          string,
+  skillBrackets: { beginner: string[]; intermediate: string[]; advanced: string[] },
+): PlayerDisplayLevel {
+  if (skillBrackets.beginner.includes(name))     return 'beginner';
+  if (skillBrackets.intermediate.includes(name)) return 'intermediate';
+  if (skillBrackets.advanced.includes(name))     return 'advanced';
+  return 'untagged';
+}
+
 /**
  * After a normal court reassignment, scan every court that is still idle.
  * A court must never remain idle when ≥4 players exist across the active queue
