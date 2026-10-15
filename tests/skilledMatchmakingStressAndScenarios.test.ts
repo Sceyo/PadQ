@@ -8,6 +8,7 @@ import {
   recalculateRest,
   projectSkilledCourtsToSlots,
   hydrateSkilledStateFromCourtSlots,
+  extractRecentPartnerPairs,
   type SkilledState,
   type CourtDef,
   type SkillLevel,
@@ -395,5 +396,84 @@ describe('Skill-Aware Matchmaking — Realistic Live Club Scenarios', () => {
     expect(restoredSlots).toEqual(initialSlots);
     expect(state.waitingQueue).toEqual(undoSnapshot.queue);
     assertPartitionIntegrity(allPlayers, state, restoredSlots);
+  });
+
+  it('Scenario 6: Live 13-Player Simulation with Partner Variety & Snake Balance', () => {
+    // Exact user test scenario: 13 players across 2 courts
+    const b = ['1', '2', '7', '9', '11'];
+    const i = ['3', '6', '8', '13'];
+    const a = ['4', '5', '12', '0'];
+    const allPlayers = [...b, ...i, ...a];
+    const brackets = createBrackets(b, i, a);
+    const defs = createCourtDefs(2);
+
+    let state = initSkilledState(allPlayers, brackets, defs, []);
+    let courtSlots = projectSkilledCourtsToSlots(state.courts);
+    assertPartitionIntegrity(allPlayers, state, courtSlots);
+
+    const matchHistory: { players: string }[] = [];
+    const player12Partners: string[] = [];
+
+    // Track initial partners for player 12 if on court
+    for (const c of courtSlots) {
+      if (c.onCourt.includes('12')) {
+        const teamA = c.onCourt.slice(0, 2);
+        const teamB = c.onCourt.slice(2, 4);
+        const partner = teamA.includes('12')
+          ? teamA.find(p => p !== '12')!
+          : teamB.find(p => p !== '12')!;
+        player12Partners.push(partner);
+      }
+    }
+
+    // Simulate 20 consecutive match completions with staggered courts
+    for (let round = 0; round < 20; round++) {
+      const courtIdx = round % 2;
+      const targetCourt = state.courts[courtIdx];
+      if (targetCourt.players.length === 4) {
+        const teamA = targetCourt.players.slice(0, 2);
+        const teamB = targetCourt.players.slice(2, 4);
+        const matchString = `${teamA.join(' & ')} vs ${teamB.join(' & ')}`;
+        matchHistory.unshift({ players: matchString });
+
+        // Check if player 12 is in this match
+        if (targetCourt.players.includes('12')) {
+          const partner = teamA.includes('12')
+            ? teamA.find(p => p !== '12')!
+            : teamB.find(p => p !== '12')!;
+          player12Partners.push(partner);
+        }
+
+        const recentPartners = extractRecentPartnerPairs(matchHistory, 15);
+        const afterRotate = rotatePlayers(targetCourt.players, state, brackets);
+        const afterReassign = reassignCourt(targetCourt.id, afterRotate, brackets, recentPartners);
+        state = fillIdleCourts(afterReassign, recentPartners);
+        courtSlots = projectSkilledCourtsToSlots(state.courts);
+
+        assertPartitionIntegrity(allPlayers, state, courtSlots);
+
+        // Assert competitive balance on active courts
+        for (const slot of courtSlots) {
+          if (slot.onCourt.length === 4) {
+            assertSnakeDraftPairing(slot.onCourt, brackets);
+          }
+        }
+      }
+    }
+
+    // Verify player 12 partner variety: player 12 must not be paired with only one single player!
+    if (player12Partners.length >= 3) {
+      const uniquePartnersFor12 = new Set(player12Partners);
+      // With partner penalty enabled, player 12 must have more than 1 distinct partner across multiple games
+      expect(uniquePartnersFor12.size).toBeGreaterThan(1);
+
+      // Verify no player was paired with 12 more than 2 consecutive times in a row
+      for (let idx = 0; idx < player12Partners.length - 2; idx++) {
+        const threeInARow =
+          player12Partners[idx] === player12Partners[idx + 1] &&
+          player12Partners[idx + 1] === player12Partners[idx + 2];
+        expect(threeInARow).toBe(false);
+      }
+    }
   });
 });

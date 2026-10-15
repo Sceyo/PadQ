@@ -13,6 +13,9 @@ import {
   fillIdleCourts,
   hydrateSkilledStateFromCourtSlots,
   projectSkilledCourtsToSlots,
+  snakeOrder,
+  makePairKey,
+  extractRecentPartnerPairs,
   type SkilledState,
   type SkillQueue,
   type CourtDef,
@@ -560,5 +563,96 @@ describe('skilledMatchmakingEngine — Option B Unified Dual-Projection & Hydrat
     const rehydrated = hydrateSkilledStateFromCourtSlots(players, b, courtSlots, []);
     const rehydratedSlots = projectSkilledCourtsToSlots(rehydrated.courts);
     expect(rehydratedSlots).toEqual(courtSlots);
+  });
+});
+
+describe('skilledMatchmakingEngine — makePairKey and extractRecentPartnerPairs', () => {
+  it('makePairKey formats canonical undirected key', () => {
+    expect(makePairKey('Alice', 'Bob')).toBe('Alice|Bob');
+    expect(makePairKey('Bob', 'Alice')).toBe('Alice|Bob');
+    expect(makePairKey('11', '12')).toBe('11|12');
+    expect(makePairKey('12', '11')).toBe('11|12');
+  });
+
+  it('extractRecentPartnerPairs assigns recency weights to partner pairs', () => {
+    const history = [
+      { players: '12 & 11 vs 6 & 1' }, // most recent (index 0)
+      { players: '13 & 2 vs 8 & 3' },  // index 1
+      { players: '12 & 11 vs 6 & 13' }, // index 2 (12 & 11 repeated)
+    ];
+
+    const pairs = extractRecentPartnerPairs(history, 10);
+    // 12 & 11 was in match 0 (weight 10) and match 2 (weight 8) -> 18
+    expect(pairs.get('11|12')).toBe(18);
+    // 1 & 6 was in match 0 (weight 10) -> 10
+    expect(pairs.get('1|6')).toBe(10);
+    // 2 & 13 was in match 1 (weight 9) -> 9
+    expect(pairs.get('13|2') ?? pairs.get('2|13')).toBe(9);
+  });
+});
+
+describe('skilledMatchmakingEngine — snakeOrder competitive balance and partner variety', () => {
+  const sq = (b: string[], i: string[], a: string[]): SkillQueue => ({
+    beginner: b, intermediate: i, advanced: a,
+  });
+
+  it('balances 2 Beginners and 2 Intermediates into B+I vs B+I (skillDiff = 0)', () => {
+    const queue = sq(['B1', 'B2'], ['I1', 'I2'], []);
+    const ordered = snakeOrder(['B1', 'B2', 'I1', 'I2'], queue);
+    const teamA = ordered.slice(0, 2);
+    const teamB = ordered.slice(2, 4);
+
+    const intermediatesInA = teamA.filter(p => queue.intermediate.includes(p)).length;
+    const intermediatesInB = teamB.filter(p => queue.intermediate.includes(p)).length;
+
+    expect(intermediatesInA).toBe(1);
+    expect(intermediatesInB).toBe(1);
+  });
+
+  it('balances 1 Advanced, 2 Intermediates, and 1 Beginner into A+B vs I+I (skillDiff = 0)', () => {
+    const queue = sq(['B1'], ['I1', 'I2'], ['A1']);
+    const ordered = snakeOrder(['A1', 'I1', 'I2', 'B1'], queue);
+    const teamA = ordered.slice(0, 2);
+    const teamB = ordered.slice(2, 4);
+
+    // Team with A1 must also contain B1 to achieve (3+1) vs (2+2) = 4 vs 4
+    if (teamA.includes('A1')) {
+      expect(teamA).toContain('B1');
+      expect(teamB).toContain('I1');
+      expect(teamB).toContain('I2');
+    } else {
+      expect(teamB).toContain('B1');
+      expect(teamA).toContain('I1');
+      expect(teamA).toContain('I2');
+    }
+  });
+
+  it('rotates partner pairings when skill differences tie (avoiding duplicate partner)', () => {
+    // 1 Advanced (12), 1 Intermediate (6), 2 Beginners (11, 1)
+    // Div 1: [12, 1] vs [6, 11]  (skill 4 vs 3, diff = 1)
+    // Div 2: [12, 11] vs [6, 1]  (skill 4 vs 3, diff = 1)
+    const queue = sq(['11', '1'], ['6'], ['12']);
+
+    // Without penalty, default order picks Div 1 (12 with 1)
+    const initial = snakeOrder(['12', '6', '11', '1'], queue);
+    const teamWith12Initial = initial.slice(0, 2).includes('12') ? initial.slice(0, 2) : initial.slice(2, 4);
+    expect(teamWith12Initial).toContain('1');
+
+    // When 12 & 1 has a partner penalty, snakeOrder picks Div 2 (12 with 11) instead!
+    const recentPartners = new Set([makePairKey('12', '1')]);
+    const rotated = snakeOrder(['12', '6', '11', '1'], queue, recentPartners);
+    const teamWith12Rotated = rotated.slice(0, 2).includes('12') ? rotated.slice(0, 2) : rotated.slice(2, 4);
+    expect(teamWith12Rotated).toContain('11');
+  });
+
+  it('P3 in assignCourts arranges 2 Beginners and 2 Intermediates into balanced teams', () => {
+    const queue = buildSkillQueue(['B1', 'B2', 'I1', 'I2'], brackets(['B1', 'B2'], ['I1', 'I2'], []));
+    const { courts: filled } = assignCourts(queue, courts(1));
+    const [teamA, teamB] = [filled[0].players.slice(0, 2), filled[0].players.slice(2, 4)];
+
+    expect(teamA.some(p => p.startsWith('B'))).toBe(true);
+    expect(teamA.some(p => p.startsWith('I'))).toBe(true);
+    expect(teamB.some(p => p.startsWith('B'))).toBe(true);
+    expect(teamB.some(p => p.startsWith('I'))).toBe(true);
   });
 });

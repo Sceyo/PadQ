@@ -124,7 +124,11 @@ function updateWaitCycles(
  * filling the remaining slots from whichever other brackets have players,
  * in B→I→A order. Used only when STARVATION_THRESHOLD is exceeded.
  */
-function forceIncludeGroup(sq: SkillQueue, starvedLevel: SkillLevel): PickResult | null {
+function forceIncludeGroup(
+  sq: SkillQueue,
+  starvedLevel: SkillLevel,
+  recentPartners?: Set<string> | Map<string, number>,
+): PickResult | null {
   const starvedPool = sq[starvedLevel];
   if (starvedPool.length === 0) return null;
 
@@ -134,7 +138,7 @@ function forceIncludeGroup(sq: SkillQueue, starvedLevel: SkillLevel): PickResult
 
   const selected = [starvedPlayer, ...others.slice(0, 3)];
   return {
-    players:    snakeOrder(selected, sq),
+    players:    snakeOrder(selected, sq, recentPartners),
     skillMatch: 'mixed',
     matchLevel: 'mixed',
   };
@@ -154,23 +158,117 @@ function computeRestThreshold(
   };
 }
 
-// ── Snake team ordering ───────────────────────────────────────
-// Sorts 4 players by skill descending then interleaves so each team
-// gets one strong + one weak player:
-//   sorted[0] → Team A slot 0  (strongest)
-//   sorted[1] → Team B slot 0
-//   sorted[2] → Team B slot 1
-//   sorted[3] → Team A slot 1  (weakest pairs with strongest)
-// Stored as [TeamA[0], TeamA[1], TeamB[0], TeamB[1]] so that
-// court.players.slice(0,2) = Team A and slice(2,4) = Team B.
-function snakeOrder(selected: string[], sq: SkillQueue): string[] {
+// ── Partner pairing and snake team ordering ───────────────────
+
+/**
+ * Canonical key for an undirected pair of players: "playerA|playerB" with playerA < playerB.
+ */
+export function makePairKey(p1: string, p2: string): string {
+  return p1 < p2 ? `${p1}|${p2}` : `${p2}|${p1}`;
+}
+
+/**
+ * Extracts recent partner frequency/recency penalties from match history.
+ * More recent matches are weighted more heavily to avoid immediate repeats.
+ */
+export function extractRecentPartnerPairs(
+  history: { players: string }[],
+  lookbackMatches: number = 20,
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  const recent = history.slice(0, lookbackMatches);
+
+  for (let i = 0; i < recent.length; i++) {
+    const entry = recent[i];
+    if (!entry.players) continue;
+    const sides = entry.players.split(' vs ');
+    if (sides.length !== 2) continue;
+
+    const sideA = sides[0].split(' & ').map(s => s.trim()).filter(Boolean);
+    const sideB = sides[1].split(' & ').map(s => s.trim()).filter(Boolean);
+
+    const recencyWeight = (lookbackMatches - i);
+
+    if (sideA.length === 2) {
+      const key = makePairKey(sideA[0], sideA[1]);
+      counts.set(key, (counts.get(key) ?? 0) + recencyWeight);
+    }
+    if (sideB.length === 2) {
+      const key = makePairKey(sideB[0], sideB[1]);
+      counts.set(key, (counts.get(key) ?? 0) + recencyWeight);
+    }
+  }
+
+  return counts;
+}
+
+function getPairPenalty(
+  p1: string,
+  p2: string,
+  recentPartners?: Set<string> | Map<string, number>,
+): number {
+  if (!recentPartners) return 0;
+  const key = makePairKey(p1, p2);
+  if (recentPartners instanceof Map) {
+    return recentPartners.get(key) ?? 0;
+  }
+  return recentPartners.has(key) ? 1 : 0;
+}
+
+/**
+ * Orders 4 players into Team A (slots 0-1) and Team B (slots 2-3).
+ * Evaluates all 3 possible doubles divisions:
+ *   Div 1: [s[0], s[3]] vs [s[1], s[2]] (classic snake: highest + lowest vs middle two)
+ *   Div 2: [s[0], s[2]] vs [s[1], s[3]]
+ *   Div 3: [s[0], s[1]] vs [s[2], s[3]]
+ *
+ * Selection priority:
+ *   1. Minimum skill difference (|skill(Team A) - skill(Team B)|)
+ *   2. Minimum partner penalty (avoid back-to-back duplicate partners)
+ *   3. Division index (classic snake tie-breaker)
+ *
+ * Stored as [TeamA[0], TeamA[1], TeamB[0], TeamB[1]] so that
+ * court.players.slice(0,2) = Team A and slice(2,4) = Team B.
+ */
+export function snakeOrder(
+  selected: string[],
+  sq: SkillQueue,
+  recentPartners?: Set<string> | Map<string, number>,
+): string[] {
+  if (selected.length !== 4) return selected;
+
   const levelOf = (name: string): number => {
     if (sq.advanced.includes(name))     return 3;
     if (sq.intermediate.includes(name)) return 2;
     return 1;
   };
+
   const s = [...selected].sort((a, b) => levelOf(b) - levelOf(a));
-  return [s[0], s[3], s[1], s[2]];
+
+  const divisions = [
+    { teamA: [s[0], s[3]] as [string, string], teamB: [s[1], s[2]] as [string, string] },
+    { teamA: [s[0], s[2]] as [string, string], teamB: [s[1], s[3]] as [string, string] },
+    { teamA: [s[0], s[1]] as [string, string], teamB: [s[2], s[3]] as [string, string] },
+  ];
+
+  const scored = divisions.map((div, index) => {
+    const skillA = levelOf(div.teamA[0]) + levelOf(div.teamA[1]);
+    const skillB = levelOf(div.teamB[0]) + levelOf(div.teamB[1]);
+    const skillDiff = Math.abs(skillA - skillB);
+    const penalty =
+      getPairPenalty(div.teamA[0], div.teamA[1], recentPartners) +
+      getPairPenalty(div.teamB[0], div.teamB[1], recentPartners);
+    return { div, skillDiff, penalty, index };
+  });
+
+  scored.sort((a, b) => {
+    if (a.skillDiff !== b.skillDiff) return a.skillDiff - b.skillDiff;
+    if (a.penalty !== b.penalty) return a.penalty - b.penalty;
+    return a.index - b.index;
+  });
+
+  const best = scored[0].div;
+  return [best.teamA[0], best.teamA[1], best.teamB[0], best.teamB[1]];
 }
 
 // ── Pick algorithm ────────────────────────────────────────────
@@ -194,6 +292,7 @@ function pickBestGroup(
   sq: SkillQueue,
   waitCycles: Record<SkillLevel, number> = { beginner: 0, intermediate: 0, advanced: 0 },
   threshold: number = 3,
+  recentPartners?: Set<string> | Map<string, number>,
 ): PickResult | null {
   if (totalWaiting(sq) < 4) return null;
 
@@ -207,15 +306,15 @@ function pickBestGroup(
   // group anyway when more than one bracket is starved).
   for (const level of ['beginner', 'intermediate', 'advanced'] as SkillLevel[]) {
     if (sq[level].length > 0 && (waitCycles[level] ?? 0) >= threshold) {
-      const forced = forceIncludeGroup(sq, level);
+      const forced = forceIncludeGroup(sq, level, recentPartners);
       if (forced) return forced;
     }
   }
 
   // ── P1: Pure match ─────────────────────────────────────────
-  if (B.length >= 4) return { players: B.slice(0, 4), skillMatch: 'pure', matchLevel: 'beginner' };
-  if (I.length >= 4) return { players: I.slice(0, 4), skillMatch: 'pure', matchLevel: 'intermediate' };
-  if (A.length >= 4) return { players: A.slice(0, 4), skillMatch: 'pure', matchLevel: 'advanced' };
+  if (B.length >= 4) return { players: snakeOrder(B.slice(0, 4), sq, recentPartners), skillMatch: 'pure', matchLevel: 'beginner' };
+  if (I.length >= 4) return { players: snakeOrder(I.slice(0, 4), sq, recentPartners), skillMatch: 'pure', matchLevel: 'intermediate' };
+  if (A.length >= 4) return { players: snakeOrder(A.slice(0, 4), sq, recentPartners), skillMatch: 'pure', matchLevel: 'advanced' };
 
   // ── P2: Majority + adjacent fill ───────────────────────────
   // Determine majority level (most players), break ties by level index
@@ -232,8 +331,9 @@ function pickBestGroup(
     const sortedFills = [...fills].sort((a, b) => (b as string[]).length - (a as string[]).length);
     for (const fill of sortedFills as string[][]) {
       if (fill.length >= need) {
+        const raw = [...pool, ...fill.slice(0, need)];
         return {
-          players:    [...pool, ...fill.slice(0, need)],
+          players:    snakeOrder(raw, sq, recentPartners),
           skillMatch: 'mixed',
           matchLevel: 'mixed',
         };
@@ -247,12 +347,14 @@ function pickBestGroup(
     const bTake = Math.min(B.length, 4);
     const iTake = 4 - bTake;
     if (iTake <= I.length) {
-      return { players: [...B.slice(0, bTake), ...I.slice(0, iTake)], skillMatch: 'mixed', matchLevel: 'mixed' };
+      const raw = [...B.slice(0, bTake), ...I.slice(0, iTake)];
+      return { players: snakeOrder(raw, sq, recentPartners), skillMatch: 'mixed', matchLevel: 'mixed' };
     }
     const iTake2 = Math.min(I.length, 4);
     const bTake2 = 4 - iTake2;
     if (bTake2 <= B.length) {
-      return { players: [...B.slice(0, bTake2), ...I.slice(0, iTake2)], skillMatch: 'mixed', matchLevel: 'mixed' };
+      const raw = [...B.slice(0, bTake2), ...I.slice(0, iTake2)];
+      return { players: snakeOrder(raw, sq, recentPartners), skillMatch: 'mixed', matchLevel: 'mixed' };
     }
   }
 
@@ -261,12 +363,14 @@ function pickBestGroup(
     const iTake = Math.min(I.length, 4);
     const aTake = 4 - iTake;
     if (aTake <= A.length) {
-      return { players: [...I.slice(0, iTake), ...A.slice(0, aTake)], skillMatch: 'mixed', matchLevel: 'mixed' };
+      const raw = [...I.slice(0, iTake), ...A.slice(0, aTake)];
+      return { players: snakeOrder(raw, sq, recentPartners), skillMatch: 'mixed', matchLevel: 'mixed' };
     }
     const aTake2 = Math.min(A.length, 4);
     const iTake2 = 4 - aTake2;
     if (iTake2 <= I.length) {
-      return { players: [...I.slice(0, iTake2), ...A.slice(0, aTake2)], skillMatch: 'mixed', matchLevel: 'mixed' };
+      const raw = [...I.slice(0, iTake2), ...A.slice(0, aTake2)];
+      return { players: snakeOrder(raw, sq, recentPartners), skillMatch: 'mixed', matchLevel: 'mixed' };
     }
   }
 
@@ -279,7 +383,7 @@ function pickBestGroup(
       console.warn('[SkilledEngine] P3B — cross-bracket B+A fill, no Intermediates available');
     }
     return {
-      players:    snakeOrder(all.slice(0, 4), sq),
+      players:    snakeOrder(all.slice(0, 4), sq, recentPartners),
       skillMatch: 'mixed',
       matchLevel: 'mixed',
     };
@@ -326,6 +430,7 @@ export function assignCourts(
   courtDefs:  CourtDef[],
   waitCycles: Record<SkillLevel, number> = { beginner: 0, intermediate: 0, advanced: 0 },
   threshold:  number = 3,
+  recentPartners?: Set<string> | Map<string, number>,
 ): { courts: SkilledCourt[]; remainingQueue: SkillQueue; waitCycles: Record<SkillLevel, number> } {
   let sq = { ...skillQueue, beginner: [...skillQueue.beginner], intermediate: [...skillQueue.intermediate], advanced: [...skillQueue.advanced] };
   let wc = { ...waitCycles };
@@ -333,7 +438,7 @@ export function assignCourts(
 
   for (const def of courtDefs) {
     const sqBefore = sq;
-    const group = pickBestGroup(sq, wc, threshold);
+    const group = pickBestGroup(sq, wc, threshold, recentPartners);
     if (!group) {
       courts.push({ id: def.id, name: def.name, players: [], skillMatch: 'pure', matchLevel: 'mixed', idleCycles: 0, earlyReturns: [] });
     } else {
@@ -415,10 +520,11 @@ export function reassignCourt(
   courtId:       string,
   state:         SkilledState,
   skillBrackets: { beginner: string[]; intermediate: string[]; advanced: string[] },
+  recentPartners?: Set<string> | Map<string, number>,
 ): SkilledState {
   const prevIdle = state.courts.find(c => c.id === courtId)?.idleCycles ?? 0;
   const sqBefore = state.skillQueue;
-  const group    = pickBestGroup(state.skillQueue, state.bracketWaitCycles, state.starvationThreshold);
+  const group    = pickBestGroup(state.skillQueue, state.bracketWaitCycles, state.starvationThreshold, recentPartners);
   const newQueue = group ? removeFromQueue(state.skillQueue, group.players) : state.skillQueue;
   const newWaitCycles = group
     ? updateWaitCycles(state.bracketWaitCycles, sqBefore, group.players)
@@ -446,11 +552,12 @@ export function initSkilledState(
   skillBrackets: { beginner: string[]; intermediate: string[]; advanced: string[] },
   courtDefs:     CourtDef[],
   sitOut:        string[] = [],
+  recentPartners?: Set<string> | Map<string, number>,
 ): SkilledState {
   const active    = players.filter(p => !sitOut.includes(p));
   const sq        = buildSkillQueue(active, skillBrackets);
   const threshold = Math.max(2, courtDefs.length);
-  const { courts, remainingQueue, waitCycles } = assignCourts(sq, courtDefs, undefined, threshold);
+  const { courts, remainingQueue, waitCycles } = assignCourts(sq, courtDefs, undefined, threshold, recentPartners);
   const { restEnabled, restCycleLength } = computeRestThreshold(active.length, courtDefs.length);
   return {
     skillQueue:          remainingQueue,
@@ -637,6 +744,7 @@ export function getPlayerSkillTag(
  */
 export function fillIdleCourts(
   state: SkilledState,
+  recentPartners?: Set<string> | Map<string, number>,
 ): SkilledState {
   let s = state;
 
@@ -653,7 +761,7 @@ export function fillIdleCourts(
       // Active queue alone has enough — cross-bracket fill (P3B)
       const all     = flattenQueue(s.skillQueue);
       const sel     = all.slice(0, 4);
-      const ordered = snakeOrder(sel, s.skillQueue);
+      const ordered = snakeOrder(sel, s.skillQueue, recentPartners);
       const newSq   = removeFromQueue(s.skillQueue, sel);
       const newWaitCycles = updateWaitCycles(s.bracketWaitCycles, s.skillQueue, sel);
 
@@ -692,7 +800,7 @@ export function fillIdleCourts(
 
       const all     = flattenQueue(tempSq);
       const sel     = all.slice(0, 4);
-      const ordered = snakeOrder(sel, tempSq);
+      const ordered = snakeOrder(sel, tempSq, recentPartners);
       const finalSq = removeFromQueue(tempSq, sel);
       const newWaitCycles = updateWaitCycles(s.bracketWaitCycles, tempSq, sel);
 

@@ -39,7 +39,7 @@ import {
   initSkilledState, rotatePlayers as rotatePlayersEngine, reassignCourt as reassignCourtEngine,
   addPlayerToSkilledState as addPlayerToSkilledStateEngine, retagPlayerInQueue,
   getPlayerBracketLevel, getPlayerSkillTag, fillIdleCourts as fillIdleCourtsEngine,
-  recalculateRest as recalculateRestEngine,
+  recalculateRest as recalculateRestEngine, extractRecentPartnerPairs,
   hydrateSkilledStateFromCourtSlots, projectSkilledCourtsToSlots,
   type SkilledState, type SkilledCourt, type SkillLevel, type CourtDef,
 } from './lib/skilledMatchmakingEngine';
@@ -486,7 +486,7 @@ function QueueSystemContent() {
     if (courtSlots.some(c => c.onCourt.length === 4)) {
       setSkilledState(hydrateSkilledStateFromCourtSlots(players, skilledBrackets, courtSlots, activeSittingOut));
     } else {
-      const state = initSkilledState(players, skilledBrackets, defs, activeSittingOut);
+      const state = initSkilledState(players, skilledBrackets, defs, activeSittingOut, extractRecentPartnerPairs(activeHistory));
       setSkilledState(state);
       const projectedSlots: CourtSlot[] = projectSkilledCourtsToSlots(state.courts);
       setLocalCourtSlots(projectedSlots);
@@ -734,7 +734,7 @@ function QueueSystemContent() {
       const defs: CourtDef[] = courtSlots.length > 0
         ? courtSlots.map(c => ({ id: c.id, name: c.name }))
         : [{ id: 'court-0', name: 'Court 1' }];
-      const state = initSkilledState(players, skilledBrackets, defs, activeSittingOut);
+      const state = initSkilledState(players, skilledBrackets, defs, activeSittingOut, extractRecentPartnerPairs(activeHistory));
       setSkilledState(state);
       setShowSkillBrackets(false);
       const projectedSlots: CourtSlot[] = projectSkilledCourtsToSlots(state.courts);
@@ -1392,9 +1392,17 @@ function QueueSystemContent() {
     const winnerTeam = side === 'A' ? teamA : teamB;
     const winnerNames = winnerTeam.join(' & ');
 
+    const entry: MatchHistoryEntry = {
+      id: Date.now(), mode: `Skilled (${court.name})`,
+      players: `${teamA.join(' & ')} vs ${teamB.join(' & ')}`,
+      winner: winnerNames, timestamp: new Date().toLocaleTimeString(),
+    };
+    const updatedHistory = [entry, ...activeHistory];
+    const recentPartners = extractRecentPartnerPairs(updatedHistory);
+
     const afterRotate   = rotatePlayersEngine(court.players, skilledState, skilledBrackets);
-    const afterReassign = reassignCourtEngine(courtId, afterRotate, skilledBrackets);
-    const finalState    = fillIdleCourtsEngine(afterReassign);
+    const afterReassign = reassignCourtEngine(courtId, afterRotate, skilledBrackets, recentPartners);
+    const finalState    = fillIdleCourtsEngine(afterReassign, recentPartners);
     setSkilledState(finalState);
 
     const projectedSlots: CourtSlot[] = projectSkilledCourtsToSlots(finalState.courts);
@@ -1405,11 +1413,6 @@ function QueueSystemContent() {
     setQueue(projectedQueue);
     queueRef.current = projectedQueue;
 
-    const entry: MatchHistoryEntry = {
-      id: Date.now(), mode: `Skilled (${court.name})`,
-      players: `${teamA.join(' & ')} vs ${teamB.join(' & ')}`,
-      winner: winnerNames, timestamp: new Date().toLocaleTimeString(),
-    };
     setLocalHistory(prev => [entry, ...prev]);
     recordCareerResult(entry.players, entry.winner);
     setCareerStats(loadCareerStats());
