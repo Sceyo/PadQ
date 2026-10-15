@@ -10,6 +10,8 @@ import {
   recalculateRest,
   getPlayerBracketLevel,
   fillIdleCourts,
+  hydrateSkilledStateFromCourtSlots,
+  projectSkilledCourtsToSlots,
   type SkilledState,
   type SkillQueue,
   type CourtDef,
@@ -126,7 +128,7 @@ describe('skilledMatchmakingEngine — assignCourts (multi-court)', () => {
   it('fills as many courts as the player pool allows, leaving the rest empty', () => {
     // 4 players, 2 courts requested -> only 1 court can be filled.
     const sq = buildSkillQueue(['P1', 'P2', 'P3', 'P4'], brackets(['P1', 'P2', 'P3', 'P4'], [], []));
-    const { courts: filled, remainingQueue } = assignCourts(sq, courts(2));
+    const { courts: filled } = assignCourts(sq, courts(2));
     const filledCount = filled.filter(c => c.players.length > 0).length;
     expect(filledCount).toBe(1);
     expect(filled[1].players).toEqual([]);
@@ -446,5 +448,106 @@ describe('skilledMatchmakingEngine — multi-court non-overlap invariant (integr
 
     const allOnCourts = state.courts.flatMap(c => c.players);
     expect(new Set(allOnCourts).size).toBe(allOnCourts.length);
+  });
+});
+
+describe('skilledMatchmakingEngine — Option B Unified Dual-Projection & Hydration', () => {
+  it('projectSkilledCourtsToSlots maps SkilledCourt array to standard CourtSlot shape', () => {
+    const players = ['A1', 'A2', 'B1', 'B2'];
+    const skilledCourts = [
+      { id: 'court-0', name: 'Court 1', players, skillMatch: 'pure' as const, matchLevel: 'beginner' as const, idleCycles: 0, earlyReturns: [] },
+      { id: 'court-1', name: 'Court 2', players: [], skillMatch: 'pure' as const, matchLevel: 'mixed' as const, idleCycles: 0, earlyReturns: [] },
+    ];
+    const projected = projectSkilledCourtsToSlots(skilledCourts);
+    expect(projected).toEqual([
+      { id: 'court-0', name: 'Court 1', onCourt: ['A1', 'A2', 'B1', 'B2'] },
+      { id: 'court-1', name: 'Court 2', onCourt: [] },
+    ]);
+  });
+
+  it('hydrateSkilledStateFromCourtSlots preserves active matches from courtSlots without reshuffling', () => {
+    const allPlayers = ['B1', 'B2', 'B3', 'B4', 'I1', 'I2', 'I3', 'I4', 'A1', 'A2'];
+    const activeSlots = [
+      { id: 'court-0', name: 'Court 1', onCourt: ['B1', 'B2', 'B3', 'B4'] },
+      { id: 'court-1', name: 'Court 2', onCourt: ['I1', 'I2', 'I3', 'I4'] },
+    ];
+    const b = brackets(['B1', 'B2', 'B3', 'B4'], ['I1', 'I2', 'I3', 'I4'], ['A1', 'A2']);
+    const hydrated = hydrateSkilledStateFromCourtSlots(allPlayers, b, activeSlots, []);
+
+    // On-court rosters must be strictly preserved
+    expect(hydrated.courts[0].players).toEqual(['B1', 'B2', 'B3', 'B4']);
+    expect(hydrated.courts[1].players).toEqual(['I1', 'I2', 'I3', 'I4']);
+
+    // Only waiting players should be in skillQueue
+    expect(hydrated.skillQueue.beginner).toEqual([]);
+    expect(hydrated.skillQueue.intermediate).toEqual([]);
+    expect(hydrated.skillQueue.advanced).toEqual(['A1', 'A2']);
+    expect(hydrated.waitingQueue).toEqual(['A1', 'A2']);
+  });
+
+  it('hydrateSkilledStateFromCourtSlots defaults untagged waiting players to intermediate', () => {
+    const allPlayers = ['C1', 'C2', 'C3', 'C4', 'Untagged1', 'Untagged2'];
+    const activeSlots = [
+      { id: 'court-0', name: 'Court 1', onCourt: ['C1', 'C2', 'C3', 'C4'] },
+    ];
+    const b = brackets([], [], []);
+    const hydrated = hydrateSkilledStateFromCourtSlots(allPlayers, b, activeSlots, []);
+
+    expect(hydrated.courts[0].players).toEqual(['C1', 'C2', 'C3', 'C4']);
+    expect(hydrated.skillQueue.intermediate).toContain('Untagged1');
+    expect(hydrated.skillQueue.intermediate).toContain('Untagged2');
+    expect(hydrated.waitingQueue).toEqual(['Untagged1', 'Untagged2']);
+  });
+
+  it('end-to-end Option B dual-projection lifecycle maintains non-overlapping players across court rotation', () => {
+    const players = Array.from({ length: 14 }, (_, i) => `Player${i + 1}`);
+    const b = brackets(
+      ['Player1', 'Player2', 'Player3', 'Player4', 'Player5'],
+      ['Player6', 'Player7', 'Player8', 'Player9', 'Player10'],
+      ['Player11', 'Player12', 'Player13', 'Player14'],
+    );
+    const defs: CourtDef[] = [
+      { id: 'court-0', name: 'Court 1' },
+      { id: 'court-1', name: 'Court 2' },
+    ];
+
+    // 1. Initial assignment
+    let state = initSkilledState(players, b, defs, []);
+    let courtSlots = projectSkilledCourtsToSlots(state.courts);
+
+    expect(courtSlots.length).toBe(2);
+    expect(courtSlots[0].onCourt.length).toBe(4);
+    expect(courtSlots[1].onCourt.length).toBe(4);
+    expect(state.waitingQueue.length).toBe(6);
+
+    // Verify disjointness between courts and waiting queue
+    const allAssigned = courtSlots.flatMap(c => c.onCourt);
+    expect(new Set(allAssigned).size).toBe(8);
+    for (const p of state.waitingQueue) {
+      expect(allAssigned).not.toContain(p);
+    }
+
+    // 2. Court 1 finishes match: rotate players, reassign court, and fill idle courts
+    const teamA = courtSlots[0].onCourt.slice(0, 2);
+    const teamB = courtSlots[0].onCourt.slice(2, 4);
+    expect(teamA.length).toBe(2);
+    expect(teamB.length).toBe(2);
+
+    const afterRotate = rotatePlayers(courtSlots[0].onCourt, state, b);
+    const afterReassign = reassignCourt('court-0', afterRotate, b);
+    state = fillIdleCourts(afterReassign);
+    courtSlots = projectSkilledCourtsToSlots(state.courts);
+
+    // Both courts must still be populated
+    expect(courtSlots[0].onCourt.length).toBe(4);
+    expect(courtSlots[1].onCourt.length).toBe(4);
+
+    const postAssigned = courtSlots.flatMap(c => c.onCourt);
+    expect(new Set(postAssigned).size).toBe(8);
+
+    // 3. Hydration test: reload session with current courtSlots reproduces identical court onCourt
+    const rehydrated = hydrateSkilledStateFromCourtSlots(players, b, courtSlots, []);
+    const rehydratedSlots = projectSkilledCourtsToSlots(rehydrated.courts);
+    expect(rehydratedSlots).toEqual(courtSlots);
   });
 });

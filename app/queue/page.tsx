@@ -40,6 +40,7 @@ import {
   addPlayerToSkilledState as addPlayerToSkilledStateEngine, retagPlayerInQueue,
   getPlayerBracketLevel, fillIdleCourts as fillIdleCourtsEngine,
   recalculateRest as recalculateRestEngine,
+  hydrateSkilledStateFromCourtSlots, projectSkilledCourtsToSlots,
   type SkilledState, type SkilledCourt, type SkillLevel, type CourtDef,
 } from './lib/skilledMatchmakingEngine';
 import type { PaddleState, SerializablePaddleState, Team } from './lib/doublesEngine';
@@ -101,6 +102,27 @@ interface UndoSnapshot {
   poolSinglesState?: PoolSinglesState;
   singlesFormat?:    'pool' | 'king';
   courtSlots?:       CourtSlot[];
+  skilledState?:     SkilledState;
+}
+
+function cloneSkilledState(s: SkilledState): SkilledState {
+  return {
+    ...s,
+    skillQueue: {
+      beginner:     [...s.skillQueue.beginner],
+      intermediate: [...s.skillQueue.intermediate],
+      advanced:     [...s.skillQueue.advanced],
+    },
+    courts: s.courts.map(c => ({
+      ...c,
+      players:      [...c.players],
+      earlyReturns: [...c.earlyReturns],
+    })),
+    waitingQueue:      [...s.waitingQueue],
+    sitOut:            [...s.sitOut],
+    restPool:          s.restPool.map(r => ({ ...r })),
+    bracketWaitCycles: { ...s.bracketWaitCycles },
+  };
 }
 
 // Deep-copy helpers so undo doesn't share references with live state
@@ -461,7 +483,20 @@ function QueueSystemContent() {
     const defs: CourtDef[] = courtSlots.length > 0
       ? courtSlots.map(c => ({ id: c.id, name: c.name }))
       : [{ id: 'court-0', name: 'Court 1' }];
-    setSkilledState(initSkilledState(players, skilledBrackets, defs, activeSittingOut));
+    if (courtSlots.some(c => c.onCourt.length === 4)) {
+      setSkilledState(hydrateSkilledStateFromCourtSlots(players, skilledBrackets, courtSlots, activeSittingOut));
+    } else {
+      const state = initSkilledState(players, skilledBrackets, defs, activeSittingOut);
+      setSkilledState(state);
+      const projectedSlots: CourtSlot[] = projectSkilledCourtsToSlots(state.courts);
+      setLocalCourtSlots(projectedSlots);
+      courtSlotsRef.current = projectedSlots;
+      setQueue(state.waitingQueue);
+      queueRef.current = state.waitingQueue;
+      if (session.sessionId) {
+        session.syncField({ courtSlots: projectedSlots, queue: state.waitingQueue });
+      }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeQueueMode, players, courtSlots]);
 
@@ -556,7 +591,16 @@ function QueueSystemContent() {
     // Build initial court slots for multi-court doubles mode
     let initialCourtSlots: CourtSlot[] | undefined;
     let initialQueue: string[];
-    if (gameMode === 'doubles' && courtCount > 1) {
+    let initialSkilledState: SkilledState | null = null;
+    if (localQueueMode === 'skilled') {
+      const defs: CourtDef[] = Array.from({ length: courtCount }, (_, i) => ({
+        id: `court-${i}`,
+        name: `Court ${i + 1}`,
+      }));
+      initialSkilledState = initSkilledState(orderedPlayers, skilledBrackets, defs, []);
+      initialCourtSlots = projectSkilledCourtsToSlots(initialSkilledState.courts);
+      initialQueue = [...initialSkilledState.waitingQueue];
+    } else if (gameMode === 'doubles' && courtCount > 1) {
       const seeded = seedMultiCourtDoubles(orderedPlayers, courtCount, []);
 
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
@@ -592,7 +636,7 @@ function QueueSystemContent() {
     const pin = V1_RELEASE.showAccessPinSetup ? (setupPin.trim().toUpperCase().slice(0, 4) || null) : null;
     const courtName = courtCount > 1 ? `${courtCount} Courts` : (setupCourtName.trim() || 'Court 1');
     const startResult = await session.startSession({
-      gameMode: gameMode ?? 'singles', queueMode: V1_RELEASE.queueMode, elimType: localElimType,
+      gameMode: gameMode ?? 'singles', queueMode: localQueueMode === 'skilled' ? 'skilled' : 'default', elimType: localElimType,
       players: tempPlayers, queue: initialQueue, playAllRel: {},
       tournamentMatches: initialBracket, tournamentActive: false,
       tournamentWinner: null, isLive: true,
@@ -616,6 +660,7 @@ function QueueSystemContent() {
     resetPaddleState();
     resetSinglesState(orderedPlayers);
     resetPoolSinglesState();
+    if (initialSkilledState) setSkilledState(initialSkilledState);
     setPlayers(orderedPlayers);
     setTempPlayers([]);
     setLocalHistory([]);
@@ -669,7 +714,11 @@ function QueueSystemContent() {
     if (newMode === 'tournament' && players.length > 0) initTournament(players, activeElimType);
     else if (newMode !== 'tournament') { setTournamentActive(false); setTournamentWinner(null); setTournamentMatches([]); }
     if (newMode === 'playall') resetPlayAllRelationships();
-    if (newMode === 'default') { resetPaddleState(); resetSinglesState(players); }
+    if (newMode === 'default') {
+      resetPaddleState();
+      resetSinglesState(players);
+      setSkilledState(null);
+    }
     if (newMode === 'skilled') {
       // Build court definitions from existing court config (or default single court)
       const defs: CourtDef[] = courtSlots.length > 0
@@ -678,6 +727,21 @@ function QueueSystemContent() {
       const state = initSkilledState(players, skilledBrackets, defs, activeSittingOut);
       setSkilledState(state);
       setShowSkillBrackets(false);
+      const projectedSlots: CourtSlot[] = projectSkilledCourtsToSlots(state.courts);
+      const projectedQueue = [...state.waitingQueue];
+      setLocalCourtSlots(projectedSlots);
+      courtSlotsRef.current = projectedSlots;
+      setQueue(projectedQueue);
+      queueRef.current = projectedQueue;
+      if (session.sessionId) {
+        session.syncField({
+          queueMode: 'skilled',
+          courtSlots: projectedSlots,
+          queue: projectedQueue,
+          doublesEngineState: null,
+          singlesEngineState: null,
+        });
+      }
     }
   };
 
@@ -741,7 +805,27 @@ function QueueSystemContent() {
     // Recalculate rest thresholds when active player count changes in skilled mode
     if (activeQueueMode === 'skilled' && skilledState) {
       const activeCount = players.filter(p => !newSittingOut.includes(p)).length;
-      setSkilledState(prev => prev ? recalculateRestEngine(prev, activeCount) : prev);
+      setSkilledState(prev => {
+        if (!prev) return prev;
+        let s = prev;
+        if (isSittingOut) {
+          s = addPlayerToSkilledStateEngine(name, s, skilledBrackets);
+          s = { ...s, sitOut: s.sitOut.filter(p => p !== name) };
+        } else {
+          const sq = {
+            beginner: s.skillQueue.beginner.filter(p => p !== name),
+            intermediate: s.skillQueue.intermediate.filter(p => p !== name),
+            advanced: s.skillQueue.advanced.filter(p => p !== name),
+          };
+          s = {
+            ...s,
+            skillQueue: sq,
+            waitingQueue: [...sq.beginner, ...sq.intermediate, ...sq.advanced],
+            sitOut: [...s.sitOut, name],
+          };
+        }
+        return recalculateRestEngine(s, activeCount);
+      });
     }
   };
 
@@ -762,6 +846,9 @@ function QueueSystemContent() {
     if (snap.courtSlots) {
       setLocalCourtSlots(snap.courtSlots);
       courtSlotsRef.current = snap.courtSlots;
+    }
+    if (snap.skilledState) {
+      setSkilledState(snap.skilledState);
     }
     // Trim local history immediately — also removes from Firestore via
     // deleteLatestHistoryEntry called inside session.undoLastMatch.
@@ -1281,7 +1368,13 @@ function QueueSystemContent() {
     const court = skilledState.courts.find(c => c.id === courtId);
     if (!court || court.players.length < 4) { isProcessingMatchRef.current = false; return; }
 
-    undoSnapshotRef.current = { queue: [...queue], paddleState: clonePaddleState(paddleStateRef.current), singlesState: cloneSinglesState(singlesStateRef.current) };
+    undoSnapshotRef.current = {
+      queue: [...queue],
+      courtSlots: courtSlotsRef.current ? courtSlotsRef.current.map(c => ({ ...c, onCourt: [...c.onCourt] })) : [],
+      paddleState: clonePaddleState(paddleStateRef.current),
+      singlesState: cloneSinglesState(singlesStateRef.current),
+      skilledState: cloneSkilledState(skilledState),
+    };
     setHasUndo(true);
 
     const teamA      = court.players.slice(0, 2) as [string, string];
@@ -1291,7 +1384,16 @@ function QueueSystemContent() {
 
     const afterRotate   = rotatePlayersEngine(court.players, skilledState, skilledBrackets);
     const afterReassign = reassignCourtEngine(courtId, afterRotate, skilledBrackets);
-    setSkilledState(fillIdleCourtsEngine(afterReassign));
+    const finalState    = fillIdleCourtsEngine(afterReassign);
+    setSkilledState(finalState);
+
+    const projectedSlots: CourtSlot[] = projectSkilledCourtsToSlots(finalState.courts);
+    const projectedQueue = [...finalState.waitingQueue];
+
+    setLocalCourtSlots(projectedSlots);
+    courtSlotsRef.current = projectedSlots;
+    setQueue(projectedQueue);
+    queueRef.current = projectedQueue;
 
     const entry: MatchHistoryEntry = {
       id: Date.now(), mode: `Skilled (${court.name})`,
@@ -1301,7 +1403,7 @@ function QueueSystemContent() {
     setLocalHistory(prev => [entry, ...prev]);
     recordCareerResult(entry.players, entry.winner);
     setCareerStats(loadCareerStats());
-    if (session.sessionId) void session.commitMatchResult({ queue }, entry).then(result => {
+    if (session.sessionId) void session.commitMatchResult({ queue: projectedQueue, courtSlots: projectedSlots }, entry).then(result => {
       const message = matchResultFailureMessage(result);
       if (message) showToast(message);
     });
@@ -1315,8 +1417,8 @@ function QueueSystemContent() {
     if (players.some(player => player.toLowerCase() === trimmedName.toLowerCase())) { showToast(`"${trimmedName}" is already in the session`); return; }
     if (players.length >= V1_RELEASE.maxPlayers) { showToast(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
     if (trimmedName.length === 0 || trimmedName.length > 60) { showToast('Player names must be 60 characters or fewer'); return; }
-    const np = [...players, trimmedName], nq = [...queue, trimmedName];
-    setPlayers(np); setQueue(nq);
+    const np = [...players, trimmedName];
+    let nq = [...queue, trimmedName];
     if (activeQueueMode === 'default' && gameMode === 'doubles') {
       const newPaddleState = addPlayerToWaiting(paddleStateRef.current, trimmedName);
       paddleStateRef.current = newPaddleState;
@@ -1333,12 +1435,19 @@ function QueueSystemContent() {
       }
     } else if (activeQueueMode === 'skilled' && skilledState) {
       const activeCount = np.filter(p => !activeSittingOut.includes(p)).length;
+      let nextQueue = nq;
       setSkilledState(prev => {
         if (!prev) return prev;
         const afterAdd = addPlayerToSkilledStateEngine(trimmedName, prev, skilledBrackets);
-        return recalculateRestEngine(afterAdd, activeCount);
+        const afterRest = recalculateRestEngine(afterAdd, activeCount);
+        nextQueue = [...afterRest.waitingQueue];
+        return afterRest;
       });
+      nq = nextQueue;
     }
+    setPlayers(np);
+    setQueue(nq);
+    queueRef.current = nq;
     if (session.sessionId) session.syncField({ players: np, queue: nq });
   };
 
@@ -1488,21 +1597,42 @@ function QueueSystemContent() {
       };
       return { ...cleared, [bracket]: [...cleared[bracket], name] };
     });
-    if (skilledState) setSkilledState(prev => prev ? retagPlayerInQueue(name, bracket as SkillLevel, prev) : prev);
+    if (skilledState) {
+      setSkilledState(prev => {
+        if (!prev) return prev;
+        const next = retagPlayerInQueue(name, bracket as SkillLevel, prev);
+        setQueue(next.waitingQueue);
+        queueRef.current = next.waitingQueue;
+        if (session.sessionId) session.syncField({ queue: next.waitingQueue });
+        return next;
+      });
+    }
   };
 
   // Remove skill tag only — player stays in session and queue (defaults to intermediate)
   const handleUnassignFromBracket = (bracket: SkillBracket, name: string) => {
     setSkilledBrackets(prev => ({ ...prev, [bracket]: prev[bracket].filter(n => n !== name) }));
-    if (skilledState) setSkilledState(prev => prev ? retagPlayerInQueue(name, 'intermediate', prev) : prev);
+    if (skilledState) {
+      setSkilledState(prev => {
+        if (!prev) return prev;
+        const next = retagPlayerInQueue(name, 'intermediate', prev);
+        setQueue(next.waitingQueue);
+        queueRef.current = next.waitingQueue;
+        if (session.sessionId) session.syncField({ queue: next.waitingQueue });
+        return next;
+      });
+    }
   };
 
   // Add one or more players to the session AND assign to a bracket in one atomic update
   const handleAddNewToSkilled = (bracket: SkillBracket, names: string[]) => {
     if (!names.length) return;
     const genuinelyNew = names.filter(n => n.trim() && !players.includes(n));
+    let np = players;
+    let nq = queue;
     if (genuinelyNew.length > 0) {
-      const np = [...players, ...genuinelyNew], nq = [...queue, ...genuinelyNew];
+      np = [...players, ...genuinelyNew];
+      nq = [...queue, ...genuinelyNew];
       setPlayers(np); setQueue(nq);
       if (session.sessionId) session.syncField({ players: np, queue: nq });
     }
@@ -1530,6 +1660,9 @@ function QueueSystemContent() {
           s = addPlayerToSkilledStateEngine(name, s, updatedBrackets);
           s = retagPlayerInQueue(name, bracket as SkillLevel, s);
         }
+        setQueue(s.waitingQueue);
+        queueRef.current = s.waitingQueue;
+        if (session.sessionId) session.syncField({ players: np, queue: s.waitingQueue });
         return s;
       });
     }
@@ -1544,12 +1677,10 @@ function QueueSystemContent() {
 
   const modeSelector = V1_RELEASE.showQueueModeSelector ? (
     <div className="mode-selector">
-      {(['default', 'tournament', 'playall', 'skilled'] as const).map(m => (
+      {(['default', 'skilled'] as const).map(m => (
         <button key={m} className={`mode-btn ${activeQueueMode === m ? 'active' : ''}`} onClick={() => canControl && handleModeChange(m)} disabled={!canControl}>
-          {m === 'default'    && <><Swords size={12} /> Default</>}
-          {m === 'tournament' && <><Trophy size={12} /> Tournament</>}
-          {m === 'playall'    && <><Star   size={12} /> Play‑all</>}
-          {m === 'skilled'    && <><Layers size={12} /> Skilled</>}
+          {m === 'default' && <><Swords size={12} /> Default</>}
+          {m === 'skilled' && <><Layers size={12} /> Skilled</>}
         </button>
       ))}
     </div>

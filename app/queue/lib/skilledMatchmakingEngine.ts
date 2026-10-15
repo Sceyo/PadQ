@@ -468,6 +468,62 @@ export function initSkilledState(
 }
 
 /**
+ * Hydrate a SkilledState preserving on-court players from existing courtSlots.
+ * Used on page reload when reconnecting to an active skilled session.
+ */
+export function hydrateSkilledStateFromCourtSlots(
+  players:       string[],
+  skillBrackets: { beginner: string[]; intermediate: string[]; advanced: string[] },
+  courtSlots:    { id: string; name: string; onCourt: string[] }[],
+  sitOut:        string[] = [],
+): SkilledState {
+  const onCourt = courtSlots.flatMap(c => c.onCourt);
+  const activeWaiting = players.filter(p => !sitOut.includes(p) && !onCourt.includes(p));
+  const sq = buildSkillQueue(activeWaiting, skillBrackets);
+  const threshold = Math.max(2, courtSlots.length);
+  const totalActive = players.filter(p => !sitOut.includes(p)).length;
+  const { restEnabled, restCycleLength } = computeRestThreshold(totalActive, courtSlots.length);
+
+  const courts: SkilledCourt[] = courtSlots.map(slot => ({
+    id:           slot.id,
+    name:         slot.name,
+    players:      [...slot.onCourt],
+    skillMatch:   'mixed',
+    matchLevel:   'mixed',
+    idleCycles:   0,
+    earlyReturns: [],
+  }));
+
+  return {
+    skillQueue:          sq,
+    courts,
+    waitingQueue:        flattenQueue(sq),
+    sitOut,
+    restPool:            [],
+    restEnabled,
+    restCycleLength,
+    totalPlayers:        totalActive,
+    gamesCycleCount:     0,
+    bracketWaitCycles:   { beginner: 0, intermediate: 0, advanced: 0 },
+    starvationThreshold: threshold,
+  };
+}
+
+/**
+ * Projects skilled courts to standard CourtSlot format for Firestore synchronization.
+ */
+export function projectSkilledCourtsToSlots(
+  courts: SkilledCourt[],
+): { id: string; name: string; onCourt: string[] }[] {
+  return courts.map(c => ({
+    id:      c.id,
+    name:    c.name,
+    onCourt: [...c.players],
+  }));
+}
+
+
+/**
  * Add a new player (joined mid-session) to the back of their skill group in the queue.
  */
 export function addPlayerToSkilledState(

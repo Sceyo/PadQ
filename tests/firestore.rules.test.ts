@@ -132,7 +132,6 @@ suite('Firestore V1 production rules', () => {
     for (const patch of [
       { queueMode: 'tournament' },
       { queueMode: 'playall', playAllRel: { A: 1 } },
-      { queueMode: 'skilled' },
       { tournamentActive: true },
       { accessPin: '1234' },
       { courtSlots: [0, 1, 2, 3].map(i => ({ id: `court-${i}`, name: `Court ${i + 1}`, onCourt: [] })) },
@@ -141,6 +140,17 @@ suite('Firestore V1 production rules', () => {
         ...patch, revision: 1, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
       }));
     }
+  });
+
+  it('accepts skilled queueMode on create and on update (V1.2)', async () => {
+    const host = env.authenticatedContext('host-4b').firestore();
+    const ref = doc(host, 'sessions', 'SK9LLD');
+    // Succeeds on create
+    await assertSucceeds(setDoc(ref, sessionData('host-4b', { queueMode: 'skilled' })));
+    // Succeeds on update
+    await assertSucceeds(updateDoc(ref, {
+      queueMode: 'skilled', revision: 1, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp(),
+    }));
   });
 
   it('accepts a valid 30-player waiting roster', async () => {

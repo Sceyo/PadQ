@@ -470,7 +470,7 @@ function WatchPageContent() {
         <div className="w-topbar-mode">
           {gameMode === 'singles' ? <Swords size={14} /> : <Users size={14} />}
           {gameMode === 'singles' ? 'Singles' : 'Doubles'} ·{' '}
-          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : 'Default'}
+          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : visibleQueueMode === 'skilled' ? 'Skilled' : 'Default'}
         </div>
       </div>
 

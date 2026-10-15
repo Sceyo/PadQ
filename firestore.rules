@@ -252,7 +252,7 @@ service cloud.firestore {
         data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128 &&
         data.revision is int && data.revision >= 0 && data.revision <= 1000000 &&
         data.gameMode in ['singles', 'doubles'] &&
-        data.queueMode == 'default' && data.elimType == 'single' &&
+        data.queueMode in ['default', 'skilled'] && data.elimType == 'single' &&
         players is list && players.size() >= 5 && validPlayerRoster(players) &&
         validPlayerSubset(data.queue, players) &&
         data.playAllRel is map && data.playAllRel.size() == 0 &&
@@ -293,7 +293,7 @@ service cloud.firestore {
         data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128 &&
         data.revision is int && data.revision >= 0 && data.revision <= 1000000 &&
         data.gameMode in ['singles', 'doubles'] &&
-        data.queueMode == 'default' && data.elimType == 'single' &&
+        data.queueMode in ['default', 'skilled'] && data.elimType == 'single' &&
         players is list && players.size() >= 5 && validPlayerRoster(players) &&
         data.playAllRel is map && data.playAllRel.size() == 0 &&
         data.tournamentMatches is list && data.tournamentMatches.size() == 0 &&
