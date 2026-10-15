@@ -809,8 +809,8 @@ function QueueSystemContent() {
         if (!prev) return prev;
         let s = prev;
         if (isSittingOut) {
-          s = addPlayerToSkilledStateEngine(name, s, skilledBrackets);
           s = { ...s, sitOut: s.sitOut.filter(p => p !== name) };
+          s = addPlayerToSkilledStateEngine(name, s, skilledBrackets);
         } else {
           const sq = {
             beginner: s.skillQueue.beginner.filter(p => p !== name),
