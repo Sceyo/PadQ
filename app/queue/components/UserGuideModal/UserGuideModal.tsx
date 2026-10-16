@@ -18,7 +18,7 @@ const GUIDE_SECTIONS = [
   },
   {
     title: '🏆 Scoring',
-    body: 'Single-court sessions support live + / − point-by-point scoring with deuce extensions until a team leads by 2. Multi-court sessions feature rapid 1-tap winner buttons so hosts can smoothly manage up to 3 active courts without point-tracking bottleneck.',
+    body: 'Single-court sessions support live + / − point-by-point scoring with deuce extensions until a team leads by 2. Multi-court sessions feature a Match Scores toggle (ON by default) that lets hosts directly enter final scores (e.g. 11–9) with 1-tap presets to power Point Differential (+/−), or switch to rapid winner-only recording when toggled off.',
   },
   {
     title: '📡 Go Live & Sharing',
