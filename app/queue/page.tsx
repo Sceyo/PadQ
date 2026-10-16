@@ -1811,7 +1811,7 @@ function QueueSystemContent() {
             <div className="confirm-dialog">
               <p className="confirm-message">
                 {pendingConfirm.type === 'clear-history' && 'Clear all match history? The queue and players will stay.'}
-                {pendingConfirm.type === 'hard-reset' && 'Permanently delete this event and all match history from Firebase? Saved roster and career stats on this device will stay.'}
+                {pendingConfirm.type === 'hard-reset' && 'Delete this event and all match history? Saved roster and career stats will be kept.'}
                 {pendingConfirm.type === 'back-home' && 'Leave this session? The session stays active — rejoin anytime with the room code.'}
                 {pendingConfirm.type === 'remove-court' && 'Remove this court from your session group?'}
               </p>
@@ -2309,7 +2309,7 @@ function QueueSystemContent() {
           <div className="confirm-dialog">
             <p className="confirm-message">
               {pendingConfirm.type === 'clear-history' && 'Clear all match history? The queue and players will stay.'}
-              {pendingConfirm.type === 'hard-reset' && 'Permanently delete this event and all match history from Firebase? Saved roster and career stats on this device will stay.'}
+              {pendingConfirm.type === 'hard-reset' && 'Delete this event and all match history? Saved roster and career stats will be kept.'}
               {pendingConfirm.type === 'back-home' && 'Leave this session? The session stays active — rejoin anytime with the room code.'}
               {pendingConfirm.type === 'remove-court' && 'Remove this court from your session group?'}
             </p>

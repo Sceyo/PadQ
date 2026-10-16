@@ -14,23 +14,23 @@ const GUIDE_SECTIONS = [
   },
   {
     title: '🔄 V1 Queue Rotation',
-    body: 'PAD-Q V1 uses the Default rotation: structured Winners/Losers cycles with unplayed-player prioritisation. For multi-court sessions, all courts draw from one shared waiting queue and unlocked teammates are split before their next shared rotation. Optional locked partner pairs intentionally stay together when assigned.',
+    body: 'PAD-Q V1 uses the Default rotation: structured Winners/Losers cycles with unplayed-player prioritisation. For multi-court sessions, all courts draw from one shared waiting queue and unlocked teammates are split before their next shared rotation. Tap the pencil icon on any court card to manually adjust or swap player positions.',
   },
   {
     title: '🏆 Scoring',
-    body: "Single-court sessions can use + / − point-by-point scoring. Deuce extends the game until one team leads by 2 past the target. In multi-court V1, record only the winning team on each court so all courts remain quick to manage.",
+    body: 'Single-court sessions support live + / − point-by-point scoring with deuce extensions until a team leads by 2. Multi-court sessions feature rapid 1-tap winner buttons so hosts can smoothly manage up to 3 active courts without point-tracking bottleneck.',
   },
   {
     title: '📡 Go Live & Sharing',
     body: 'Tap Go Live to allow spectators. Share via QR code, copy link, or native share sheet (WhatsApp/SMS). Viewers see the queue and Live Court Status in real time. Single-court viewers also see the score when scoring is enabled; multi-court viewers see current players and completed results.',
   },
   {
-    title: '📊 Stats & Suggestions',
-    body: 'Stats tab shows wins, losses, win rate, streak, and rank tiers (Bronze→Diamond). Smart Suggestions alert you to overused/underused players, hot streaks, and unbalanced teams.',
+    title: '📊 Stats & Standings',
+    body: 'Standings rank players by Wins, then Win %, Point Differential (+/−), and Opponent Win % (OWP matchup strength) for fair tiebreaks. Career stats track cumulative history across sessions.',
   },
   {
-    title: '⚙️ Reset Options',
-    body: 'Clear History — wipes match log only; queue and players stay.\nHard Reset — clears ALL cached data and returns to homepage.',
+    title: '⚙️ Settings & Controls',
+    body: '• Undo Last Match — restores previous match and queue state if recorded in error.\n• Clear History — wipes the match log while keeping on-court and queue players.\n• End & Delete Event — permanently ends the live event and removes the room. Saved roster and career stats are safely kept.\n• Privacy & Data — inspect or clear saved player data anytime.',
   },
 ] as const;
 
