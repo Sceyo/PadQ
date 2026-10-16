@@ -44,6 +44,31 @@ describe('partner-aware multi-court doubles', () => {
     expect(result.waiting).toHaveLength(4);
   });
 
+  it('Option 2: holds back a player in waiting whose partner is still in a match on another court', () => {
+    // P1 is on Court 1 (absent from ranked list). P9 is in queue.
+    const ranked = ['P9', 'P10', 'P11', 'P12', 'P5', 'P6', 'P7', 'P8'];
+    const locked: LockedPartnerPair[] = [['P1', 'P9']];
+
+    // When Court 2 rotates, P9's partner P1 is absent (on Court 1).
+    // P9 must stay in waiting while the other available players form the court.
+    const result = selectPartnerAwareMatch(ranked, locked);
+
+    expect(result.onCourt).toHaveLength(4);
+    expect(result.onCourt).not.toContain('P9');
+    expect(result.waiting).toContain('P9');
+
+    // When Court 1 finishes, P1 becomes available in ranked list.
+    const nextRanked = [...result.waiting, 'P1', 'P2', 'P3', 'P4'];
+    const nextResult = selectPartnerAwareMatch(nextRanked, locked);
+
+    expect(nextResult.onCourt).toHaveLength(4);
+    expect(nextResult.onCourt).toContain('P1');
+    expect(nextResult.onCourt).toContain('P9');
+    expect(Math.floor(nextResult.onCourt.indexOf('P1') / 2)).toBe(
+      Math.floor(nextResult.onCourt.indexOf('P9') / 2),
+    );
+  });
+
   it('seeds three courts without splitting any locked pair', () => {
     const players = Array.from({ length: 30 }, (_, i) => `P${i + 1}`);
     const locked: LockedPartnerPair[] = [['P2', 'P29'], ['P7', 'P8'], ['P17', 'P25']];

@@ -101,16 +101,25 @@ export function addPartnerPair(
   return [...pairs, [first, second]];
 }
 
+export function getPlayerLocationLabel(
+  player: string,
+  playerGroups?: string[][],
+): string | null {
+  if (!playerGroups || playerGroups.length === 0) return null;
+  if (playerGroups[0]?.includes(player)) return 'Queue';
+  for (let i = 1; i < playerGroups.length; i += 1) {
+    if (playerGroups[i]?.includes(player)) return `Court ${i}`;
+  }
+  return null;
+}
+
 export function getCompatiblePartnerPlayers(
   availablePlayers: string[],
-  playerGroups: string[][],
-  selected: string | null,
+  _playerGroups?: string[][],
+  _selected?: string | null,
 ): string[] {
-  if (!selected) return availablePlayers;
-  const selectedGroup = playerGroups.find(group => group.includes(selected));
-  if (!selectedGroup) return [selected];
-  const groupSet = new Set(selectedGroup);
-  return availablePlayers.filter(player => groupSet.has(player));
+  // Option 2 (Global Pairing): Any unpartnered player across all courts and queue is selectable.
+  return availablePlayers;
 }
 
 export const PartnerPanel: React.FC<{
@@ -164,7 +173,7 @@ export const PartnerPanel: React.FC<{
           <div className="partner-panel-heading">
             <div>
               <strong>Partner pairs</strong>
-              <p>Choose two players from the same court or waiting queue. Changes apply on their next assignment.</p>
+              <p>Pair any two players across courts or queue. Changes apply on their next assignment.</p>
             </div>
             <span>{maxPairs} max for {players.length} players</span>
           </div>
@@ -190,17 +199,21 @@ export const PartnerPanel: React.FC<{
 
           {!limitReached && availablePlayers.length >= 2 ? (
             <div className="partner-player-grid">
-              {compatiblePlayers.map(player => (
-                <button
-                  key={player}
-                  type="button"
-                  aria-pressed={selected === player}
-                  className={`partner-player-btn${selected === player ? ' partner-player-btn--selected' : ''}`}
-                  onClick={() => choosePlayer(player)}
-                >
-                  {player}
-                </button>
-              ))}
+              {compatiblePlayers.map(player => {
+                const loc = getPlayerLocationLabel(player, playerGroups);
+                return (
+                  <button
+                    key={player}
+                    type="button"
+                    aria-pressed={selected === player}
+                    className={`partner-player-btn${selected === player ? ' partner-player-btn--selected' : ''}`}
+                    onClick={() => choosePlayer(player)}
+                  >
+                    <span className="partner-player-name">{player}</span>
+                    {loc && <span className="partner-player-loc">{loc}</span>}
+                  </button>
+                );
+              })}
             </div>
           ) : (
             <p className="partner-panel-limit">
