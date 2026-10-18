@@ -538,7 +538,10 @@ function QueueSystemContent() {
     if (!t) return;
     if (tempPlayers.length >= V1_RELEASE.maxPlayers) { setSetupErrorMsg(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
     if (t.length > 60) { setSetupErrorMsg('Player names must be 60 characters or fewer'); return; }
-    if (tempPlayers.some(name => name.toLowerCase() === t.toLowerCase())) { setSetupErrorMsg(`"${t}" is already in the list`); return; }
+    if (tempPlayers.some(name => name.toLowerCase() === t.toLowerCase())) {
+      setSetupErrorMsg(`"${t}" already exists. If two players share a name, add an initial (e.g. "${t} D.") to distinguish them.`);
+      return;
+    }
     setSetupErrorMsg(null);
     setTempPlayers(prev => [...prev, t]); setCurrentName('');
   };
@@ -548,13 +551,26 @@ function QueueSystemContent() {
     const names = pasteInput.split(/[,\n]+/).map(n => n.trim()).filter(n => n.length > 0 && n.length <= 60);
     const available = V1_RELEASE.maxPlayers - tempPlayers.length;
     const seen = new Set(tempPlayers.map(name => name.toLowerCase()));
+    let duplicateCount = 0;
     const fresh = names.filter(name => {
       const key = name.toLowerCase();
-      if (seen.has(key)) return false;
+      if (seen.has(key)) {
+        duplicateCount++;
+        return false;
+      }
       seen.add(key);
       return true;
     }).slice(0, available);
-    if (fresh.length === 0) { setPasteInput(''); return; }
+    if (fresh.length === 0) {
+      if (duplicateCount > 0) {
+        showToast('Duplicate names were skipped. Add initials (e.g. "Mike D.") to distinguish players with the same name.');
+      }
+      setPasteInput('');
+      return;
+    }
+    if (duplicateCount > 0) {
+      showToast(`${duplicateCount} duplicate name${duplicateCount > 1 ? 's were' : ' was'} skipped. Use initials (e.g. "Ben J.") to distinguish identical names.`);
+    }
     setTempPlayers(prev => [...prev, ...fresh]);
     setPasteInput('');
   };
@@ -1457,6 +1473,26 @@ function QueueSystemContent() {
     if (session.sessionId) session.syncField({ players: np, queue: nq });
   };
 
+  const handleMoveWaitingPlayer = (playerName: string, direction: -1 | 1) => {
+    const curIdx = waitingPlayers.indexOf(playerName);
+    if (curIdx === -1) return;
+    const targetIdx = curIdx + direction;
+    if (targetIdx < 0 || targetIdx >= waitingPlayers.length) return;
+    const otherPlayer = waitingPlayers[targetIdx];
+
+    const qIdx1 = queue.indexOf(playerName);
+    const qIdx2 = queue.indexOf(otherPlayer);
+    if (qIdx1 === -1 || qIdx2 === -1) return;
+
+    const newQueue = [...queue];
+    newQueue[qIdx1] = otherPlayer;
+    newQueue[qIdx2] = playerName;
+
+    setQueue(newQueue);
+    queueRef.current = newQueue;
+    if (session.sessionId) session.syncField({ queue: newQueue });
+  };
+
   const handlePartnerPairsChange = (nextPairs: [string, string][]) => {
     const playerSet = new Set(players);
     const used = new Set<string>();
@@ -2324,6 +2360,30 @@ function QueueSystemContent() {
                           <div key={`wait-${i}-${p}`} className="waiting-player-row">
                             <span className="waiting-num">#{i + 1}</span>
                             <PlayerLabel name={p} statsMap={statsMap} />
+                            {canControl && (
+                              <div className="waiting-reorder-btns">
+                                <button
+                                  type="button"
+                                  className="waiting-reorder-btn"
+                                  disabled={i === 0}
+                                  onClick={() => handleMoveWaitingPlayer(p, -1)}
+                                  title="Move up in queue"
+                                  aria-label={`Move ${p} up in queue`}
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  className="waiting-reorder-btn"
+                                  disabled={i === waitingPlayers.length - 1}
+                                  onClick={() => handleMoveWaitingPlayer(p, 1)}
+                                  title="Move down in queue"
+                                  aria-label={`Move ${p} down in queue`}
+                                >
+                                  ▼
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

@@ -35,6 +35,7 @@ import {
   SessionDoc,
   MatchHistoryEntry,
   TournamentMatch,
+  CourtSlot,
 } from '@/lib/sessionService';
 import { useSessionAccess } from '@/hooks/useSessionAccess';
 import AccessCodeModal from '@/app/queue/components/atoms/AccessCodeModal';
@@ -155,8 +156,9 @@ function WatchPageContent() {
   };
 
   // ── Match announcement (Task 12) ────────────────────────
-  const [announcement,   setAnnouncement]    = useState<string | null>(null);
+  const [announcement,   setAnnouncement]    = useState<{ label: string; text: string } | null>(null);
   const prevMatchKeyRef = useRef<string>('');
+  const prevCourtSlotsRef = useRef<CourtSlot[] | null>(null);
 
   // ── Guardrail: validate session exists before subscribing ──
 
@@ -235,6 +237,36 @@ function WatchPageContent() {
   // ── Match change detection — fires announcement ──────────
   useEffect(() => {
     if (!session?.isLive) return;
+
+    // Multi-court match detection
+    if (session.courtSlots && session.courtSlots.length > 0) {
+      if (prevCourtSlotsRef.current) {
+        const changedCourt = session.courtSlots.find(curr => {
+          const prev = prevCourtSlotsRef.current?.find(p => p.id === curr.id);
+          return prev && curr.onCourt.length >= 4 && curr.onCourt.join(',') !== prev.onCourt.join(',');
+        });
+
+        if (changedCourt) {
+          const tA = changedCourt.onCourt.slice(0, 2).join(' & ');
+          const tB = changedCourt.onCourt.slice(2, 4).join(' & ');
+          const payload = {
+            label: `🎾 NOW PLAYING ON ${changedCourt.name.toUpperCase()}`,
+            text: `${tA}  vs  ${tB}`,
+          };
+          const showTimer = setTimeout(() => setAnnouncement(payload), 0);
+          const clearTimer = setTimeout(() => setAnnouncement(null), 6000);
+          prevCourtSlotsRef.current = session.courtSlots.map(c => ({ ...c, onCourt: [...c.onCourt] }));
+          return () => {
+            clearTimeout(showTimer);
+            clearTimeout(clearTimer);
+          };
+        }
+      }
+      prevCourtSlotsRef.current = session.courtSlots.map(c => ({ ...c, onCourt: [...c.onCourt] }));
+      return;
+    }
+
+    // Single-court match detection
     const q  = session.queue ?? [];
     const gm = session.gameMode;
     let key = '';
@@ -247,7 +279,8 @@ function WatchPageContent() {
         ? `${q[0]} vs ${q[1]}`
         : `${q[0]} & ${q[1]}  vs  ${q[2]} & ${q[3]}`;
       prevMatchKeyRef.current = key;
-      const showTimer = setTimeout(() => setAnnouncement(text), 0);
+      const payload = { label: '🎉 NEXT UP ON COURT', text };
+      const showTimer = setTimeout(() => setAnnouncement(payload), 0);
       const clearTimer = setTimeout(() => setAnnouncement(null), 6000);
       return () => {
         clearTimeout(showTimer);
@@ -437,8 +470,8 @@ function WatchPageContent() {
       {announcement && (
         <div className="w-announcement" role="alert">
           <div className="w-announcement-inner">
-            <div className="w-announcement-label">🏓 NEXT UP ON COURT</div>
-            <div className="w-announcement-match">{announcement}</div>
+            <div className="w-announcement-label">{announcement.label}</div>
+            <div className="w-announcement-match">{announcement.text}</div>
             <button className="w-announcement-close" onClick={() => setAnnouncement(null)}>✕</button>
           </div>
         </div>

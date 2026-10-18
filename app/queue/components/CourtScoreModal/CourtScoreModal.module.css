@@ -277,13 +277,14 @@
 }
 
 .cancelBtn {
-  background: transparent;
-  border: 1px solid transparent;
-  color: var(--txt-3, #94a3b8);
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  color: var(--txt-2, #64748b);
 }
 .cancelBtn:hover {
-  color: var(--txt-1, #1e293b);
-  background: rgba(0, 0, 0, 0.04);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.35);
+  background: rgba(239, 68, 68, 0.05);
 }
 
 /* Dark mode */
@@ -327,10 +328,13 @@ body.dark-mode .skipBtn {
   border-color: rgba(255, 255, 255, 0.08);
   color: var(--txt-2, #94a3b8);
 }
-body.dark-mode .skipBtn:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--txt-1, #f0f4ff);
+body.dark-mode .cancelBtn {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--txt-2, #cbd5e1);
 }
 body.dark-mode .cancelBtn:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
 }

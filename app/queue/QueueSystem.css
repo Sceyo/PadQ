@@ -2932,6 +2932,53 @@ body.dark-mode .court-count-value { color: #f1f5f9; }
   text-align: right;
 }
 
+.waiting-reorder-btns {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.waiting-reorder-btn {
+  background: var(--btn, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--txt-2, #64748b);
+  transition: all 0.12s;
+  padding: 0;
+  line-height: 1;
+}
+
+.waiting-reorder-btn:hover:not(:disabled) {
+  background: var(--btn-hover, #e2e8f0);
+  color: var(--txt-1, #1e293b);
+  border-color: var(--txt-3, #94a3b8);
+}
+
+.waiting-reorder-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+body.dark-mode .waiting-reorder-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--txt-2, #94a3b8);
+}
+
+body.dark-mode .waiting-reorder-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
 body.dark-mode .waiting-queue-panel {
   background: rgba(255,255,255,.04);
   border-color: rgba(255,255,255,.08);

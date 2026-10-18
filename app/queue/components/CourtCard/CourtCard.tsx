@@ -72,16 +72,18 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
               <button
                 className={`${styles.winBtn} ${styles.winBtnA}`}
                 onClick={() => onWin(slot.id, 'A')}
+                title={`${teamA.join(' & ')} win`}
               >
                 <Trophy size={12} />
-                {teamA.join(' & ')} win
+                Team 1 Wins
               </button>
               <button
                 className={`${styles.winBtn} ${styles.winBtnB}`}
                 onClick={() => onWin(slot.id, 'B')}
+                title={`${teamB.join(' & ')} win`}
               >
                 <Trophy size={12} />
-                {teamB.join(' & ')} win
+                Team 2 Wins
               </button>
             </div>
           )}

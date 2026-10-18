@@ -1,3 +1,4 @@
+import React from 'react';
 import type { CourtSlot } from '@/lib/sessionService';
 
 type GameMode = 'singles' | 'doubles';
@@ -80,10 +81,36 @@ export function LiveCourtStatus({
         </div>
 
         {hasMatch ? (
-          <div className="w-vs-row">
-            <span className="w-player-chip w-player-chip--team">{teamA.join(' & ')}</span>
-            <span className="w-vs">VS</span>
-            <span className="w-player-chip w-player-chip--team">{teamB.join(' & ')}</span>
+          <div className="w-matchup-container">
+            <div className="w-team-box w-team-box--a">
+              <span className="w-team-tag w-team-tag--a">Team 1</span>
+              <div className="w-team-players">
+                {teamA.map((player, idx) => (
+                  <React.Fragment key={`w-a-${idx}-${player}`}>
+                    {idx > 0 && <span className="w-partner-and">&amp;</span>}
+                    <div className="w-player-chip w-player-chip--individual">
+                      <span className="w-player-name">{player}</span>
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            <div className="w-vs-badge" aria-label="Versus">VS</div>
+
+            <div className="w-team-box w-team-box--b">
+              <span className="w-team-tag w-team-tag--b">Team 2</span>
+              <div className="w-team-players">
+                {teamB.map((player, idx) => (
+                  <React.Fragment key={`w-b-${idx}-${player}`}>
+                    {idx > 0 && <span className="w-partner-and">&amp;</span>}
+                    <div className="w-player-chip w-player-chip--individual">
+                      <span className="w-player-name">{player}</span>
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <p className="w-muted">The host will assign the next available players here.</p>

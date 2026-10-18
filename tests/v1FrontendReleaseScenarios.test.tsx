@@ -67,8 +67,8 @@ describe('V1 Frontend Component & Interaction Release Stress Suite', () => {
       expect(connectors.length).toBe(2);
 
       // Host win buttons
-      const winBtnA = getByText(/Ben Johns & Anna Leigh Waters win/i);
-      const winBtnB = getByText(/Tyson McGuffin & Catherine Parenteau win/i);
+      const winBtnA = getByText(/Team 1 Wins/i);
+      const winBtnB = getByText(/Team 2 Wins/i);
       expect(winBtnA).toBeTruthy();
       expect(winBtnB).toBeTruthy();
 
