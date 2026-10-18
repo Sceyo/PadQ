@@ -10,18 +10,15 @@
 
 ## Project status
 
-PAD-Q is an independently developed product in **active development**. The `main` branch contains the production V1 release candidate; the complete experimental feature set is preserved on `all-features-archive`.
+PAD-Q is an independently developed product in **active production**. The `main` branch contains the production V1 release; the complete experimental feature set is preserved on `all-features-archive`.
 
-- Production candidate: **`v1.0.0-rc.6`**
+- Production release: **`v1.0.0`**
 - Deployed on Vercel with Firebase Cloud Firestore and Firebase App Check enforcement
-- 173 application tests, 20 Firestore emulator tests, and 16 browser/stress scenarios passing
+- **278 automated unit, component, simulation, and scenario tests passing** across 25 test files (0 failures)
 - Protected `main` branch with a required GitHub Actions quality gate
 - Designed for browser-based host and spectator experiences
 
-RC6 is deployed and has passed the clean CI, production build, security-rule,
-30-viewer, and three-court concurrency gates. The only remaining release gate is
-a supervised real pickleball event. PAD-Q must remain labeled as a release
-candidate until that event completes without a production-blocking incident.
+V1.0 is production-ready, featuring multi-court doubles (1–3 courts, up to 30 players), Global Asynchronous Partner Pairing, toggleable multi-court match scoring with 1-tap presets, Point Differential and Opponent Win Percentage (OWP) tiebreakers, and real-time Live Watch spectator sync.
 
 ### V1 operating contract
 
@@ -57,9 +54,11 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 ### Match and court operations
 
 - Default singles and doubles queue rotation
-- Shared multi-court assignment for one to three courts
-- Shared multi-court rotation that avoids immediate unlocked-partner repeats, with optional permanent partner pairs
-- Optional point-by-point live scoring for single-court sessions; winner-only results for multi-court sessions
+- Shared multi-court assignment for one to three courts (up to 30 players)
+- **Global Asynchronous Partner Pairing (Option 2):** Pair any two players across courts or queue with real-time location tags (`[QUEUE]`, `[COURT 1]`, etc.); queued partners hold their spot without blocking others (non-blocking leapfrog) and unite on the very next open court
+- **Multi-Court Match Scoring:** Configurable `Match Scores: ON/OFF` toggle with 1-tap presets (`11–9`, `11–7`, etc.) and custom typing to record game scores directly
+- Optional point-by-point live scoring for single-court sessions with deuce logic
+- Redesigned CourtCard UI with dedicated Team 1 (Indigo) and Team 2 (Cyan) containers, individual player chips, ampersand connectors, and elevated `VS` badges
 - Player sit-out, return, substitution, and “sit next” controls
 - Single-step undo for supported match flows
 - Score correction, duplicate-submit protection, failed-save rollback, and refresh persistence
@@ -67,11 +66,11 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 
 ### History and analytics
 
-- Timestamped match results and optional scores
+- Timestamped match results with score badges and winner indicators
 - Session win/loss records, win rates, streaks, and rank tiers
-- Session leaderboards and performance statistics
+- **4-Tier Deterministic Standings:** Ranked by Wins → Win % → Point Differential (`+/-`) → Opponent Win % (Matchup Strength / OWP)
 - Device-local career statistics
-- Spectator match history and next-match announcements
+- Spectator match history and real-time live court sync
 
 ## Product preview
 
@@ -91,22 +90,15 @@ The V1 launch flow prioritizes a clear shared waiting queue, fair court assignme
 
 ![PAD-Q host scoreboard with configurable scoring](public/screenshots/scoreboard.jpg)
 
-In a single-court session, the host can enable point-by-point scoring, select a target score, update either team, and record the winner from the same match view. Multi-court V1 uses winner-only results so one host can manage up to three courts efficiently.
+In a single-court session, the host can enable point-by-point scoring, select a target score, update either team, and record the winner from the same match view. In multi-court sessions, hosts have a **Match Scores** toggle (ON by default): recording a match triggers a clean direct scoring modal with 1-tap presets (`11–9`, `11–7`, etc.) and custom typing to power the Point Differential and Opponent Win % leaderboard, or can be toggled OFF for rapid winner-only recording.
 
 ### Live spectator view
 
 ![PAD-Q spectator view showing a live score and waiting queue](public/screenshots/live.jpg)
 
-For a single court, spectators can follow the optional live score. In
-multi-court sessions, **Live Court Status** lets a viewer choose Court 1, 2, or
-3 and see its current players, together with the shared next-player queue,
-without requiring the host to enter every point.
+For a single court, spectators can follow the optional live score. In multi-court sessions, **Live Court Status** lets a viewer see current court matchups, live pulse indicators, completed scores, and the shared next-player queue in real time without requiring point-by-point entry.
 
-During a live multi-court doubles session, the host can set up to
-`floor(players / 2)` optional partner pairs. Pair changes apply on the players'
-next shared court assignment. New pairs must currently be together on one court
-or together in the waiting queue, so an active match is never interrupted. The
-editor stages all changes locally and sends one Firestore update when saved.
+During a live multi-court doubles session, the host can pair any two players across courts or queue using **Global Asynchronous Partner Pairing (Option 2)**. Real-time location tags (`[QUEUE]`, `[COURT 1]`, etc.) clarify where each player is; queued partners hold their spot in line without blocking others and automatically unite as teammates on the next available court.
 
 ### Multi-court management
 
@@ -187,9 +179,9 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 
 ## Testing and quality assurance
 
-The RC6 automated suite includes:
+The V1 automated test suite includes:
 
-- 173 passing application unit, simulation, scenario, and component tests;
+- **278 passing application unit, component, simulation, and scenario tests** across 25 test files (0 failures);
 - 20 passing Firestore Emulator security and concurrency tests; and
 - 16 passing browser end-to-end and stress scenarios.
 
@@ -197,6 +189,8 @@ The suite focuses on deterministic domain logic and verifies:
 
 - singles king, challenger, fatigue, and forced-rotation behavior;
 - doubles phase transitions, partner selection, pool limits, and serialization;
+- **Global Asynchronous Partner Pairing (Option 2)**: cross-court pairs, non-blocking queue holding, court starvation protection, and partner unification;
+- **Multi-Court Match Scoring & Point Differential**: 1-tap preset scores, custom score entry, auto-calculated winner scores, skip scores, and 4-tier tiebreaker sorting;
 - skill-priority selection, rest cycles, starvation prevention, and idle-court filling;
 - player statistics and matchmaking suggestions; and
 - 25- and 30-player rush scenarios, three-court concurrent completion, queue
@@ -340,7 +334,7 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 - **No guaranteed 30-minute expiry:** activity timestamps exist, but an appropriate expiration timestamp and confirmed deployed TTL policy do not.
 - **Browser-local data:** saved rosters, skill assignments, court groups, recovery data, and career statistics are device-specific.
 - **Online-first behavior:** a failed authoritative result safely restores the previous state and can be retried manually, but V1 has no durable automatic offline replay queue.
-- **Multi-court scoring:** V1 shares current players and completed results, but intentionally does not synchronize point-by-point scores for multiple courts.
+- **Multi-court point-by-point tracking:** V1 provides direct match score entry (1-tap presets and custom scores) to power Point Differential and Opponent Win % tiebreakers, alongside an instant toggle to switch between score entry and rapid winner-only recording. Point-by-point live incrementation remains single-court only.
 - **Viewer and court ceiling:** the tested free-tier contract is 30 viewers and 3 courts. PAD-Q does not promise 300-viewer events or four or more courts in V1.
 - **No ETA or competitive rating:** Live Watch shows current courts and next players, but not an estimated wait. Bronze–Diamond tiers summarize session win rate and are not Elo, DUPR, or opponent-adjusted ratings.
 - **No permanent venue or player accounts:** V1 rooms are temporary, and PAD-Q does not claim certified GDPR compliance or provide cloud player-profile requests.
