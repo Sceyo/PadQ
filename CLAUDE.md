@@ -2,6 +2,14 @@
 
 # PadQ — AI Agent Codebase Guide
 
+## Engineering Guidelines & Standards
+All development, code reviews, debugging, architectural design, and operational checks in this codebase strictly adhere to the project standards in [`.claude/guidelines/`](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/):
+- **[Architecture & System Design](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/architecture.md)**: Simplicity first, reversible two-way doors, strict boundary isolation, honest data ownership.
+- **[Observability & Reliability](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/observability-reliability.md)**: Structured logging, RED/USE metrics, network timeouts, bounded retries with jitter, idempotency, graceful degradation.
+- **[Performance](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/performance.md)**: Measure baseline/target before optimizing, algorithmic efficiency, bounded allocations, and Firebase Spark ($0) budget awareness.
+- **[Code Review](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/code-review.md)**: Prioritized review (Correctness → Security → Design → Tests → Operability → Performance → Readability) with labeled comments (`[blocker]`, `[suggestion]`, `[question]`, `[nit]`, `[praise]`).
+- **[Debugging](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/debugging.md)**: Reproduce first, hypothesize then falsify, root cause before fixing, minimal fix, and regression test prevention.
+
 ## What This App Is
 
 PadQ is a **real-time match queue manager** for singles and doubles paddle/racket sports. A host creates a session, adds players, and the app handles fair rotation. Viewers join via a room code (4-char uppercase) to watch live.
