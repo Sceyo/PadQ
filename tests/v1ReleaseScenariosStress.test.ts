@@ -2,17 +2,16 @@ import { describe, expect, it } from 'vitest';
 import {
   seedMultiCourtDoubles,
   rotateMultiCourtDoubles,
-  selectPartnerAwareMatch,
   type LockedPartnerPair,
 } from '@/app/queue/lib/doublesEngine';
-import { planMultiCourtResult, type MultiCourtSlot } from '@/app/queue/lib/multiCourtResult';
+import { planMultiCourtResult } from '@/app/queue/lib/multiCourtResult';
 import {
   buildPlayerStats,
   comparePlayerStats,
 } from '@/app/queue/lib/playerUtils';
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
 import { getMaxPartnerPairs } from '@/app/queue/components/LiveManagement/LiveManagement';
-import type { MatchHistoryEntry, PlayerStat } from '@/app/queue/lib/types';
+import type { MatchHistoryEntry } from '@/app/queue/lib/types';
 
 function createRoster(count: number, prefix: string): string[] {
   return Array.from({ length: count }, (_, i) => `${prefix}${i + 1}`);
@@ -60,7 +59,7 @@ describe('V1 Backend & Engine Release Stress Suite', () => {
       const roster = createRoster(20, 'P'); // 20 players, 3 courts (12 on court, 8 in queue)
       // Initial seeding with 0 locked pairs
       const seeded = seedMultiCourtDoubles(roster, 3, []);
-      let courts = seeded.courts.map(c => [...c]);
+      const courts = seeded.courts.map(c => [...c]);
       let queue = [...seeded.waiting];
 
       // Courts initially:
@@ -233,7 +232,7 @@ describe('V1 Backend & Engine Release Stress Suite', () => {
     it('seamlessly preserves court slots, queue integrity, and undo snapshots through live changes', () => {
       const roster = createRoster(14, 'R');
       const seeded = seedMultiCourtDoubles(roster, 2, []);
-      let state = {
+      const state = {
         queue: seeded.waiting,
         courtSlots: [
           { id: 'c1', name: 'Court 1', onCourt: seeded.courts[0] },
@@ -290,7 +289,7 @@ describe('V1 Backend & Engine Release Stress Suite', () => {
         expect(seeded.courts).toHaveLength(courtCount);
         expect(seeded.courts.every(c => c.length === 4)).toBe(true);
 
-        let courts = seeded.courts.map(c => [...c]);
+        const courts = seeded.courts.map(c => [...c]);
         let queue = [...seeded.waiting];
 
         // Rotate each court twice with 0 waiting queue
