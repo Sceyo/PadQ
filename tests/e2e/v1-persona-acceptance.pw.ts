@@ -46,7 +46,7 @@ test('25-player rush preserves registration order and a middle departure', async
     await host.locator('.mqp-btn--remove').filter({ hasText: departingPlayer }).click();
 
     const remainingWaiting = await host.locator('.waiting-player-row').allTextContents();
-    expect(remainingWaiting.map(text => text.replace(/^#\d+/, '').trim())).toEqual([
+    expect(remainingWaiting.map(text => text.replace(/^#\d+/, '').replace(/[▲▼]/g, '').trim())).toEqual([
       ...RUSH_PLAYERS.slice(12, 18),
       ...RUSH_PLAYERS.slice(19),
     ]);
