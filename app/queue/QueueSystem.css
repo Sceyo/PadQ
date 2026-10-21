@@ -122,6 +122,11 @@ body.dark-mode {
 .live-panel{position:relative;}
 .live-panel-toggle{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:var(--r-sm);border:1.5px solid var(--border);background:var(--btn);cursor:pointer;font-size:.78rem;font-weight:600;color:var(--txt-2);font-family:inherit;transition:background .15s,color .15s;}
 .live-panel-toggle:hover{background:var(--btn-hover);color:var(--txt-1);}
+.score-toggle-btn{display:inline-flex;align-items:center;gap:6px;cursor:pointer;transition:background .15s,border-color .15s,color .15s;}
+.score-toggle-btn--on{border-color:rgba(34,197,94,.45);background:rgba(34,197,94,.08);color:var(--txt-1);}
+.score-toggle-btn--on strong{color:#16a34a;}
+body.dark-mode .score-toggle-btn--on{border-color:rgba(34,197,94,.4);background:rgba(34,197,94,.12);color:#f0f4ff;}
+body.dark-mode .score-toggle-btn--on strong{color:#4ade80;}
 .partner-panel-count{display:inline-flex;align-items:center;justify-content:center;min-width:30px;padding:1px 6px;border-radius:999px;background:rgba(99,102,241,.18);color:#a5b4fc;font-size:.65rem;}
 .partner-panel-body{width:min(620px,calc(100vw - 56px));margin-top:10px;padding:14px;border:1.5px solid var(--border);border-radius:var(--r-md);background:var(--card-alt);}
 .partner-panel-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:12px;}
@@ -133,9 +138,12 @@ body.dark-mode {
 .partner-pair-chip button{display:inline-flex;padding:2px;border:0;background:transparent;color:var(--txt-3);cursor:pointer;}
 .partner-pair-chip button:hover{color:#f87171;}
 .partner-player-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:7px;}
-.partner-player-btn{min-height:38px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--btn);color:var(--txt-2);font:inherit;font-size:.72rem;cursor:pointer;overflow-wrap:anywhere;}
+.partner-player-btn{min-height:38px;padding:7px 9px;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--btn);color:var(--txt-2);font:inherit;font-size:.72rem;cursor:pointer;overflow-wrap:anywhere;display:flex;align-items:center;justify-content:space-between;gap:6px;}
 .partner-player-btn:hover{border-color:#6366f1;color:var(--txt-1);}
 .partner-player-btn--selected{border-color:#6366f1;background:rgba(99,102,241,.2);color:#fff;box-shadow:0 0 0 2px rgba(99,102,241,.12);}
+.partner-player-name{font-weight:600;text-align:left;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.partner-player-loc{font-size:.60rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;padding:1px 5px;border-radius:4px;background:rgba(255,255,255,.07);color:var(--txt-3);white-space:nowrap;flex-shrink:0;}
+.partner-player-btn--selected .partner-player-loc{background:rgba(255,255,255,.22);color:#fff;}
 .partner-panel-limit{margin:0;color:var(--txt-3);font-size:.72rem;}
 .partner-panel-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
 .partner-panel-cancel,.partner-panel-save{padding:7px 12px;border-radius:var(--r-sm);font:inherit;font-size:.72rem;font-weight:700;cursor:pointer;}
@@ -2922,6 +2930,53 @@ body.dark-mode .court-count-value { color: #f1f5f9; }
   color: var(--txt-3);
   min-width: 24px;
   text-align: right;
+}
+
+.waiting-reorder-btns {
+  display: flex;
+  gap: 3px;
+  margin-left: auto;
+}
+
+.waiting-reorder-btn {
+  background: var(--btn, #f1f5f9);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--txt-2, #64748b);
+  transition: all 0.12s;
+  padding: 0;
+  line-height: 1;
+}
+
+.waiting-reorder-btn:hover:not(:disabled) {
+  background: var(--btn-hover, #e2e8f0);
+  color: var(--txt-1, #1e293b);
+  border-color: var(--txt-3, #94a3b8);
+}
+
+.waiting-reorder-btn:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+body.dark-mode .waiting-reorder-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--txt-2, #94a3b8);
+}
+
+body.dark-mode .waiting-reorder-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
 }
 
 body.dark-mode .waiting-queue-panel {

@@ -59,23 +59,117 @@
 
 .matchup {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  align-items: stretch;
+  gap: 8px;
+  width: 100%;
 }
 
 .team {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  align-items: center;
+  padding: 10px 8px;
+  border-radius: var(--r-sm, 8px);
+  border: 1px solid var(--border);
+  background: var(--card, #ffffff);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s, background 0.15s;
 }
 
+.teamA {
+  border-color: rgba(99, 102, 241, 0.28);
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.teamB {
+  border-color: rgba(6, 182, 212, 0.28);
+  background: rgba(6, 182, 212, 0.04);
+}
+
+.teamHeader {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  line-height: 1;
+}
+
+.teamA .teamHeader {
+  color: #4f46e5;
+}
+
+.teamB .teamHeader {
+  color: #0891b2;
+}
+
+.playerList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.playerRow {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  min-width: 0;
+}
+
+.playerChip {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  padding: 7px 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--txt-1, #1e293b);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-width: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  word-break: break-word;
+  line-height: 1.25;
+}
+
+.partnerConnector {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: var(--txt-3, #94a3b8);
+  text-align: center;
+  line-height: 1;
+  align-self: center;
+  user-select: none;
+}
+
+.vsBadge,
 .vs {
   font-size: 0.65rem;
   font-weight: 800;
-  color: var(--txt-3);
+  color: var(--txt-3, #94a3b8);
   letter-spacing: 0.1em;
+  flex-shrink: 0;
+  align-self: center;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crownIcon {
+  margin-right: 4px;
+  color: #eab308;
   flex-shrink: 0;
 }
 
@@ -126,6 +220,38 @@
 body.dark-mode .card {
   background: rgba(255, 255, 255, 0.04);
   border-color: rgba(255, 255, 255, 0.08);
+}
+body.dark-mode .team {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+body.dark-mode .teamA {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.08);
+}
+body.dark-mode .teamB {
+  border-color: rgba(6, 182, 212, 0.35);
+  background: rgba(6, 182, 212, 0.08);
+}
+body.dark-mode .teamA .teamHeader {
+  color: #a5b4fc;
+}
+body.dark-mode .teamB .teamHeader {
+  color: #67e8f9;
+}
+body.dark-mode .playerChip {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--txt-1, #f0f4ff);
+}
+body.dark-mode .partnerConnector {
+  color: var(--txt-3, #64748b);
+}
+body.dark-mode .vsBadge,
+body.dark-mode .vs {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: var(--txt-3, #94a3b8);
 }
 body.dark-mode .winBtnA {
   background: linear-gradient(135deg, #6366f1, #4338ca);

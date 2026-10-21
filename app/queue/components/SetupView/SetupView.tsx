@@ -108,12 +108,16 @@ export function SetupView({
             </div>
             {courtCount > 1 && gameMode === 'doubles' && (
               <span className="setup-field-hint">
-                Needs {courtCount * 4}+ players · shared waiting queue
+                {tempPlayers.length >= courtCount * 4
+                  ? `${courtCount * 4} players on court, ${tempPlayers.length - courtCount * 4} waiting in queue`
+                  : `Needs ${courtCount * 4}+ players · shared waiting queue`}
               </span>
             )}
             {courtCount > 1 && gameMode === 'singles' && (
               <span className="setup-field-hint">
-                {courtCount} courts · shared queue · 2 player per court
+                {tempPlayers.length >= courtCount * 2
+                  ? `${courtCount * 2} players on court, ${tempPlayers.length - courtCount * 2} waiting in queue`
+                  : `Needs ${courtCount * 2}+ players · shared waiting queue`}
               </span>
             )}
           </div>

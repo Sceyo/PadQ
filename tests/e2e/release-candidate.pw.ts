@@ -76,7 +76,7 @@ test('release candidate supports responsive viewers and offline reconnection', a
 
     const courtThreeCard = host.locator('.courts-grid > div').filter({ hasText: 'Court 3' });
     const beforeHostResult = await courtThreeCard.innerText();
-    await courtThreeCard.getByRole('button', { name: /win$/ }).first().click();
+    await courtThreeCard.getByRole('button', { name: /wins?$/i }).first().click();
     await expect.poll(
       async () => courtThreeCard.innerText(),
       { timeout: 20_000 },

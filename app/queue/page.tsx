@@ -86,6 +86,7 @@ import { CourtTabs } from './components/CourtTabs/CourtTabs';
 import { CourtCard } from './components/CourtCard/CourtCard';
 import { SinglesCourtCard } from './components/SinglesCourtCard/SinglesCourtCard';
 import { CourtSwapModal } from './components/CourtSwapModal/CourtSwapModal';
+import { CourtScoreModal, type PendingCourtMatch } from './components/CourtScoreModal/CourtScoreModal';
 import { GearMenu } from './components/GearMenu/GearMenu';
 import { CoordinatorOverlay } from './components/CoordinatorOverlay/CoordinatorOverlay';
 import { SetupView } from './components/SetupView/SetupView';
@@ -200,6 +201,21 @@ function QueueSystemContent() {
   const [modalScore,   setModalScore]   = useState<string | undefined>(undefined);
   const [swapCourtId,  setSwapCourtId]  = useState<string | null>(null);
   const [autoClose,    setAutoClose]    = useState(false);
+  const [scorePromptEnabled, setScorePromptEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    const saved = localStorage.getItem('padq_multicourt_scores');
+    return saved !== null ? saved === 'true' : false;
+  });
+  const [pendingCourtScore, setPendingCourtScore] = useState<PendingCourtMatch | null>(null);
+  const handleToggleScorePrompt = () => {
+    setScorePromptEnabled(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('padq_multicourt_scores', String(next));
+      }
+      return next;
+    });
+  };
   const [showHistory,  setShowHistory]  = useState(true);
   const [darkMode,     setDarkMode]     = useState(true);
   const [activeTab,    setActiveTab]    = useState<GameTab>('queue');
@@ -522,7 +538,10 @@ function QueueSystemContent() {
     if (!t) return;
     if (tempPlayers.length >= V1_RELEASE.maxPlayers) { setSetupErrorMsg(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
     if (t.length > 60) { setSetupErrorMsg('Player names must be 60 characters or fewer'); return; }
-    if (tempPlayers.some(name => name.toLowerCase() === t.toLowerCase())) { setSetupErrorMsg(`"${t}" is already in the list`); return; }
+    if (tempPlayers.some(name => name.toLowerCase() === t.toLowerCase())) {
+      setSetupErrorMsg(`"${t}" already exists. If two players share a name, add an initial (e.g. "${t} D.") to distinguish them.`);
+      return;
+    }
     setSetupErrorMsg(null);
     setTempPlayers(prev => [...prev, t]); setCurrentName('');
   };
@@ -532,13 +551,26 @@ function QueueSystemContent() {
     const names = pasteInput.split(/[,\n]+/).map(n => n.trim()).filter(n => n.length > 0 && n.length <= 60);
     const available = V1_RELEASE.maxPlayers - tempPlayers.length;
     const seen = new Set(tempPlayers.map(name => name.toLowerCase()));
+    let duplicateCount = 0;
     const fresh = names.filter(name => {
       const key = name.toLowerCase();
-      if (seen.has(key)) return false;
+      if (seen.has(key)) {
+        duplicateCount++;
+        return false;
+      }
       seen.add(key);
       return true;
     }).slice(0, available);
-    if (fresh.length === 0) { setPasteInput(''); return; }
+    if (fresh.length === 0) {
+      if (duplicateCount > 0) {
+        showToast('Duplicate names were skipped. Add initials (e.g. "Mike D.") to distinguish players with the same name.');
+      }
+      setPasteInput('');
+      return;
+    }
+    if (duplicateCount > 0) {
+      showToast(`${duplicateCount} duplicate name${duplicateCount > 1 ? 's were' : ' was'} skipped. Use initials (e.g. "Ben J.") to distinguish identical names.`);
+    }
     setTempPlayers(prev => [...prev, ...fresh]);
     setPasteInput('');
   };
@@ -919,6 +951,7 @@ function QueueSystemContent() {
           gameMode: 'singles',
           id: entry.id,
           timestamp: entry.timestamp,
+          score,
         }).then(result => {
           if (!result || result.status === 'failed') {
             setLocalHistory(previous => previous.filter(item => item.id !== entry.id));
@@ -943,16 +976,24 @@ function QueueSystemContent() {
           }
           recordCareerResult(entry.players, entry.winner);
           setCareerStats(loadCareerStats());
-          setModalWinner(`${winner} wins!`);
-          setModalScore(score);
-          setModalOpen(true);
+          if (score) {
+            showToast(`${slot.name}: ${winner} wins (${score})`);
+          } else {
+            setModalWinner(`${winner} wins!`);
+            setModalScore(undefined);
+            setModalOpen(true);
+          }
         }).finally(() => processingCourtIdsRef.current.delete(courtId));
       } else {
         recordCareerResult(entry.players, entry.winner);
         setCareerStats(loadCareerStats());
-        setModalWinner(`${winner} wins!`);
-        setModalScore(score);
-        setModalOpen(true);
+        if (score) {
+          showToast(`${slot.name}: ${winner} wins (${score})`);
+        } else {
+          setModalWinner(`${winner} wins!`);
+          setModalScore(undefined);
+          setModalOpen(true);
+        }
         processingCourtIdsRef.current.delete(courtId);
       }
       return;
@@ -1155,7 +1196,7 @@ function QueueSystemContent() {
     }
   };
 
-  const handleCourtMatch = (courtId: string, side: 'A' | 'B') => {
+  const handleCourtMatch = (courtId: string, side: 'A' | 'B', score?: string) => {
     if (processingCourtIdsRef.current.has(courtId)) return;
     processingCourtIdsRef.current.add(courtId);
     const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
@@ -1202,6 +1243,7 @@ function QueueSystemContent() {
       mode: `Doubles (${slot.name})`,
       players: `${teamA.join(' & ')} vs ${teamB.join(' & ')}`,
       winner: winnerNames,
+      score,
       timestamp: new Date().toLocaleTimeString(),
     };
     const previousQueue = [...queueRef.current];
@@ -1221,6 +1263,7 @@ function QueueSystemContent() {
         gameMode: 'doubles',
         id: entry.id,
         timestamp: entry.timestamp,
+        score,
       }).then(result => {
         if (!result || result.status === 'failed') {
           setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
@@ -1245,17 +1288,79 @@ function QueueSystemContent() {
         }
         recordCareerResult(entry.players, entry.winner);
         setCareerStats(loadCareerStats());
-        setModalWinner(`${winnerNames} win!`);
-        setModalScore(undefined);
-        setModalOpen(true);
+        if (score) {
+          showToast(`${slot.name}: ${winnerNames} win (${score})`);
+        } else {
+          setModalWinner(`${winnerNames} win!`);
+          setModalScore(undefined);
+          setModalOpen(true);
+        }
       }).finally(() => processingCourtIdsRef.current.delete(courtId));
     } else {
       recordCareerResult(entry.players, entry.winner);
       setCareerStats(loadCareerStats());
-      setModalWinner(`${winnerNames} win!`);
-      setModalScore(undefined);
-      setModalOpen(true);
+      if (score) {
+        showToast(`${slot.name}: ${winnerNames} win (${score})`);
+      } else {
+        setModalWinner(`${winnerNames} win!`);
+        setModalScore(undefined);
+        setModalOpen(true);
+      }
       processingCourtIdsRef.current.delete(courtId);
+    }
+  };
+
+  const handleCourtWinClick = (courtId: string, side: 'A' | 'B') => {
+    const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
+    const slot = currentSlots.find(c => c.id === courtId);
+    if (!slot || slot.onCourt.length < 4) return;
+    if (!scorePromptEnabled) {
+      handleCourtMatch(courtId, side);
+      return;
+    }
+    const teamA = slot.onCourt.slice(0, 2);
+    const teamB = slot.onCourt.slice(2, 4);
+    setPendingCourtScore({
+      courtId,
+      courtName: slot.name,
+      side,
+      teamA,
+      teamB,
+      mode: 'doubles',
+    });
+  };
+
+  const handleSinglesCourtWinClick = (courtId: string, winner: string) => {
+    const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
+    const slot = currentSlots.find(c => c.id === courtId);
+    if (!slot || slot.onCourt.length < 2) return;
+    const [p1, p2] = slot.onCourt;
+    const side = winner === p1 ? 'A' : 'B';
+    if (!scorePromptEnabled) {
+      handleSinglesMatch(winner, undefined, courtId);
+      return;
+    }
+    setPendingCourtScore({
+      courtId,
+      courtName: slot.name,
+      side,
+      teamA: [p1],
+      teamB: [p2],
+      mode: 'singles',
+    });
+  };
+
+  const handleConfirmCourtScore = (score?: string) => {
+    if (!pendingCourtScore) return;
+    const { courtId, side, teamA, teamB, mode } = pendingCourtScore;
+    setPendingCourtScore(null);
+    if (mode === 'singles') {
+      const winner = side === 'A' ? teamA[0] : teamB[0];
+      handleSinglesMatch(winner, score, courtId);
+    } else if (mode === 'skilled') {
+      handleSkilledResult(courtId, side, score);
+    } else {
+      handleCourtMatch(courtId, side, score);
     }
   };
 
@@ -1274,7 +1379,7 @@ function QueueSystemContent() {
   };
 
   // ── Skilled mode result handler ────────────────────────────
-  const handleSkilledResult = (courtId: string, side: 'A' | 'B') => {
+  const handleSkilledResult = (courtId: string, side: 'A' | 'B', score?: string) => {
     if (isProcessingMatchRef.current || !skilledState) return;
     isProcessingMatchRef.current = true;
 
@@ -1296,7 +1401,9 @@ function QueueSystemContent() {
     const entry: MatchHistoryEntry = {
       id: Date.now(), mode: `Skilled (${court.name})`,
       players: `${teamA.join(' & ')} vs ${teamB.join(' & ')}`,
-      winner: winnerNames, timestamp: new Date().toLocaleTimeString(),
+      winner: winnerNames,
+      score,
+      timestamp: new Date().toLocaleTimeString(),
     };
     setLocalHistory(prev => [entry, ...prev]);
     recordCareerResult(entry.players, entry.winner);
@@ -1306,8 +1413,32 @@ function QueueSystemContent() {
       if (message) showToast(message);
     });
 
-    setModalWinner(`${winnerNames} win!`); setModalScore(undefined); setModalOpen(true);
+    if (score) {
+      showToast(`${court.name}: ${winnerNames} win (${score})`);
+    } else {
+      setModalWinner(`${winnerNames} win!`); setModalScore(undefined); setModalOpen(true);
+    }
     isProcessingMatchRef.current = false;
+  };
+
+  const handleSkilledWinClick = (courtId: string, side: 'A' | 'B') => {
+    if (!skilledState) return;
+    const court = skilledState.courts.find(c => c.id === courtId);
+    if (!court || court.players.length < 4) return;
+    if (!scorePromptEnabled) {
+      handleSkilledResult(courtId, side);
+      return;
+    }
+    const teamA = court.players.slice(0, 2);
+    const teamB = court.players.slice(2, 4);
+    setPendingCourtScore({
+      courtId,
+      courtName: court.name,
+      side,
+      teamA,
+      teamB,
+      mode: 'skilled',
+    });
   };
 
   const handleAddPlayerLive = (name: string) => {
@@ -1340,6 +1471,26 @@ function QueueSystemContent() {
       });
     }
     if (session.sessionId) session.syncField({ players: np, queue: nq });
+  };
+
+  const handleMoveWaitingPlayer = (playerName: string, direction: -1 | 1) => {
+    const curIdx = waitingPlayers.indexOf(playerName);
+    if (curIdx === -1) return;
+    const targetIdx = curIdx + direction;
+    if (targetIdx < 0 || targetIdx >= waitingPlayers.length) return;
+    const otherPlayer = waitingPlayers[targetIdx];
+
+    const qIdx1 = queue.indexOf(playerName);
+    const qIdx2 = queue.indexOf(otherPlayer);
+    if (qIdx1 === -1 || qIdx2 === -1) return;
+
+    const newQueue = [...queue];
+    newQueue[qIdx1] = otherPlayer;
+    newQueue[qIdx2] = playerName;
+
+    setQueue(newQueue);
+    queueRef.current = newQueue;
+    if (session.sessionId) session.syncField({ queue: newQueue });
   };
 
   const handlePartnerPairsChange = (nextPairs: [string, string][]) => {
@@ -1777,6 +1928,12 @@ function QueueSystemContent() {
           </div>
         )}
         <WinnerModal isOpen={modalOpen} winner={modalWinner} score={modalScore} onClose={() => setModalOpen(false)} autoClose={autoClose} setAutoClose={setAutoClose} />
+        <CourtScoreModal
+          isOpen={pendingCourtScore !== null}
+          match={pendingCourtScore}
+          onConfirm={handleConfirmCourtScore}
+          onCancel={() => setPendingCourtScore(null)}
+        />
         {swapCourtId && (() => {
           const slot = courtSlotsRef.current.find(s => s.id === swapCourtId);
           return slot ? (
@@ -1811,7 +1968,7 @@ function QueueSystemContent() {
             <div className="confirm-dialog">
               <p className="confirm-message">
                 {pendingConfirm.type === 'clear-history' && 'Clear all match history? The queue and players will stay.'}
-                {pendingConfirm.type === 'hard-reset' && 'Permanently delete this event and all match history from Firebase? Saved roster and career stats on this device will stay.'}
+                {pendingConfirm.type === 'hard-reset' && 'Delete this event and all match history? Saved roster and career stats will be kept.'}
                 {pendingConfirm.type === 'back-home' && 'Leave this session? The session stays active — rejoin anytime with the room code.'}
                 {pendingConfirm.type === 'remove-court' && 'Remove this court from your session group?'}
               </p>
@@ -1918,6 +2075,17 @@ function QueueSystemContent() {
                     onChange={handlePartnerPairsChange}
                   />
                 )}
+                {courtSlots.length > 0 && (
+                  <button
+                    type="button"
+                    className={`live-panel-toggle score-toggle-btn ${scorePromptEnabled ? 'score-toggle-btn--on' : ''}`}
+                    onClick={handleToggleScorePrompt}
+                    title={scorePromptEnabled ? 'Match score input is enabled — tap to record winners only' : 'Match score input is disabled — tap to enable direct score input'}
+                  >
+                    <Trophy size={13} />
+                    <span>Match Scores: <strong>{scorePromptEnabled ? 'ON' : 'OFF'}</strong></span>
+                  </button>
+                )}
               </div>
             )}
 
@@ -1997,10 +2165,10 @@ function QueueSystemContent() {
                             </div>
                             {session.isHost && (
                               <div className="skilled-court-actions">
-                                <button className="skilled-win-btn skilled-win-btn--a" onClick={() => handleSkilledResult(court.id, 'A')}>
+                                <button className="skilled-win-btn skilled-win-btn--a" onClick={() => handleSkilledWinClick(court.id, 'A')}>
                                   <Trophy size={12} /> Team A wins
                                 </button>
-                                <button className="skilled-win-btn skilled-win-btn--b" onClick={() => handleSkilledResult(court.id, 'B')}>
+                                <button className="skilled-win-btn skilled-win-btn--b" onClick={() => handleSkilledWinClick(court.id, 'B')}>
                                   <Trophy size={12} /> Team B wins
                                 </button>
                               </div>
@@ -2093,7 +2261,7 @@ function QueueSystemContent() {
                       }}
                       statsMap={statsMap}
                       isHost={canControl}
-                      onWin={(courtId, winner) => handleSinglesMatch(winner, undefined, courtId)}
+                      onWin={handleSinglesCourtWinClick}
                     />
                   ))}
                 </div>
@@ -2177,7 +2345,7 @@ function QueueSystemContent() {
                       slot={slot}
                       statsMap={statsMap}
                       isHost={canControl}
-                      onWin={handleCourtMatch}
+                      onWin={handleCourtWinClick}
                       onEdit={canControl ? (id) => setSwapCourtId(id) : undefined}
                     />
                   ))}
@@ -2192,6 +2360,30 @@ function QueueSystemContent() {
                           <div key={`wait-${i}-${p}`} className="waiting-player-row">
                             <span className="waiting-num">#{i + 1}</span>
                             <PlayerLabel name={p} statsMap={statsMap} />
+                            {canControl && (
+                              <div className="waiting-reorder-btns">
+                                <button
+                                  type="button"
+                                  className="waiting-reorder-btn"
+                                  disabled={i === 0}
+                                  onClick={() => handleMoveWaitingPlayer(p, -1)}
+                                  title="Move up in queue"
+                                  aria-label={`Move ${p} up in queue`}
+                                >
+                                  ▲
+                                </button>
+                                <button
+                                  type="button"
+                                  className="waiting-reorder-btn"
+                                  disabled={i === waitingPlayers.length - 1}
+                                  onClick={() => handleMoveWaitingPlayer(p, 1)}
+                                  title="Move down in queue"
+                                  aria-label={`Move ${p} down in queue`}
+                                >
+                                  ▼
+                                </button>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -2275,6 +2467,12 @@ function QueueSystemContent() {
         </div>
       )}
       <WinnerModal isOpen={modalOpen} winner={modalWinner} score={modalScore} onClose={() => setModalOpen(false)} autoClose={autoClose} setAutoClose={setAutoClose} />
+      <CourtScoreModal
+        isOpen={pendingCourtScore !== null}
+        match={pendingCourtScore}
+        onConfirm={handleConfirmCourtScore}
+        onCancel={() => setPendingCourtScore(null)}
+      />
       {swapCourtId && (() => {
         const slot = courtSlotsRef.current.find(s => s.id === swapCourtId);
         return slot ? (
@@ -2309,7 +2507,7 @@ function QueueSystemContent() {
           <div className="confirm-dialog">
             <p className="confirm-message">
               {pendingConfirm.type === 'clear-history' && 'Clear all match history? The queue and players will stay.'}
-              {pendingConfirm.type === 'hard-reset' && 'Permanently delete this event and all match history from Firebase? Saved roster and career stats on this device will stay.'}
+              {pendingConfirm.type === 'hard-reset' && 'Delete this event and all match history? Saved roster and career stats will be kept.'}
               {pendingConfirm.type === 'back-home' && 'Leave this session? The session stays active — rejoin anytime with the room code.'}
               {pendingConfirm.type === 'remove-court' && 'Remove this court from your session group?'}
             </p>

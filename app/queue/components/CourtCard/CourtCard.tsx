@@ -38,16 +38,32 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
       {ready ? (
         <>
           <div className={styles.matchup}>
-            <div className={styles.team}>
-              {teamA.map((p, i) => (
-                <PlayerLabel key={`a-${i}-${p}`} name={p} statsMap={statsMap} />
-              ))}
+            <div className={`${styles.team} ${styles.teamA}`}>
+              <div className={styles.teamHeader}>Team 1</div>
+              <div className={styles.playerList}>
+                {teamA.map((p, i) => (
+                  <div key={`a-${i}-${p}`} className={styles.playerRow}>
+                    {i > 0 && <span className={styles.partnerConnector}>{' & '}</span>}
+                    <div className={styles.playerChip}>
+                      <PlayerLabel name={p} statsMap={statsMap} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <span className={styles.vs}>VS</span>
-            <div className={styles.team}>
-              {teamB.map((p, i) => (
-                <PlayerLabel key={`b-${i}-${p}`} name={p} statsMap={statsMap} />
-              ))}
+            <div className={styles.vsBadge}>VS</div>
+            <div className={`${styles.team} ${styles.teamB}`}>
+              <div className={styles.teamHeader}>Team 2</div>
+              <div className={styles.playerList}>
+                {teamB.map((p, i) => (
+                  <div key={`b-${i}-${p}`} className={styles.playerRow}>
+                    {i > 0 && <span className={styles.partnerConnector}>{' & '}</span>}
+                    <div className={styles.playerChip}>
+                      <PlayerLabel name={p} statsMap={statsMap} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -56,16 +72,18 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
               <button
                 className={`${styles.winBtn} ${styles.winBtnA}`}
                 onClick={() => onWin(slot.id, 'A')}
+                title={`${teamA.join(' & ')} win`}
               >
                 <Trophy size={12} />
-                {teamA.join(' & ')} win
+                Team 1 Wins
               </button>
               <button
                 className={`${styles.winBtn} ${styles.winBtnB}`}
                 onClick={() => onWin(slot.id, 'B')}
+                title={`${teamB.join(' & ')} win`}
               >
                 <Trophy size={12} />
-                {teamB.join(' & ')} win
+                Team 2 Wins
               </button>
             </div>
           )}

@@ -34,14 +34,18 @@ export function SinglesCourtCard({ slot, statsMap, isHost, onWin }: Props) {
         <>
           <div className={styles.matchup}>
             {/* Singles: two players side by side, king gets a crown */}
-            <div className={styles.team} style={{ alignItems: 'center' }}>
-              {slot.king === p1 && <Crown size={11} style={{ marginBottom: 2, opacity: 0.8 }} />}
-              <PlayerLabel name={p1} statsMap={statsMap} />
+            <div className={`${styles.team} ${styles.teamA}`}>
+              <div className={styles.playerChip}>
+                {slot.king === p1 && <Crown size={12} className={styles.crownIcon} />}
+                <PlayerLabel name={p1} statsMap={statsMap} />
+              </div>
             </div>
-            <span className={styles.vs}>VS</span>
-            <div className={styles.team} style={{ alignItems: 'center' }}>
-              {slot.king === p2 && <Crown size={11} style={{ marginBottom: 2, opacity: 0.8 }} />}
-              <PlayerLabel name={p2} statsMap={statsMap} />
+            <div className={styles.vsBadge}>VS</div>
+            <div className={`${styles.team} ${styles.teamB}`}>
+              <div className={styles.playerChip}>
+                {slot.king === p2 && <Crown size={12} className={styles.crownIcon} />}
+                <PlayerLabel name={p2} statsMap={statsMap} />
+              </div>
             </div>
           </div>
 

@@ -38,8 +38,13 @@ describe('Live Court Status', () => {
 
     expect(html).toContain('aria-selected="true"');
     expect(html).toContain('Following');
-    expect(html).toContain('I &amp; J');
-    expect(html).toContain('K &amp; L');
+    expect(html).toContain('Team 1');
+    expect(html).toContain('Team 2');
+    expect(html).toContain('>I</span>');
+    expect(html).toContain('>J</span>');
+    expect(html).toContain('>K</span>');
+    expect(html).toContain('>L</span>');
+    expect(html).toContain('w-vs-badge');
     expect(html).toContain('Assignment is confirmed when the next court becomes available.');
     expect(html).toContain('#1</span> M');
     expect(html).toContain('+1 waiting');

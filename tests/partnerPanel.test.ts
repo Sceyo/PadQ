@@ -4,6 +4,7 @@ import {
   getAvailablePartnerPlayers,
   getCompatiblePartnerPlayers,
   getMaxPartnerPairs,
+  getPlayerLocationLabel,
   type LockedPartnerPair,
 } from '../app/queue/components/LiveManagement/LiveManagement';
 
@@ -34,11 +35,21 @@ describe('live partner controls', () => {
     expect(addPartnerPair([...players, 'F'], firstPair, 'C', 'D')).toEqual([['A', 'B'], ['C', 'D']]);
   }, 30_000);
 
-  it('only offers partners from the same court or waiting group', () => {
+  it('allows pairing any available player across courts or queue (Option 2)', () => {
     const available = ['A', 'B', 'C', 'D', 'E', 'F'];
     const groups = [['E', 'F'], ['A', 'B'], ['C', 'D']];
     expect(getCompatiblePartnerPlayers(available, groups, null)).toEqual(available);
-    expect(getCompatiblePartnerPlayers(available, groups, 'A')).toEqual(['A', 'B']);
-    expect(getCompatiblePartnerPlayers(available, groups, 'E')).toEqual(['E', 'F']);
+    // When 'A' (Court 1) is selected, players across all groups remain selectable
+    expect(getCompatiblePartnerPlayers(available, groups, 'A')).toEqual(available);
+    expect(getCompatiblePartnerPlayers(available, groups, 'E')).toEqual(available);
+  });
+
+  it('determines the correct player location label from player groups', () => {
+    const groups = [['Queue1', 'Queue2'], ['C1_1', 'C1_2'], ['C2_1', 'C2_2']];
+    expect(getPlayerLocationLabel('Queue1', groups)).toBe('Queue');
+    expect(getPlayerLocationLabel('C1_1', groups)).toBe('Court 1');
+    expect(getPlayerLocationLabel('C2_2', groups)).toBe('Court 2');
+    expect(getPlayerLocationLabel('Unknown', groups)).toBeNull();
+    expect(getPlayerLocationLabel('Any', [])).toBeNull();
   });
 });

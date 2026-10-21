@@ -23,6 +23,13 @@ export const metadata: Metadata = {
     title: "PADQ — Fair Live Court Queues",
     description: "Smart multi-court queues with live viewer updates.",
   },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/icon.png", type: "image/png" },
+    ],
+    apple: "/apple-icon.png",
+  },
 };
 
 export default function RootLayout({

@@ -468,54 +468,81 @@ export function selectPartnerAwareMatch(
   );
   const playerSet = new Set(players);
   const partnerOf = new Map<string, string>();
+  const waitingForPartner = new Set<string>();
 
   for (const [a, b] of lockedPairs) {
-    if (a === b || !playerSet.has(a) || !playerSet.has(b)) continue;
+    if (a === b) continue;
     if (partnerOf.has(a) || partnerOf.has(b)) continue;
-    partnerOf.set(a, b);
-    partnerOf.set(b, a);
-  }
-
-  const consumed = new Set<string>();
-  const units: string[][] = [];
-  for (const player of players) {
-    if (consumed.has(player)) continue;
-    const partner = partnerOf.get(player);
-    if (partner) {
-      const pair = [player, partner].sort(
-        (a, b) => players.indexOf(a) - players.indexOf(b)
-      );
-      units.push(pair);
-      consumed.add(player);
-      consumed.add(partner);
-    } else {
-      units.push([player]);
-      consumed.add(player);
+    if (playerSet.has(a) && playerSet.has(b)) {
+      partnerOf.set(a, b);
+      partnerOf.set(b, a);
+    } else if (playerSet.has(a) && !playerSet.has(b)) {
+      waitingForPartner.add(a);
+    } else if (playerSet.has(b) && !playerSet.has(a)) {
+      waitingForPartner.add(b);
     }
   }
 
-  let bestUnits: string[][] | null = null;
-  let bestScore = Number.POSITIVE_INFINITY;
-  const search = (index: number, chosen: string[][], size: number) => {
-    if (size === 4) {
-      // A locked pair owns one queue position: the position of whichever
-      // partner has waited longest. Charging both player indices would make a
-      // pair with one late-listed member starve behind four single players.
-      const score = chosen.reduce(
-        (sum, unit) => sum + Math.min(...unit.map(p => players.indexOf(p))),
-        0,
-      );
-      if (score < bestScore) {
-        bestScore = score;
-        bestUnits = [...chosen];
+  const buildUnits = (excludeWaitingPartners: boolean): string[][] => {
+    const consumed = new Set<string>();
+    const res: string[][] = [];
+    for (const player of players) {
+      if (consumed.has(player)) continue;
+      if (excludeWaitingPartners && waitingForPartner.has(player)) continue;
+      const partner = partnerOf.get(player);
+      if (partner) {
+        const pair = [player, partner].sort(
+          (a, b) => players.indexOf(a) - players.indexOf(b)
+        );
+        res.push(pair);
+        consumed.add(player);
+        consumed.add(partner);
+      } else {
+        res.push([player]);
+        consumed.add(player);
       }
-      return;
     }
-    if (size > 4 || index >= units.length) return;
-    search(index + 1, [...chosen, units[index]], size + units[index].length);
-    search(index + 1, chosen, size);
+    return res;
   };
-  search(0, [], 0);
+
+  const findBestMatch = (candidateUnits: string[][]): string[][] | null => {
+    let bestMatch: string[][] | null = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    const search = (index: number, chosen: string[][], size: number) => {
+      if (size === 4) {
+        // A locked pair owns one queue position: the position of whichever
+        // partner has waited longest. Charging both player indices would make a
+        // pair with one late-listed member starve behind four single players.
+        const score = chosen.reduce(
+          (sum, unit) => sum + Math.min(...unit.map(p => players.indexOf(p))),
+          0,
+        );
+        if (score < bestScore) {
+          bestScore = score;
+          bestMatch = [...chosen];
+        }
+        return;
+      }
+      if (size > 4 || index >= candidateUnits.length) return;
+      search(index + 1, [...chosen, candidateUnits[index]], size + candidateUnits[index].length);
+      search(index + 1, chosen, size);
+    };
+    search(0, [], 0);
+    return bestMatch;
+  };
+
+  // Option 2 (Asynchronous / Global Pairing):
+  // 1. Try to form a full 4-player match while letting waiting partners hold their queue spot
+  // until their partner finishes their match on another court.
+  let units = buildUnits(true);
+  let bestUnits = findBestMatch(units);
+
+  // 2. Constrained fallback: If we cannot form a full 4-player match without them (e.g. tight 8-player 2-court
+  // session where holding them back would starve the court), fall back to including them as singles.
+  if (!bestUnits && waitingForPartner.size > 0) {
+    units = buildUnits(false);
+    bestUnits = findBestMatch(units);
+  }
 
   // Fewer than four eligible players: preserve atomicity and return the
   // earliest units that fit, allowing callers to show an incomplete court.

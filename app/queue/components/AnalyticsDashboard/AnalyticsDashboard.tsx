@@ -352,7 +352,7 @@ export const AnalyticsDashboard: React.FC<{
 
       {tab === 'career' && hasCareer && (
         <>
-          <div className="analytics-section-label"><BarChart2 size={13} /> All-Time Career Stats (this device)</div>
+          <div className="analytics-section-label"><BarChart2 size={13} /> All-Time Career Stats</div>
           {careerList.length === 0
             ? <p className="muted-hint">No career data yet.</p>
             : (

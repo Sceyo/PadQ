@@ -327,6 +327,7 @@ export interface CourtResultCommand {
   gameMode: 'singles' | 'doubles';
   id: number;
   timestamp: string;
+  score?: string;
 }
 
 export type CourtResultCommit = {
@@ -444,6 +445,7 @@ export async function commitMultiCourtResult(
       timestamp: command.timestamp,
       commandId,
       revision: nextRevision,
+      ...(command.score ? { score: command.score } : {}),
     });
 
     return {

@@ -25,6 +25,14 @@ This directory contains the operational, architectural, testing, and release doc
 
 ## 4. Design & Operations
 - [V1-SUPERVISED-EVENT-RUNBOOK.md](V1-SUPERVISED-EVENT-RUNBOOK.md) — Host and coordinator step-by-step event runbook.
-- [DESIGN_MATCHUP_DIFFERENTIAL.md](DESIGN_MATCHUP_DIFFERENTIAL.md) — Matchup differential and fairness algorithm specification.
+- [DESIGN_MATCHUP_DIFFERENTIAL.md](DESIGN_MATCHUP_DIFFERENTIAL.md) — Matchup differential, Point Differential (+/-), and 4-tier tiebreaker specification (Implemented in V1).
 - [PADQ-RELEASE-ROADMAP.md](PADQ-RELEASE-ROADMAP.md) — Post-V1 roadmap and feature backlog.
 - [PADQ-PROMPT.md](PADQ-PROMPT.md) — System architectural reference and prompt specifications.
+
+## 5. Engineering Standards & Operational Guidelines
+- [`.claude/guidelines/architecture.md`](../.claude/guidelines/architecture.md) — System design, boundary honesty, and one-way vs two-way doors.
+- [`.claude/guidelines/observability-reliability.md`](../.claude/guidelines/observability-reliability.md) — Reliability patterns, idempotency, bounded retries, and error handling.
+- [`.claude/guidelines/performance.md`](../.claude/guidelines/performance.md) — Performance workflow, algorithmic bounds, and Spark $0 cost discipline.
+- [`.claude/guidelines/code-review.md`](../.claude/guidelines/code-review.md) — Prioritized code review hierarchy and PR discipline.
+- [`.claude/guidelines/debugging.md`](../.claude/guidelines/debugging.md) — Scientific debugging, reproduction, and regression test prevention.
+
