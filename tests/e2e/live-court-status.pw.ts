@@ -48,7 +48,7 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
     await expect(viewer.getByText('You are watching live. Only the host can make changes.')).toBeVisible();
     await expect(viewer.getByRole('tab')).toHaveCount(3);
     await expect(viewer.getByRole('button', { name: 'Add Player' })).toHaveCount(0);
-    await expect(viewer.getByRole('button', { name: /win$/ })).toHaveCount(0);
+    await expect(viewer.getByRole('button', { name: /wins?$/i })).toHaveCount(0);
 
     const courtThreeTab = viewer.getByRole('tab', { name: /Court 3/ });
     await courtThreeTab.click();
@@ -63,7 +63,7 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
 
     const beforeResult = await viewer.getByRole('tabpanel').innerText();
     const courtThreeCard = host.locator('.courts-grid > div').filter({ hasText: 'Court 3' });
-    await courtThreeCard.getByRole('button', { name: /win$/ }).first().click();
+    await courtThreeCard.getByRole('button', { name: /wins?$/i }).first().click();
 
     await expect.poll(
       async () => viewer.getByRole('tabpanel').innerText(),
@@ -113,7 +113,7 @@ test('multi-court mode reveals Undo Last Match in settings and restores court an
     await host.keyboard.press('Escape');
 
     // Complete match on Court 1 (Team A win)
-    await courtOneCard.getByRole('button', { name: /win$/ }).first().click();
+    await courtOneCard.getByRole('button', { name: /wins?$/i }).first().click();
 
     // WinnerModal opens after a win; autoClose is false by default, so dismiss it.
     await expect(host.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });

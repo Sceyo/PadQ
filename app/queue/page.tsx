@@ -202,9 +202,9 @@ function QueueSystemContent() {
   const [swapCourtId,  setSwapCourtId]  = useState<string | null>(null);
   const [autoClose,    setAutoClose]    = useState(false);
   const [scorePromptEnabled, setScorePromptEnabled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
+    if (typeof window === 'undefined') return false;
     const saved = localStorage.getItem('padq_multicourt_scores');
-    return saved !== null ? saved === 'true' : true;
+    return saved !== null ? saved === 'true' : false;
   });
   const [pendingCourtScore, setPendingCourtScore] = useState<PendingCourtMatch | null>(null);
   const handleToggleScorePrompt = () => {

@@ -54,7 +54,7 @@ test('30 viewer tabs receive a three-court queue rotation in real time', async (
 
     const queueBefore = await viewers[0].locator('.w-next-up').innerText();
     const courtOne = host.locator('.courts-grid > div').filter({ hasText: 'Court 1' });
-    await courtOne.getByRole('button', { name: /win$/ }).first().evaluate(button => {
+    await courtOne.getByRole('button', { name: /wins?$/i }).first().evaluate(button => {
       (button as HTMLButtonElement).click();
       (button as HTMLButtonElement).click();
     });

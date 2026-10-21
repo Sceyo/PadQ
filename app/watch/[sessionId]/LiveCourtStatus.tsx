@@ -87,7 +87,7 @@ export function LiveCourtStatus({
               <div className="w-team-players">
                 {teamA.map((player, idx) => (
                   <React.Fragment key={`w-a-${idx}-${player}`}>
-                    {idx > 0 && <span className="w-partner-and">&amp;</span>}
+                    {idx > 0 && <span className="w-partner-and">{' & '}</span>}
                     <div className="w-player-chip w-player-chip--individual">
                       <span className="w-player-name">{player}</span>
                     </div>
@@ -103,7 +103,7 @@ export function LiveCourtStatus({
               <div className="w-team-players">
                 {teamB.map((player, idx) => (
                   <React.Fragment key={`w-b-${idx}-${player}`}>
-                    {idx > 0 && <span className="w-partner-and">&amp;</span>}
+                    {idx > 0 && <span className="w-partner-and">{' & '}</span>}
                     <div className="w-player-chip w-player-chip--individual">
                       <span className="w-player-name">{player}</span>
                     </div>

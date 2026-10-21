@@ -43,7 +43,7 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
               <div className={styles.playerList}>
                 {teamA.map((p, i) => (
                   <div key={`a-${i}-${p}`} className={styles.playerRow}>
-                    {i > 0 && <span className={styles.partnerConnector}>&amp;</span>}
+                    {i > 0 && <span className={styles.partnerConnector}>{' & '}</span>}
                     <div className={styles.playerChip}>
                       <PlayerLabel name={p} statsMap={statsMap} />
                     </div>
@@ -57,7 +57,7 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
               <div className={styles.playerList}>
                 {teamB.map((p, i) => (
                   <div key={`b-${i}-${p}`} className={styles.playerRow}>
-                    {i > 0 && <span className={styles.partnerConnector}>&amp;</span>}
+                    {i > 0 && <span className={styles.partnerConnector}>{' & '}</span>}
                     <div className={styles.playerChip}>
                       <PlayerLabel name={p} statsMap={statsMap} />
                     </div>
