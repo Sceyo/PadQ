@@ -713,7 +713,6 @@ describe('playerAccounting — widened random walks across modes (Phase 5c Part 
 
       for (let step = 0; step < ITERATIONS; step++) {
         const roll = rng();
-        const activePlayers = players.filter(p => !sittingOut.includes(p));
 
         if (roll < 0.50) {
           // Action 1: A court finishes a match
@@ -726,7 +725,7 @@ describe('playerAccounting — widened random walks across modes (Phase 5c Part 
               courtSlots,
               sittingOut,
               priorityPlayers,
-              lockedPartners,
+              lockedPartners: lockedPartners.map(([a, b]) => ({ a, b })),
             },
             court.id,
             [...court.onCourt],
@@ -752,7 +751,6 @@ describe('playerAccounting — widened random walks across modes (Phase 5c Part 
                 courtSlots,
                 sittingOut,
                 priorityPlayers,
-                lockedPartners,
               },
               chosen,
             );
@@ -773,7 +771,6 @@ describe('playerAccounting — widened random walks across modes (Phase 5c Part 
                 courtSlots,
                 sittingOut,
                 priorityPlayers,
-                lockedPartners,
               },
               target,
             );

@@ -246,7 +246,7 @@ service cloud.firestore {
           'players', 'queue', 'playAllRel', 'tournamentMatches',
           'tournamentActive', 'tournamentWinner', 'liveScore', 'isLive',
           'accessPin', 'courtName', 'doublesEngineState', 'singlesEngineState',
-          'courtSlots', 'lockedPartners', 'sittingOut',
+          'courtSlots', 'lockedPartners', 'sittingOut', 'priorityPlayers',
           'createdAt', 'updatedAt', 'lastActiveAt'
         ]) &&
         data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128 &&
@@ -265,6 +265,7 @@ service cloud.firestore {
         validLockedPairs(data.get('lockedPartners', []), players) &&
         (data.gameMode == 'doubles' || data.get('lockedPartners', []).size() == 0) &&
         validPlayerSubset(data.get('sittingOut', []), players) &&
+        validPlayerSubset(data.get('priorityPlayers', []), players) &&
         validDoublesEngine(data.get('doublesEngineState', null), players) &&
         validSinglesEngine(data.get('singlesEngineState', null), players) &&
         (data.gameMode == 'doubles' || data.get('doublesEngineState', null) == null) &&
@@ -287,7 +288,7 @@ service cloud.firestore {
           'players', 'queue', 'playAllRel', 'tournamentMatches',
           'tournamentActive', 'tournamentWinner', 'liveScore', 'isLive',
           'accessPin', 'courtName', 'doublesEngineState', 'singlesEngineState',
-          'courtSlots', 'lockedPartners', 'sittingOut',
+          'courtSlots', 'lockedPartners', 'sittingOut', 'priorityPlayers',
           'createdAt', 'updatedAt', 'lastActiveAt'
         ]) &&
         data.hostUid is string && data.hostUid.size() >= 1 && data.hostUid.size() <= 128 &&
@@ -307,6 +308,7 @@ service cloud.firestore {
           (validLockedPairs(data.get('lockedPartners', []), players) &&
            (data.gameMode == 'doubles' || data.get('lockedPartners', []).size() == 0))) &&
         (!changed.hasAny(['sittingOut']) || validPlayerSubset(data.get('sittingOut', []), players)) &&
+        (!changed.hasAny(['priorityPlayers']) || validPlayerSubset(data.get('priorityPlayers', []), players)) &&
         (!changed.hasAny(['doublesEngineState', 'players']) ||
           validDoublesEngineUpdate(data.get('doublesEngineState', null), players)) &&
         (!changed.hasAny(['singlesEngineState', 'players']) ||
@@ -323,10 +325,12 @@ service cloud.firestore {
       return data.revision == resource.data.revision + 1 &&
         changed.hasOnly([
           'queue', 'courtSlots', 'doublesEngineState', 'singlesEngineState',
+          'priorityPlayers',
           'revision', 'updatedAt', 'lastActiveAt'
         ]) &&
         (!changed.hasAny(['queue']) || validPlayerSubset(data.queue, players)) &&
         (!changed.hasAny(['courtSlots']) || validCourts(courts, data.gameMode, players)) &&
+        (!changed.hasAny(['priorityPlayers']) || validPlayerSubset(data.get('priorityPlayers', []), players)) &&
         (!changed.hasAny(['doublesEngineState']) ||
           (data.get('doublesEngineState', null) == null ||
            (data.get('doublesEngineState', null) is map &&

@@ -9,7 +9,7 @@ import {
   Sun, Moon, ArrowLeft,
   Star, Sparkles, RefreshCw, Layers,
   BarChart2, Wifi, WifiOff,
-  UserX, ArrowUp,
+  UserX, ArrowUp, SlidersHorizontal,
 } from 'lucide-react';
 import useQueue, {
   suggestNextDoublesMatch,
@@ -89,6 +89,7 @@ import {
   ManualQueuePanel,
   PartnerPanel,
 } from './components/LiveManagement/LiveManagement';
+import { PlayerActionMenu } from './components/PlayerActionMenu/PlayerActionMenu';
 import { SmartSuggestions } from './components/SmartSuggestions/SmartSuggestions';
 import { SessionBar } from './components/SessionBar/SessionBar';
 import { CourtTabs } from './components/CourtTabs/CourtTabs';
@@ -348,6 +349,12 @@ function QueueSystemContent() {
   const [substituteFor, setSubstituteFor] = useState<string | null>(null);
   const [multiCourtSubConfirmed, setMultiCourtSubConfirmed] = useState(false);
   const [localHasScoredPoints, setLocalHasScoredPoints] = useState(false);
+  const [selectedPlayerAction, setSelectedPlayerAction] = useState<{
+    player: string;
+    zone: 'playing' | 'waiting' | 'break';
+  } | null>(null);
+  const [showHostTools, setShowHostTools] = useState(true);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // ── Skilled brackets — persisted in localStorage ──────────
   const [skilledBrackets,   setSkilledBrackets]   = useState<SkilledBrackets>(() => loadSkilledBrackets());
@@ -2221,54 +2228,102 @@ function QueueSystemContent() {
             </div>
 
             {canControl && (
-              <div className="live-tools-row">
-                <AddPlayerPanel onAdd={handleAddPlayerLive} />
-                {!isSkilled && (
-                  <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
-                    onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
-                    onRemove={i => {
-                      const res = removeFromQueueTransition(
-                        { gameMode: gameMode ?? 'singles', players, queue, courtSlots, sittingOut: activeSittingOut },
-                        i,
-                      );
-                      setQueue(res.queue);
-                      if (session.sessionId) session.syncField({ queue: res.queue });
-                    }}
-                  />
-                )}
-                {!isSkilled && gameMode === 'doubles' && courtSlots.length > 0 && (
-                  <PartnerPanel
-                    players={players}
-                    playerGroups={[queue, ...courtSlots.map(court => court.onCourt)]}
-                    pairs={lockedPartners}
-                    onChange={handlePartnerPairsChange}
-                  />
-                )}
-                {courtSlots.length > 0 && (
-                  <button
-                    type="button"
-                    className={`live-panel-toggle score-toggle-btn ${scorePromptEnabled ? 'score-toggle-btn--on' : ''}`}
-                    onClick={handleToggleScorePrompt}
-                    title={scorePromptEnabled ? 'Match score input is enabled — tap to record winners only' : 'Match score input is disabled — tap to enable direct score input'}
-                  >
-                    <Trophy size={13} />
-                    <span>Match Scores: <strong>{scorePromptEnabled ? 'ON' : 'OFF'}</strong></span>
-                  </button>
-                )}
+              <div className="host-tools-bar">
+                <button
+                  type="button"
+                  className="host-tools-toggle"
+                  onClick={() => setShowHostTools(s => !s)}
+                  aria-expanded={showHostTools}
+                >
+                  <SlidersHorizontal size={14} />
+                  <span>Host Controls {showHostTools ? '▴' : '▾'}</span>
+                </button>
+              </div>
+            )}
+
+            {canControl && showHostTools && (
+              <div className="host-tools-drawer">
+                <div className="live-tools-row">
+                  <AddPlayerPanel onAdd={handleAddPlayerLive} />
+                  {!isSkilled && (
+                    <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
+                      onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
+                      onRemove={i => {
+                        const res = removeFromQueueTransition(
+                          { gameMode: gameMode ?? 'singles', players, queue, courtSlots, sittingOut: activeSittingOut },
+                          i,
+                        );
+                        setQueue(res.queue);
+                        if (session.sessionId) session.syncField({ queue: res.queue });
+                      }}
+                    />
+                  )}
+                  {!isSkilled && gameMode === 'doubles' && courtSlots.length > 0 && (
+                    <PartnerPanel
+                      players={players}
+                      playerGroups={[queue, ...courtSlots.map(court => court.onCourt)]}
+                      pairs={lockedPartners}
+                      onChange={handlePartnerPairsChange}
+                    />
+                  )}
+                  {courtSlots.length > 0 && (
+                    <div className="score-mode-wrap">
+                      <button
+                        type="button"
+                        className={`live-panel-toggle score-toggle-btn ${scorePromptEnabled ? 'score-toggle-btn--on' : ''}`}
+                        onClick={handleToggleScorePrompt}
+                        title={scorePromptEnabled ? 'Match score input is enabled — tap to record winners only' : 'Match score input is disabled — tap to enable direct score input'}
+                      >
+                        <Trophy size={13} />
+                        <span>Match Scores: <strong>{scorePromptEnabled ? 'ON' : 'OFF'}</strong></span>
+                      </button>
+                      <span className="score-mode-hint">
+                        {scorePromptEnabled
+                          ? 'On: enter score before selecting winner'
+                          : 'Off: tap winner directly'}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {canControl && !isSkilled && (
-              <SitOutPanel players={players} sittingOut={activeSittingOut} onToggle={handleToggleSitOut} />
+              <SitOutPanel
+                players={players}
+                sittingOut={activeSittingOut}
+                onToggle={handleToggleSitOut}
+                onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
+              />
             )}
 
-            {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />}
-            {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
-              singlesFormat === 'pool' ? (
-                <PoolSinglesStatusPanel poolState={poolSinglesStateUI} allPlayers={players} />
-              ) : (
-                <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
-              )
+            {session.isHost && (
+              <div className="diagnostics-bar">
+                <button
+                  type="button"
+                  className="diagnostics-toggle-btn"
+                  onClick={() => setShowDiagnostics(d => !d)}
+                  aria-expanded={showDiagnostics}
+                >
+                  <SlidersHorizontal size={12} />
+                  <span>Diagnostics {showDiagnostics ? '▴' : '▾'}</span>
+                </button>
+                {showDiagnostics && (
+                  <div className="diagnostics-panel" role="region" aria-label="Engine Diagnostics">
+                    <div className="diagnostics-header">Engine State (Host Only)</div>
+                    {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && (
+                      <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />
+                    )}
+                    {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
+                      singlesFormat === 'pool' ? (
+                        <PoolSinglesStatusPanel poolState={poolSinglesStateUI} allPlayers={players} />
+                      ) : (
+                        <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             {/* ═══════════════════════════════════════════════════
                 SKILLED MODE LAYOUT
@@ -2432,6 +2487,7 @@ function QueueSystemContent() {
                       isHost={canControl}
                       onWin={handleSinglesCourtWinClick}
                       onMarkAbsent={canControl ? handleMarkAbsent : undefined}
+                      onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'playing' })}
                     />
                   ))}
                 </div>
@@ -2442,11 +2498,16 @@ function QueueSystemContent() {
                     : (
                       <div className="waiting-players-list">
                         {waitingPlayers.map((p, i) => (
-                          <div key={`wait-${i}-${p}`} className="waiting-player-row">
+                          <div
+                            key={`wait-${i}-${p}`}
+                            className="waiting-player-row"
+                            onClick={() => setSelectedPlayerAction({ player: p, zone: 'waiting' })}
+                            style={{ cursor: 'pointer' }}
+                          >
                             <span className="waiting-num">#{i + 1}</span>
                             <PlayerLabel name={p} statsMap={statsMap} />
                             {activePriorityPlayers.includes(p) && (
-                              <span className="status-pill status-pill--priority">Priority</span>
+                              <span className="status-pill status-pill--priority">Next up</span>
                             )}
                             {formatEtaLabel(i + 1, 2, courtSlots.length > 0) && (
                               <span className="status-pill status-pill--on-deck">{formatEtaLabel(i + 1, 2, courtSlots.length > 0)}</span>
@@ -2464,14 +2525,44 @@ function QueueSystemContent() {
               <div className="match-section">
                 <h3 className="match-section-title"><Swords size={14} /> Current Match</h3>
                 <div className="current-match-players">
-                  <div className="player-with-absent">
+                  <div
+                    className="player-with-absent"
+                    onClick={() => setSelectedPlayerAction({ player: queue[0], zone: 'playing' })}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <PlayerLabel name={queue[0]} statsMap={statsMap} />
-                    {canControl && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[0])} disabled={isSingleCourtReplaceBlocked} title={isSingleCourtReplaceBlocked ? 'Cannot replace player after scoring has started' : 'Mark absent'} type="button"><UserX size={11} /></button>}
+                    {canControl && (
+                      <button
+                        className="absent-mini-btn"
+                        onClick={(e) => { e.stopPropagation(); handleMarkAbsent(queue[0]); }}
+                        disabled={isSingleCourtReplaceBlocked}
+                        title={isSingleCourtReplaceBlocked ? 'Cannot replace player after scoring has started' : "Can't play now"}
+                        aria-label={`Can't play now: Replace ${queue[0]}`}
+                        type="button"
+                      >
+                        <UserX size={11} />
+                      </button>
+                    )}
                   </div>
                   <span className="vs-sep">vs</span>
-                  <div className="player-with-absent">
+                  <div
+                    className="player-with-absent"
+                    onClick={() => setSelectedPlayerAction({ player: queue[1], zone: 'playing' })}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <PlayerLabel name={queue[1]} statsMap={statsMap} />
-                    {canControl && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[1])} disabled={isSingleCourtReplaceBlocked} title={isSingleCourtReplaceBlocked ? 'Cannot replace player after scoring has started' : 'Mark absent'} type="button"><UserX size={11} /></button>}
+                    {canControl && (
+                      <button
+                        className="absent-mini-btn"
+                        onClick={(e) => { e.stopPropagation(); handleMarkAbsent(queue[1]); }}
+                        disabled={isSingleCourtReplaceBlocked}
+                        title={isSingleCourtReplaceBlocked ? 'Cannot replace player after scoring has started' : "Can't play now"}
+                        aria-label={`Can't play now: Replace ${queue[1]}`}
+                        type="button"
+                      >
+                        <UserX size={11} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <ScoreBoard labelA={queue[0]} labelB={queue[1]} disabled={!canControl}
@@ -2524,6 +2615,7 @@ function QueueSystemContent() {
                       onWin={handleCourtWinClick}
                       onEdit={canControl ? (id) => setSwapCourtId(id) : undefined}
                       onMarkAbsent={canControl ? handleMarkAbsent : undefined}
+                      onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'playing' })}
                     />
                   ))}
                 </div>
@@ -2534,17 +2626,22 @@ function QueueSystemContent() {
                     : (
                       <div className="waiting-players-list">
                         {waitingPlayers.map((p, i) => (
-                          <div key={`wait-${i}-${p}`} className="waiting-player-row">
+                          <div
+                            key={`wait-${i}-${p}`}
+                            className="waiting-player-row"
+                            onClick={() => setSelectedPlayerAction({ player: p, zone: 'waiting' })}
+                            style={{ cursor: 'pointer' }}
+                          >
                             <span className="waiting-num">#{i + 1}</span>
                             <PlayerLabel name={p} statsMap={statsMap} />
                             {activePriorityPlayers.includes(p) && (
-                              <span className="status-pill status-pill--priority">Priority</span>
+                              <span className="status-pill status-pill--priority">Next up</span>
                             )}
                             {formatEtaLabel(i + 1, 4, courtSlots.length > 0) && (
                               <span className="status-pill status-pill--on-deck">{formatEtaLabel(i + 1, 4, courtSlots.length > 0)}</span>
                             )}
                             {canControl && (
-                              <div className="waiting-reorder-btns">
+                              <div className="waiting-reorder-btns" onClick={e => e.stopPropagation()}>
                                 <button
                                   type="button"
                                   className="waiting-reorder-btn"
@@ -2753,6 +2850,68 @@ function QueueSystemContent() {
           </div>
         </div>
       )}
+      <PlayerActionMenu
+        player={selectedPlayerAction?.player ?? null}
+        zone={selectedPlayerAction?.zone ?? 'waiting'}
+        isHost={canControl}
+        isPriority={selectedPlayerAction ? activePriorityPlayers.includes(selectedPlayerAction.player) : false}
+        canMoveUp={(() => {
+          if (!selectedPlayerAction || selectedPlayerAction.zone !== 'waiting') return false;
+          const idx = waitingPlayers.indexOf(selectedPlayerAction.player);
+          if (idx <= 0) return false;
+          const isPrio = activePriorityPlayers.includes(selectedPlayerAction.player);
+          const prevIsPrio = activePriorityPlayers.includes(waitingPlayers[idx - 1]);
+          return isPrio || !prevIsPrio;
+        })()}
+        canMoveDown={(() => {
+          if (!selectedPlayerAction || selectedPlayerAction.zone !== 'waiting') return false;
+          const idx = waitingPlayers.indexOf(selectedPlayerAction.player);
+          if (idx < 0 || idx >= waitingPlayers.length - 1) return false;
+          const isPrio = activePriorityPlayers.includes(selectedPlayerAction.player);
+          const nextIsPrio = activePriorityPlayers.includes(waitingPlayers[idx + 1]);
+          return !isPrio || nextIsPrio;
+        })()}
+        moveUpDisabledReason={(() => {
+          if (!selectedPlayerAction || selectedPlayerAction.zone !== 'waiting') return undefined;
+          const idx = waitingPlayers.indexOf(selectedPlayerAction.player);
+          if (idx > 0) {
+            const isPrio = activePriorityPlayers.includes(selectedPlayerAction.player);
+            const prevIsPrio = activePriorityPlayers.includes(waitingPlayers[idx - 1]);
+            if (!isPrio && prevIsPrio) return 'Returning and new players go first.';
+          }
+          return undefined;
+        })()}
+        onClose={() => setSelectedPlayerAction(null)}
+        onCantPlayNow={() => {
+          if (selectedPlayerAction) {
+            handleMarkAbsent(selectedPlayerAction.player);
+          }
+        }}
+        onTakeBreak={() => {
+          if (selectedPlayerAction) {
+            const p = selectedPlayerAction.player;
+            handleToggleSitOut(p);
+            showToast(`${p} is on break. They'll be Next up when they return.`);
+          }
+        }}
+        onBackIn={() => {
+          if (selectedPlayerAction) {
+            const p = selectedPlayerAction.player;
+            handleToggleSitOut(p);
+            showToast(`${p} is back and will play next.`);
+          }
+        }}
+        onMoveUp={() => {
+          if (selectedPlayerAction) {
+            handleMoveWaitingPlayer(selectedPlayerAction.player, -1);
+          }
+        }}
+        onMoveDown={() => {
+          if (selectedPlayerAction) {
+            handleMoveWaitingPlayer(selectedPlayerAction.player, 1);
+          }
+        }}
+      />
     </div>
   );
 }

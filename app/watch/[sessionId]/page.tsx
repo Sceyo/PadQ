@@ -26,7 +26,7 @@ import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
   Wifi, Check,
   BarChart2, TrendingUp, Activity, AlertCircle,
-  Loader2, Share2,
+  Loader2, Share2, Coffee,
 } from 'lucide-react';
 import {
   subscribeToSession,
@@ -677,6 +677,9 @@ function WatchPageContent() {
               queue={queue}
               selectedCourtId={selectedCourtId}
               onSelectCourt={selectCourt}
+              sittingOut={session?.sittingOut ?? []}
+              players={session?.players ?? []}
+              priorityPlayers={session?.priorityPlayers ?? []}
             />
           </div>
         )}
@@ -785,6 +788,22 @@ function WatchPageContent() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {session?.sittingOut && session.sittingOut.length > 0 && (
+              <div className="w-section">
+                <h2 className="w-section-title">
+                  <Coffee size={15} /> On Break ({session.sittingOut.length})
+                </h2>
+                <div className="w-break-chips">
+                  {session.sittingOut.map(p => (
+                    <span key={`w-break-sc-${p}`} className="w-break-chip">
+                      <span>{p}</span>
+                      <span className="w-status-pill w-status-pill--on-break">On break</span>
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </>

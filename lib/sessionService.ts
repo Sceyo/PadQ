@@ -114,6 +114,7 @@ export interface SessionDoc {
   /** Firestore-safe partner pairs (nested arrays are not supported). */
   lockedPartners?: Array<{ a: string; b: string }>;
   sittingOut?: string[];
+  priorityPlayers?: string[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   /**
@@ -335,6 +336,7 @@ export type CourtResultCommit = {
   revision: number;
   queue: string[];
   courtSlots: CourtSlot[];
+  priorityPlayers?: string[];
 };
 
 export async function batchMatchResult(
@@ -414,6 +416,7 @@ export async function commitMultiCourtResult(
         courtSlots: currentSlots,
         lockedPartners: current.lockedPartners,
         sittingOut: current.sittingOut,
+        priorityPlayers: current.priorityPlayers,
       },
       command.courtId,
       command.expectedPlayers,
@@ -433,6 +436,7 @@ export async function commitMultiCourtResult(
     tx.update(sRef, {
       queue: planned.queue,
       courtSlots: planned.courtSlots,
+      ...(planned.priorityPlayers !== undefined ? { priorityPlayers: planned.priorityPlayers } : {}),
       revision: nextRevision,
       updatedAt: serverTimestamp(),
       lastActiveAt: serverTimestamp(),
@@ -453,6 +457,7 @@ export async function commitMultiCourtResult(
       revision: nextRevision,
       queue: planned.queue,
       courtSlots: planned.courtSlots,
+      ...(planned.priorityPlayers !== undefined ? { priorityPlayers: planned.priorityPlayers } : {}),
     };
   });
 }
