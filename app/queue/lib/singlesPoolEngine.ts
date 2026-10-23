@@ -123,12 +123,12 @@ export function balancePools(
   if (nextW1.length > MAX_POOL_SIZE) {
     const overflow = nextW1.slice(MAX_POOL_SIZE);
     nextW1 = nextW1.slice(0, MAX_POOL_SIZE);
-    nextWaiting = [...nextWaiting, ...overflow];
+    nextWaiting = [...nextWaiting, ...overflow.filter(p => !nextWaiting.includes(p))];
   }
   if (nextL1.length > MAX_POOL_SIZE) {
     const overflow = nextL1.slice(MAX_POOL_SIZE);
     nextL1 = nextL1.slice(0, MAX_POOL_SIZE);
-    nextWaiting = [...nextWaiting, ...overflow];
+    nextWaiting = [...nextWaiting, ...overflow.filter(p => !nextWaiting.includes(p))];
   }
 
   return { w1: nextW1, l1: nextL1, waiting: nextWaiting };
@@ -253,12 +253,14 @@ export function advancePoolSinglesState(
   if (state.phase === 'INIT') {
     const initMatchesNeeded = Math.max(1, Math.floor(allPlayers.length / 2));
     if (nextMatchIndex >= initMatchesNeeded) {
-      const seededSet = new Set(allPlayers.slice(0, initMatchesNeeded * 2));
-      const overflow  = allPlayers.filter(p => !seededSet.has(p) && !nextWaiting.includes(p));
+      const overflow = allPlayers.filter(
+        p => !nextW1.includes(p) && !nextL1.includes(p) && !nextWaiting.includes(p),
+      );
       nextWaiting = [...nextWaiting, ...overflow];
 
       const unplayed = nextWaiting.filter(p => !nextPlayedThisCycle.has(p));
       nextW1      = [...unplayed, ...nextW1.filter(p => !unplayed.includes(p))];
+      nextL1      = nextL1.filter(p => !unplayed.includes(p));
       nextWaiting = nextWaiting.filter(p => nextPlayedThisCycle.has(p));
 
       ({ w1: nextW1, l1: nextL1, waiting: nextWaiting } = balancePools(nextW1, nextL1, nextWaiting));
@@ -280,6 +282,7 @@ export function advancePoolSinglesState(
     const unplayed = nextWaiting.filter(p => !nextPlayedThisCycle.has(p));
     if (unplayed.length > 0) {
       nextW1      = [...unplayed, ...nextW1.filter(p => !unplayed.includes(p))];
+      nextL1      = nextL1.filter(p => !unplayed.includes(p));
       nextWaiting = nextWaiting.filter(p => nextPlayedThisCycle.has(p));
       ({ w1: nextW1, l1: nextL1, waiting: nextWaiting } = balancePools(nextW1, nextL1, nextWaiting));
     }
@@ -306,17 +309,73 @@ export function advancePoolSinglesState(
   const offCourt  = allPlayers.filter(p => !onCourt.has(p));
   const newQueue  = [nextMatch.playerA, nextMatch.playerB, ...offCourt];
 
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      assertPoolSinglesStateConsistent(nextState, allPlayers);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   return { nextState, newQueue };
 }
 
-export function addPlayerToPoolSinglesWaiting(state: PoolSinglesState, playerName: string): PoolSinglesState {
+/**
+ * Guard to verify pool singles engine pool consistency:
+ * - w1, l1, waitingQueue are pairwise disjoint.
+ * - Every member of w1, l1, waitingQueue is in activePlayers.
+ *
+ * In test environment: throws Error if inconsistent.
+ * In non-test environment: logs console.error without crashing or silent repair.
+ */
+export function assertPoolSinglesStateConsistent(
+  state: PoolSinglesState,
+  activePlayers: string[],
+): void {
+  const activeSet = new Set(activePlayers);
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+  const unknown: string[] = [];
+
+  for (const pool of [state.w1, state.l1, state.waitingQueue]) {
+    for (const p of pool) {
+      if (seen.has(p) && !duplicates.includes(p)) {
+        duplicates.push(p);
+      }
+      seen.add(p);
+      if (!activeSet.has(p) && !unknown.includes(p)) {
+        unknown.push(p);
+      }
+    }
+  }
+
+  if (duplicates.length > 0 || unknown.length > 0) {
+    const msg = `[assertPoolSinglesStateConsistent] Inconsistency detected! Duplicates: [${duplicates.join(', ')}], Unknown active players: [${unknown.join(', ')}]`;
+    if (process.env.NODE_ENV === 'test') {
+      throw new Error(msg);
+    } else {
+      console.error(msg, { state, activePlayers });
+    }
+  }
+}
+
+export function addPlayerToPoolSinglesWaiting(
+  state: PoolSinglesState,
+  playerName: string,
+  priority = false,
+): PoolSinglesState {
   if (
     state.w1.includes(playerName) ||
     state.l1.includes(playerName) ||
     state.waitingQueue.includes(playerName)
   ) return state;
 
-  return { ...state, waitingQueue: [...state.waitingQueue, playerName] };
+  return {
+    ...state,
+    waitingQueue: priority
+      ? [playerName, ...state.waitingQueue]
+      : [...state.waitingQueue, playerName],
+  };
 }
 
 export function removePlayerFromPoolSinglesState(state: PoolSinglesState, playerName: string): PoolSinglesState {
