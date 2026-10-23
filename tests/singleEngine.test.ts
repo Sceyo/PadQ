@@ -286,3 +286,124 @@ describe('singleEngine — edge cases / nitpicks', () => {
     }).not.toThrow();
   });
 });
+
+describe('characterization: King sit-out with queue < 2 (Row 9)', () => {
+  it('when king sits out and only 1 player remains in queue, buildSinglesMatch returns playerB as empty string', () => {
+    // When King sits out, king becomes null in SinglesState
+    const s = {
+      ...freshSinglesState(['P1']),
+      king: null,
+      queue: ['P1'],
+    };
+    const match = buildSinglesMatch(s);
+    expect(match.playerA).toBe('P1');
+    expect(match.playerB).toBe('');
+    expect(match.isForced).toBe(false);
+  });
+});
+
+
+describe('singleEngine — King Characterization Tests & Edge Cases (Phase 5c Part C1 & C2)', () => {
+  it('C1: handles ineligible king gracefully by clearing king and playing next in queue', () => {
+    // King 'Gone' is not in allPlayers (sat out or left)
+    const state: SinglesState = {
+      ...freshSinglesState(['P1', 'P2', 'P3']),
+      king: 'Gone',
+      queue: ['P1', 'P2', 'P3'],
+    };
+    const res = advanceSinglesState(state, 'P1', ['P1', 'P2', 'P3']);
+    expect(res.nextState.king).toBe('P1');
+    expect(res.nextState.queue).not.toContain('Gone');
+  });
+
+  it('C1: dedupes duplicate queue entries in advanceSinglesState', () => {
+    const state: SinglesState = {
+      ...freshSinglesState(['P1', 'P2', 'P3']),
+      king: 'KingP',
+      queue: ['P1', 'P1', 'P2', 'P3'],
+    };
+    const res = advanceSinglesState(state, 'KingP', ['KingP', 'P1', 'P2', 'P3']);
+    const p1Count = res.nextState.queue.filter(p => p === 'P1').length;
+    expect(p1Count).toBe(1);
+  });
+
+  it('C1: dethrones king when challenger wins; new king crowned and old king goes to back', () => {
+    const state: SinglesState = {
+      ...freshSinglesState(['P1', 'P2']),
+      king: 'OldKing',
+      queue: ['Challenger', 'P2'],
+      winStreak: { OldKing: 2 },
+    };
+    const res = advanceSinglesState(state, 'Challenger', ['OldKing', 'Challenger', 'P2']);
+    expect(res.nextState.king).toBe('Challenger');
+    expect(res.nextState.winStreak['Challenger']).toBe(1);
+    expect(res.nextState.winStreak['OldKing']).toBe(0);
+    expect(res.nextState.queue[res.nextState.queue.length - 1]).toBe('OldKing');
+  });
+
+  it('C1: forces rotation when streak is maxed with >= 3 players', () => {
+    const players = ['KingP', 'P1', 'P2', 'P3'];
+    const state: SinglesState = {
+      ...freshSinglesState(['P1', 'P2', 'P3']),
+      king: 'KingP',
+      queue: ['P1', 'P2', 'P3'],
+      winStreak: { KingP: SINGLES_MAX_WIN_STREAK },
+      matchIndex: 3,
+    };
+    const match = buildSinglesMatch(state);
+    expect(match.isForced).toBe(true);
+    // King is rotated off-court; P1 vs P2 play
+    expect(match.playerA).toBe('P1');
+    expect(match.playerB).toBe('P2');
+
+    const res = advanceSinglesState(state, 'P1', players);
+    expect(res.nextState.king).toBe('P1');
+    expect(res.nextState.winStreak['KingP']).toBe(0);
+    expect(res.nextState.queue).toContain('KingP');
+  });
+
+  it('C2: skips forced rotation with exactly 2 active players to avoid P vs empty string', () => {
+    // Exactly 2 players: King and 1 Challenger
+    const players = ['KingP', 'ChallengerP'];
+    const state: SinglesState = {
+      ...freshSinglesState(['ChallengerP']),
+      king: 'KingP',
+      queue: ['ChallengerP'],
+      winStreak: { KingP: SINGLES_MAX_WIN_STREAK }, // streak maxed!
+      matchIndex: 3,
+    };
+
+    // buildSinglesMatch must NOT force rotation because only 2 active players exist
+    const match = buildSinglesMatch(state);
+    expect(match.isForced).toBe(false);
+    expect(match.playerA).toBe('KingP');
+    expect(match.playerB).toBe('ChallengerP');
+    expect(match.playerB).not.toBe('');
+
+    // Advance also continues smoothly
+    const res = advanceSinglesState(state, 'KingP', players);
+    expect(res.nextState.king).toBe('KingP');
+    expect(res.nextState.queue).toEqual(['ChallengerP']);
+    const nextMatch = buildSinglesMatch(res.nextState);
+    expect(nextMatch.playerA).toBe('KingP');
+    expect(nextMatch.playerB).toBe('ChallengerP');
+    expect(nextMatch.playerB).not.toBe('');
+  });
+
+  it('honors priority player by placing them first in line to challenge the king', () => {
+    const players = ['KingP', 'P1', 'P2', 'PriorityNewcomer'];
+    const state: SinglesState = {
+      ...freshSinglesState(['P1', 'P2', 'PriorityNewcomer']),
+      king: 'KingP',
+      queue: ['P1', 'P2', 'PriorityNewcomer'],
+      matchIndex: 1,
+    };
+
+    const res = advanceSinglesState(state, 'KingP', players, ['PriorityNewcomer']);
+    expect(res.nextState.queue[0]).toBe('PriorityNewcomer');
+    const match = buildSinglesMatch(res.nextState);
+    expect(match.playerA).toBe('KingP');
+    expect(match.playerB).toBe('PriorityNewcomer');
+    expect(res.consumedPriority).toEqual(['PriorityNewcomer']);
+  });
+});

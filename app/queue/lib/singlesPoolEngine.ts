@@ -219,7 +219,8 @@ export function advancePoolSinglesState(
   loser: string,
   allPlayers: string[],
   skillMap: Record<string, number> = {},
-): { nextState: PoolSinglesState; newQueue: string[] } {
+  priorityPlayers: string[] = [],
+): { nextState: PoolSinglesState; newQueue: string[]; consumedPriority: string[] } {
   const bothPlayers = [winner, loser];
   const nextMatchCount = state.matchCount + 1;
 
@@ -291,6 +292,24 @@ export function advancePoolSinglesState(
     nextMatchIndex = 0;
   }
 
+  if (nextPhase !== 'INIT' && priorityPlayers.length > 0) {
+    const eligibleSet = new Set(allPlayers);
+    const eligiblePriority = priorityPlayers.filter(
+      (p, idx, arr) => eligibleSet.has(p) && arr.indexOf(p) === idx,
+    );
+    if (eligiblePriority.length > 0) {
+      const prioritySet = new Set(eligiblePriority);
+      nextW1 = nextW1.filter(p => !prioritySet.has(p));
+      nextL1 = nextL1.filter(p => !prioritySet.has(p));
+      nextWaiting = nextWaiting.filter(p => !prioritySet.has(p));
+      if (nextPhase === 'WINNERS') {
+        nextW1 = [...eligiblePriority, ...nextW1];
+      } else if (nextPhase === 'LOSERS') {
+        nextL1 = [...eligiblePriority, ...nextL1];
+      }
+    }
+  }
+
   const nextState: PoolSinglesState = {
     format:            'pool',
     phase:             nextPhase,
@@ -317,7 +336,11 @@ export function advancePoolSinglesState(
     }
   }
 
-  return { nextState, newQueue };
+  const consumedPriority = priorityPlayers.filter(
+    (p, idx, arr) => onCourt.has(p) && arr.indexOf(p) === idx,
+  );
+
+  return { nextState, newQueue, consumedPriority };
 }
 
 /**

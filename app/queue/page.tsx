@@ -919,7 +919,7 @@ function QueueSystemContent() {
       showToast('Cannot replace player after scoring has started');
       return;
     }
-    setMultiCourtSubConfirmed(courtSlots.length === 0);
+    setMultiCourtSubConfirmed(false);
     setSubstituteFor(player);
   };
 
@@ -1135,12 +1135,18 @@ function QueueSystemContent() {
           loser,
           activePlayers,
           skillMap,
+          activePriorityPlayers,
         );
         poolSinglesStateRef.current = nextState;
         setPoolSinglesStateUI(nextState);
         newQueue = poolQueue;
       } else {
-        const { nextState, newQueue: singlesQueue } = advanceSinglesState(singlesStateRef.current, winner, activePlayers);
+        const { nextState, newQueue: singlesQueue } = advanceSinglesState(
+          singlesStateRef.current,
+          winner,
+          activePlayers,
+          activePriorityPlayers,
+        );
         singlesStateRef.current = nextState;
         setSinglesStateUI(nextState);
         newQueue = singlesQueue;
@@ -1570,18 +1576,20 @@ function QueueSystemContent() {
     if (players.length >= V1_RELEASE.maxPlayers) { showToast(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
     if (trimmedName.length === 0 || trimmedName.length > 60) { showToast('Player names must be 60 characters or fewer'); return; }
     const np = [...players, trimmedName], nq = [...queue, trimmedName];
+    const nextPriority = [...activePriorityPlayers, trimmedName];
     setPlayers(np); setQueue(nq);
+    setLocalPriorityPlayers(nextPriority);
     if (activeQueueMode === 'default' && gameMode === 'doubles') {
       const newPaddleState = addPlayerToWaiting(paddleStateRef.current, trimmedName);
       paddleStateRef.current = newPaddleState;
       setPaddleStateUI(newPaddleState);
     } else if (activeQueueMode === 'default' && gameMode === 'singles') {
       if (singlesFormat === 'pool') {
-        const newPoolState = addPlayerToPoolSinglesWaiting(poolSinglesStateRef.current, trimmedName);
+        const newPoolState = addPlayerToPoolSinglesWaiting(poolSinglesStateRef.current, trimmedName, true);
         poolSinglesStateRef.current = newPoolState;
         setPoolSinglesStateUI(newPoolState);
       } else {
-        const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, trimmedName);
+        const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, trimmedName, true);
         singlesStateRef.current = newSinglesState;
         setSinglesStateUI(newSinglesState);
       }
@@ -1593,7 +1601,7 @@ function QueueSystemContent() {
         return recalculateRestEngine(afterAdd, activeCount);
       });
     }
-    if (session.sessionId) session.syncField({ players: np, queue: nq });
+    if (session.sessionId) session.syncField({ players: np, queue: nq, priorityPlayers: nextPriority });
   };
 
   const handleMoveWaitingPlayer = (playerName: string, direction: -1 | 1) => {
@@ -1602,6 +1610,10 @@ function QueueSystemContent() {
     const targetIdx = curIdx + direction;
     if (targetIdx < 0 || targetIdx >= waitingPlayers.length) return;
     const otherPlayer = waitingPlayers[targetIdx];
+
+    const isPlayerPriority = activePriorityPlayers.includes(playerName);
+    const isOtherPriority = activePriorityPlayers.includes(otherPlayer);
+    if (isPlayerPriority !== isOtherPriority) return;
 
     const qIdx1 = queue.indexOf(playerName);
     const qIdx2 = queue.indexOf(otherPlayer);
@@ -2536,9 +2548,18 @@ function QueueSystemContent() {
                                 <button
                                   type="button"
                                   className="waiting-reorder-btn"
-                                  disabled={i === 0}
+                                  disabled={
+                                    i === 0 ||
+                                    (!activePriorityPlayers.includes(p) &&
+                                      activePriorityPlayers.includes(waitingPlayers[i - 1]))
+                                  }
                                   onClick={() => handleMoveWaitingPlayer(p, -1)}
-                                  title="Move up in queue"
+                                  title={
+                                    !activePriorityPlayers.includes(p) &&
+                                    activePriorityPlayers.includes(waitingPlayers[i - 1])
+                                      ? 'Returning and new players go first.'
+                                      : 'Move up in queue'
+                                  }
                                   aria-label={`Move ${p} up in queue`}
                                 >
                                   ▲
@@ -2546,9 +2567,18 @@ function QueueSystemContent() {
                                 <button
                                   type="button"
                                   className="waiting-reorder-btn"
-                                  disabled={i === waitingPlayers.length - 1}
+                                  disabled={
+                                    i === waitingPlayers.length - 1 ||
+                                    (activePriorityPlayers.includes(p) &&
+                                      !activePriorityPlayers.includes(waitingPlayers[i + 1]))
+                                  }
                                   onClick={() => handleMoveWaitingPlayer(p, 1)}
-                                  title="Move down in queue"
+                                  title={
+                                    activePriorityPlayers.includes(p) &&
+                                    !activePriorityPlayers.includes(waitingPlayers[i + 1])
+                                      ? 'Returning and new players go first.'
+                                      : 'Move down in queue'
+                                  }
                                   aria-label={`Move ${p} down in queue`}
                                 >
                                   ▼
@@ -2602,7 +2632,7 @@ function QueueSystemContent() {
                   <span className="sub-picker-label">Replace <strong>{substituteFor}</strong> with:</span>
                   <button className="sub-cancel-btn" onClick={() => { setSubstituteFor(null); setMultiCourtSubConfirmed(false); }} type="button">✕ Cancel</button>
                 </div>
-                {courtSlots.length > 0 && !multiCourtSubConfirmed ? (
+                {!multiCourtSubConfirmed ? (
                   <div className="sub-picker-confirm">
                     <p className="confirm-message">This match may already be underway. Replace anyway?</p>
                     <div className="confirm-actions">
