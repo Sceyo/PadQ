@@ -50,8 +50,8 @@ describe('SitOutPanel (Phase 2 Visibility & Return)', () => {
     );
 
     expect(screen.queryByRole('region', { name: /players on break/i })).toBeNull();
-    const toggleBtn = screen.getByRole('button', { name: /manage sit out/i });
-    expect(toggleBtn.textContent).toContain('Manage Sit Out');
+    const toggleBtn = screen.getByRole('button', { name: /sit out/i });
+    expect(toggleBtn.textContent).toContain('Sit Out');
   });
 
   it('expands full roster management drawer to sit out or return any player', () => {
@@ -64,7 +64,7 @@ describe('SitOutPanel (Phase 2 Visibility & Return)', () => {
       />,
     );
 
-    const toggleBtn = screen.getByRole('button', { name: /manage sit out/i });
+    const toggleBtn = screen.getByRole('button', { name: /sit out/i });
     fireEvent.click(toggleBtn);
 
     // Alice is active, button says "Sit Out"

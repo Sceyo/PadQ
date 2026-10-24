@@ -53,10 +53,10 @@ export function SitOutPanel({
         onClick={() => setOpen(o => !o)}
         type="button"
         aria-expanded={open}
-        aria-label={`Take a break (Manage Sit Out)${sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}`}
+        aria-label={`Sit Out${sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}`}
       >
         <UserMinus size={13} />
-        Take a break (Manage Sit Out){sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}
+        Sit Out{sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}
       </button>
 
       {open && (
@@ -71,7 +71,7 @@ export function SitOutPanel({
                   className={`sitout-btn${out ? ' sitout-btn--return' : ''}`}
                   onClick={() => onToggle(name)}
                   type="button"
-                  aria-label={out ? `Back in: Return ${name}` : `Take a break: Sit out ${name}`}
+                  aria-label={out ? `Return ${name}` : `Sit out ${name}`}
                 >
                   {out ? 'Back in' : 'Take a break'}
                 </button>
