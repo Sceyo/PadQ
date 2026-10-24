@@ -3,12 +3,12 @@
 # PadQ — AI Agent Codebase Guide
 
 ## Engineering Guidelines & Standards
-All development, code reviews, debugging, architectural design, and operational checks in this codebase strictly adhere to the project standards in [`.claude/guidelines/`](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/):
-- **[Architecture & System Design](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/architecture.md)**: Simplicity first, reversible two-way doors, strict boundary isolation, honest data ownership.
-- **[Observability & Reliability](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/observability-reliability.md)**: Structured logging, RED/USE metrics, network timeouts, bounded retries with jitter, idempotency, graceful degradation.
-- **[Performance](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/performance.md)**: Measure baseline/target before optimizing, algorithmic efficiency, bounded allocations, and Firebase Spark ($0) budget awareness.
-- **[Code Review](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/code-review.md)**: Prioritized review (Correctness → Security → Design → Tests → Operability → Performance → Readability) with labeled comments (`[blocker]`, `[suggestion]`, `[question]`, `[nit]`, `[praise]`).
-- **[Debugging](file:///c:/Users/francis/Documents/GitHub/PadQ/.claude/guidelines/debugging.md)**: Reproduce first, hypothesize then falsify, root cause before fixing, minimal fix, and regression test prevention.
+All development, code reviews, debugging, architectural design, and operational checks in this codebase strictly adhere to the project standards in [`.claude/guidelines/`](.claude/guidelines/):
+- **[Architecture & System Design](.claude/guidelines/architecture.md)**: Simplicity first, reversible two-way doors, strict boundary isolation, honest data ownership.
+- **[Observability & Reliability](.claude/guidelines/observability-reliability.md)**: Structured logging, RED/USE metrics, network timeouts, bounded retries with jitter, idempotency, graceful degradation.
+- **[Performance](.claude/guidelines/performance.md)**: Measure baseline/target before optimizing, algorithmic efficiency, bounded allocations, and Firebase Spark ($0) budget awareness.
+- **[Code Review](.claude/guidelines/code-review.md)**: Prioritized review (Correctness → Security → Design → Tests → Operability → Performance → Readability) with labeled comments (`[blocker]`, `[suggestion]`, `[question]`, `[nit]`, `[praise]`).
+- **[Debugging](.claude/guidelines/debugging.md)**: Reproduce first, hypothesize then falsify, root cause before fixing, minimal fix, and regression test prevention.
 
 ## What This App Is
 
@@ -190,11 +190,13 @@ INIT scaling: `Math.max(1, Math.floor(allPlayers.length / 4))` matches — floor
 
 ## Multi-Court System
 
-Each court is an independent Firestore session. The host device tracks all courts in `localStorage` under key `padq_court_group` (array of `CourtEntry`).
+In V1, multi-court operates inside a **single Firestore session** via the `courtSlots` array (`CourtSlot[]`, defined in `lib/sessionService.ts`).
+Each court slot has an `id` (e.g. `court-0`), a `name` (`Court 1`), and `onCourt` (2 players for singles, 4 players for doubles).
 
-Court switch mechanism: call `saveHostToStorage(targetSessionId, targetHostToken, targetGameMode)` then `window.location.reload()`. The mount effect in `useSession` resumes the target court automatically.
+When a match concludes on any court, `planMultiCourtResult` rotates that court's players with the shared queue, updates that specific slot, and leaves other courts unaffected.
+All live clients (host and `/watch` spectators) receive slot updates in real-time through the single session listener.
 
-`CourtTabs` component renders only when `courts.length >= 2` OR `canManage` is true. Renders nothing below that threshold.
+*(Note: The `CourtTabs` / `padq_court_group` multi-session approach was an earlier prototype retained in legacy helpers, but V1 production standardizes strictly on single-session `courtSlots`.)*
 
 ---
 

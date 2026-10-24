@@ -1,6 +1,6 @@
 'use client';
 
-import { Trophy, Crown } from 'lucide-react';
+import { Trophy, Crown, UserX } from 'lucide-react';
 import type { PlayerStat } from '../../lib/types';
 import { PlayerLabel } from '../atoms/PlayerLabel';
 import styles from '../CourtCard/CourtCard.module.css';
@@ -17,9 +17,11 @@ interface Props {
   statsMap: Record<string, PlayerStat>;
   isHost:   boolean;
   onWin:    (courtId: string, winner: string) => void;
+  onMarkAbsent?: (player: string) => void;
+  onSelectPlayer?: (player: string) => void;
 }
 
-export function SinglesCourtCard({ slot, statsMap, isHost, onWin }: Props) {
+export function SinglesCourtCard({ slot, statsMap, isHost, onWin, onMarkAbsent, onSelectPlayer }: Props) {
   const [p1, p2] = slot.players;
   const ready    = slot.players.length >= 2 && !!p1 && !!p2;
 
@@ -35,16 +37,46 @@ export function SinglesCourtCard({ slot, statsMap, isHost, onWin }: Props) {
           <div className={styles.matchup}>
             {/* Singles: two players side by side, king gets a crown */}
             <div className={`${styles.team} ${styles.teamA}`}>
-              <div className={styles.playerChip}>
+              <div
+                className={styles.playerChip}
+                onClick={() => onSelectPlayer?.(p1)}
+                style={onSelectPlayer ? { cursor: 'pointer' } : undefined}
+              >
                 {slot.king === p1 && <Crown size={12} className={styles.crownIcon} />}
                 <PlayerLabel name={p1} statsMap={statsMap} />
+                {isHost && onMarkAbsent && (
+                  <button
+                    className="absent-mini-btn"
+                    onClick={(e) => { e.stopPropagation(); onMarkAbsent(p1); }}
+                    title="Can't play now — replace with waiting player"
+                    aria-label={`Can't play now: Replace ${p1}`}
+                    type="button"
+                  >
+                    <UserX size={10} />
+                  </button>
+                )}
               </div>
             </div>
             <div className={styles.vsBadge}>VS</div>
             <div className={`${styles.team} ${styles.teamB}`}>
-              <div className={styles.playerChip}>
+              <div
+                className={styles.playerChip}
+                onClick={() => onSelectPlayer?.(p2)}
+                style={onSelectPlayer ? { cursor: 'pointer' } : undefined}
+              >
                 {slot.king === p2 && <Crown size={12} className={styles.crownIcon} />}
                 <PlayerLabel name={p2} statsMap={statsMap} />
+                {isHost && onMarkAbsent && (
+                  <button
+                    className="absent-mini-btn"
+                    onClick={(e) => { e.stopPropagation(); onMarkAbsent(p2); }}
+                    title="Can't play now — replace with waiting player"
+                    aria-label={`Can't play now: Replace ${p2}`}
+                    type="button"
+                  >
+                    <UserX size={10} />
+                  </button>
+                )}
               </div>
             </div>
           </div>

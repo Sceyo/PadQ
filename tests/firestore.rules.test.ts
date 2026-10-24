@@ -1002,5 +1002,94 @@ suite('Firestore V1 production rules', () => {
         lastActiveAt: serverTimestamp(),
       }));
     });
+
+    it('supports optional priorityPlayers on session create and session update', async () => {
+      const host = env.authenticatedContext('host-pp').firestore();
+      const ref = doc(host, 'sessions', 'P7PLYR');
+
+      // Create with valid priorityPlayers
+      await assertSucceeds(setDoc(ref, sessionData('host-pp', {
+        priorityPlayers: ['A', 'B'],
+      })));
+
+      // Revisioned update modifying priorityPlayers
+      await assertSucceeds(updateDoc(ref, {
+        priorityPlayers: ['C'],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Revisioned update clearing priorityPlayers
+      await assertSucceeds(updateDoc(ref, {
+        priorityPlayers: [],
+        revision: 2,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: update with invalid player in priorityPlayers is rejected
+      await assertFails(updateDoc(ref, {
+        priorityPlayers: ['NONEXISTENT'],
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: update with duplicates in priorityPlayers is rejected
+      await assertFails(updateDoc(ref, {
+        priorityPlayers: ['A', 'A'],
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('rejects session create with invalid priorityPlayers', async () => {
+      const host = env.authenticatedContext('host-pp-neg').firestore();
+      const refInvalidPlayer = doc(host, 'sessions', 'P7BADP');
+      const refDuplicate = doc(host, 'sessions', 'P7DUPP');
+
+      await assertFails(setDoc(refInvalidPlayer, sessionData('host-pp-neg', {
+        priorityPlayers: ['Z'],
+      })));
+
+      await assertFails(setDoc(refDuplicate, sessionData('host-pp-neg', {
+        priorityPlayers: ['A', 'A'],
+      })));
+    });
+
+    it('accepts write containing players, queue, and priorityPlayers together on newcomer late join and rejects invalid priority name', async () => {
+      const host = env.authenticatedContext('host-pp-late').firestore();
+      const ref = doc(host, 'sessions', 'P7LATE');
+
+      // Initial session with 5 players
+      await assertSucceeds(setDoc(ref, sessionData('host-pp-late', {
+        players: ['A', 'B', 'C', 'D', 'E'],
+        queue: ['A', 'B', 'C', 'D', 'E'],
+        priorityPlayers: [],
+      })));
+
+      // Late newcomer 'F' joins: updates players, queue, and priorityPlayers in same write
+      await assertSucceeds(updateDoc(ref, {
+        players: ['A', 'B', 'C', 'D', 'E', 'F'],
+        queue: ['A', 'B', 'C', 'D', 'E', 'F'],
+        priorityPlayers: ['F'],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: priority name 'Z' not in players is rejected
+      await assertFails(updateDoc(ref, {
+        players: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+        queue: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+        priorityPlayers: ['Z'],
+        revision: 2,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
   });
 });
+

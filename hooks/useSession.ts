@@ -75,6 +75,7 @@ export interface SessionState {
   doublesEngineState: Record<string, unknown> | null;
   singlesEngineState: Record<string, unknown> | null;
   sittingOut:        string[];
+  priorityPlayers:   string[];
 }
 
 export interface SessionActions {
@@ -163,6 +164,7 @@ const INITIAL_STATE: SessionState = {
   doublesEngineState: null,
   singlesEngineState: null,
   sittingOut:        [],
+  priorityPlayers:   [],
 };
 
 // ── Hook ───────────────────────────────────────────────────
@@ -201,6 +203,7 @@ export function useSession(): SessionState & SessionActions {
     doublesEngineState: (data.doublesEngineState as Record<string, unknown>) ?? null,
     singlesEngineState: (data.singlesEngineState as Record<string, unknown>) ?? null,
     sittingOut:         data.sittingOut ?? [],
+    priorityPlayers:    data.priorityPlayers ?? [],
   });
 
   // ── Listener setup ─────────────────────────────────────────
@@ -495,6 +498,7 @@ export function useSession(): SessionState & SessionActions {
         revision: Math.max(prev.revision, result.revision),
         queue: result.queue,
         courtSlots: result.courtSlots,
+        ...(result.priorityPlayers !== undefined ? { priorityPlayers: result.priorityPlayers } : {}),
       }));
       return result;
     } catch (err) {
@@ -547,7 +551,7 @@ export function useSession(): SessionState & SessionActions {
         'players', 'queue', 'playAllRel', 'queueMode', 'elimType',
         'tournamentMatches', 'tournamentActive', 'tournamentWinner',
         'doublesEngineState', 'singlesEngineState', 'courtSlots',
-        'lockedPartners', 'sittingOut',
+        'lockedPartners', 'sittingOut', 'priorityPlayers',
       ]);
       const needsRevision = Object.keys(patch).some(key => revisionSensitive.has(key as keyof SessionDoc));
       const write = revisionWriteChainRef.current.then(async () => {

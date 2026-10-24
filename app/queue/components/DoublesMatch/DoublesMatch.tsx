@@ -20,7 +20,8 @@ export const DoublesMatch: React.FC<{
   persistedScore?:  LiveScoreState | null;
   scoreReady?:      boolean;
   onMarkAbsent?:    (player: string) => void;
-}> = ({ firstFour, suggestedTeamA, suggestedTeamB, playAllScore, statsMap, isHost, onMatch, onScoreChange, viewerScore, persistedScore, scoreReady, onMarkAbsent }) => {
+  replaceDisabled?: boolean;
+}> = ({ firstFour, suggestedTeamA, suggestedTeamB, playAllScore, statsMap, isHost, onMatch, onScoreChange, viewerScore, persistedScore, scoreReady, onMarkAbsent, replaceDisabled }) => {
   const [teamA, setTeamA] = useState<string[]>(() =>
     firstFour.length === 4
       ? (suggestedTeamA ? [...suggestedTeamA] : [firstFour[0], firstFour[1]])
@@ -37,6 +38,11 @@ export const DoublesMatch: React.FC<{
   // scoreWinner: set by ScoreBoard when a team reaches the score limit.
   // While set, the losing team's winner button is locked out.
   const [scoreWinner, setScoreWinner] = useState<'A' | 'B' | null>(null);
+  const [hasScoredPoints, setHasScoredPoints] = useState<boolean>(() => {
+    const s = persistedScore ?? viewerScore;
+    return Boolean(s && (s.scoreA > 0 || s.scoreB > 0));
+  });
+  const isReplaceBlocked = Boolean(replaceDisabled || hasScoredPoints);
   const submittingRef = useRef(false);
 
   const toggle = (p: string) => {
@@ -65,6 +71,7 @@ export const DoublesMatch: React.FC<{
   };
 
   const handleScoreChange = (score: LiveScoreState | null) => {
+    setHasScoredPoints(Boolean(score && (score.scoreA > 0 || score.scoreB > 0)));
     if (score !== null) {
       if (score.scoreA >= score.limit) {
         setScoreWinner('A');
@@ -123,7 +130,9 @@ export const DoublesMatch: React.FC<{
                 <button
                   className="absent-mini-btn"
                   onClick={(e) => { e.stopPropagation(); onMarkAbsent(p); }}
-                  title="Mark absent — replace with waiting player"
+                  disabled={isReplaceBlocked}
+                  title={isReplaceBlocked ? 'Cannot replace player after scoring has started' : "Can't play now — replace with waiting player"}
+                  aria-label={`Can't play now: Replace ${p}`}
                   type="button"
                 >
                   <UserX size={10} />

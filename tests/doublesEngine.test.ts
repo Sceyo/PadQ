@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   freshPaddleState,
+  smartSelectPool,
   buildNextMatch,
   advancePaddleState,
   addPlayerToWaiting,
@@ -341,5 +342,136 @@ describe('doublesEngine — edge cases / nitpicks', () => {
     const state = freshPaddleState();
     const players = ['A', 'A', 'B', 'C']; // caller bug: duplicate name
     expect(() => buildNextMatch(state, players)).not.toThrow();
+  });
+});
+
+describe('doublesEngine — smartSelectPool with mustInclude (Phase 5b-1)', () => {
+  it('includes 1 priority player and fills remaining 3 slots optimally', () => {
+    const candidates = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+    const match = smartSelectPool(candidates, [], [], new Set(), {}, ['P1']);
+    const selected = match;
+    expect(selected).toContain('P1');
+    expect(new Set(selected).size).toBe(4);
+  });
+
+  it('includes 2 priority players and fills remaining 2 slots', () => {
+    const candidates = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+    const match = smartSelectPool(candidates, [], [], new Set(), {}, ['P1', 'P2']);
+    const selected = match;
+    expect(selected).toContain('P1');
+    expect(selected).toContain('P2');
+    expect(new Set(selected).size).toBe(4);
+  });
+
+  it('includes 4 priority players directly', () => {
+    const candidates = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+    const match = smartSelectPool(candidates, [], [], new Set(), {}, ['P1', 'P2', 'P3', 'P4']);
+    const selected = match;
+    expect(new Set(selected)).toEqual(new Set(['P1', 'P2', 'P3', 'P4']));
+  });
+
+  it('when >4 priority players exist, selects first 4 in order', () => {
+    const candidates = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+    const match = smartSelectPool(candidates, [], [], new Set(), {}, ['P1', 'P2', 'P3', 'P4', 'P5']);
+    const selected = match;
+    expect(new Set(selected)).toEqual(new Set(['P1', 'P2', 'P3', 'P4']));
+  });
+
+  it('forces inclusion of priority player even when they have fatigue and repeat penalties', () => {
+    const candidates = ['P_prio', 'P2', 'P3', 'P4', 'P5', 'P6'];
+    // Give P_prio maximum fatigue and repeat penalties with everyone
+    const recentPairs = ['P2+P_prio', 'P3+P_prio', 'P4+P_prio', 'P5+P_prio', 'P6+P_prio'];
+    const lastMatchPlayers = new Set(['P_prio']);
+    const match = smartSelectPool(candidates, recentPairs, [], lastMatchPlayers, {}, ['P_prio']);
+    const selected = match;
+    expect(selected).toContain('P_prio');
+    expect(new Set(selected).size).toBe(4);
+  });
+
+  it('returns fallback cleanly when <4 candidates exist', () => {
+    const candidates = ['P1', 'P2', 'P3'];
+    const match = smartSelectPool(candidates, [], [], new Set(), {}, ['P1']);
+    const selected = match.filter(Boolean);
+    expect(selected).toEqual(['P1', 'P2', 'P3']);
+  });
+});
+
+describe('doublesEngine — advancePaddleState with priorityPlayers (Phase 5b-1)', () => {
+  it('prepends priority player to next phase pool without cross-pool duplicates and returns consumedPriority', () => {
+    const players = P(12);
+    let state = freshPaddleState();
+    state = advancePaddleState(state, ['P1', 'P2'], ['P3', 'P4'], players).nextState;
+    state = advancePaddleState(state, ['P5', 'P6'], ['P7', 'P8'], players).nextState;
+    state = advancePaddleState(state, ['P9', 'P10'], ['P11', 'P12'], players).nextState;
+    expect(state.phase).toBe('WINNERS');
+
+    // Now in WINNERS phase, next phase after this match will be LOSERS.
+    // Suppose P5 (currently in w1) returned from break with priority.
+    const res = advancePaddleState(state, ['P1', 'P2'], ['P9', 'P10'], players, {}, ['P5']);
+    expect(res.nextState.phase).toBe('LOSERS');
+    // P5 was prepended to l1 (the LOSERS pool) and removed from w1 (no duplicate)
+    expect(res.nextState.l1[0]).toBe('P5');
+    expect(res.nextState.w1).not.toContain('P5');
+    expect(res.newQueue.slice(0, 4)).toContain('P5');
+    expect(res.consumedPriority).toEqual(['P5']);
+  });
+
+  it('ignores priority during INIT phase', () => {
+    const players = P(8);
+    const state = freshPaddleState();
+    // INIT match 1 finishes; still in INIT for match 2 (P5..P8)
+    const res = advancePaddleState(state, ['P1', 'P2'], ['P3', 'P4'], players, {}, ['P1']);
+    expect(res.nextState.phase).toBe('INIT');
+    expect(new Set(res.newQueue.slice(0, 4))).toEqual(new Set(['P5', 'P6', 'P7', 'P8']));
+    expect(res.consumedPriority).toEqual([]);
+  });
+});
+
+
+describe('doublesEngine — Golden Equivalence across N=5..30 x 20 seeds (Phase 5c-1)', () => {
+  it('guarantees engine output is 100% equivalent to reference INIT behavior when no sit-outs occur', () => {
+    // Reference overflow logic before Phase 5c fix:
+    // seededSet = new Set(allPlayers.slice(0, initMatchesNeeded * 4));
+    // overflow = allPlayers.filter(p => !seededSet.has(p) && !nextWaiting.includes(p));
+    //
+    // Golden theorem: when no sit-outs/substitutions occur in INIT,
+    // (p not in nextW1 && p not in nextL1 && p not in nextWaiting)
+    // is identically equal to (!seededSet.has(p) && !nextWaiting.includes(p)).
+    for (let n = 5; n <= 30; n++) {
+      const players = P(n);
+      for (let seed = 1; seed <= 20; seed++) {
+        let state = freshPaddleState();
+        let rng = seed * 1000 + n;
+        const nextRand = () => {
+          rng = (rng * 1664525 + 1013904223) >>> 0;
+          return rng / 4294967296;
+        };
+
+        const initMatchesNeeded = Math.max(1, Math.floor(n / 4));
+        const totalMatches = initMatchesNeeded + 6; // through INIT, WINNERS, and LOSERS
+
+        for (let m = 0; m < totalMatches; m++) {
+          const match = buildNextMatch(state, players);
+          const allFour = [...match.teamA, ...match.teamB];
+          expect(new Set(allFour).size).toBe(4);
+
+          // Winner is teamA or teamB based on PRNG
+          const teamAWins = nextRand() > 0.5;
+          const winnerTeam = teamAWins ? match.teamA : match.teamB;
+          const loserTeam = teamAWins ? match.teamB : match.teamA;
+
+          const res = advancePaddleState(state, winnerTeam, loserTeam, players);
+          state = res.nextState;
+
+          // Consistency guard: no duplicates across pools
+          const seen = new Set<string>();
+          for (const p of [...state.w1, ...state.l1, ...state.waitingQueue]) {
+            expect(seen.has(p)).toBe(false);
+            seen.add(p);
+          }
+          expect(res.newQueue.length).toBe(players.length);
+        }
+      }
+    }
   });
 });

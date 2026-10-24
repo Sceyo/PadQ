@@ -1,6 +1,6 @@
 'use client';
 
-import { Trophy, Pencil } from 'lucide-react';
+import { Trophy, Pencil, UserX } from 'lucide-react';
 import type { CourtSlot } from '@/lib/sessionService';
 import type { PlayerStat } from '../../lib/types';
 import { PlayerLabel } from '../atoms/PlayerLabel';
@@ -12,9 +12,11 @@ interface Props {
   isHost: boolean;
   onWin: (courtId: string, side: 'A' | 'B') => void;
   onEdit?: (courtId: string) => void;
+  onMarkAbsent?: (player: string) => void;
+  onSelectPlayer?: (player: string) => void;
 }
 
-export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
+export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent, onSelectPlayer }: Props) {
   const teamA = slot.onCourt.slice(0, 2);
   const teamB = slot.onCourt.slice(2, 4);
   const ready = slot.onCourt.length >= 4;
@@ -44,8 +46,23 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
                 {teamA.map((p, i) => (
                   <div key={`a-${i}-${p}`} className={styles.playerRow}>
                     {i > 0 && <span className={styles.partnerConnector}>{' & '}</span>}
-                    <div className={styles.playerChip}>
+                    <div
+                      className={styles.playerChip}
+                      onClick={() => onSelectPlayer?.(p)}
+                      style={onSelectPlayer ? { cursor: 'pointer' } : undefined}
+                    >
                       <PlayerLabel name={p} statsMap={statsMap} />
+                      {isHost && onMarkAbsent && (
+                        <button
+                          className="absent-mini-btn"
+                          onClick={(e) => { e.stopPropagation(); onMarkAbsent(p); }}
+                          title="Can't play now — replace with waiting player"
+                          aria-label={`Can't play now: Replace ${p}`}
+                          type="button"
+                        >
+                          <UserX size={10} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -58,8 +75,23 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit }: Props) {
                 {teamB.map((p, i) => (
                   <div key={`b-${i}-${p}`} className={styles.playerRow}>
                     {i > 0 && <span className={styles.partnerConnector}>{' & '}</span>}
-                    <div className={styles.playerChip}>
+                    <div
+                      className={styles.playerChip}
+                      onClick={() => onSelectPlayer?.(p)}
+                      style={onSelectPlayer ? { cursor: 'pointer' } : undefined}
+                    >
                       <PlayerLabel name={p} statsMap={statsMap} />
+                      {isHost && onMarkAbsent && (
+                        <button
+                          className="absent-mini-btn"
+                          onClick={(e) => { e.stopPropagation(); onMarkAbsent(p); }}
+                          title="Can't play now — replace with waiting player"
+                          aria-label={`Can't play now: Replace ${p}`}
+                          type="button"
+                        >
+                          <UserX size={10} />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

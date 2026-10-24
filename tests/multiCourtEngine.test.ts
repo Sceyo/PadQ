@@ -300,4 +300,37 @@ describe('partner-aware multi-court doubles', () => {
     }
   });
 
+
+describe('planMultiCourtResult — sitting-out finishers defensive exclusion (Phase 1, Row 8)', () => {
+  it('doubles: finisher who is sittingOut does not re-enter next.waiting or a new match', () => {
+    const state = {
+      queue: ['Q1', 'Q2', 'Q3', 'Q4'],
+      courtSlots: [
+        { id: 'court-0', name: 'Court 1', onCourt: ['A1', 'A2', 'B1', 'B2'] },
+      ],
+      sittingOut: ['A1'],
+    };
+    const result = planMultiCourtResult(state, 'court-0', ['A1', 'A2', 'B1', 'B2'], 'A', 'doubles');
+    expect(result).not.toBeNull();
+    // A1 is in sittingOut, so A1 must NOT be in queue and must NOT be on court
+    expect(result!.queue).not.toContain('A1');
+    expect(result!.courtSlots[0].onCourt).not.toContain('A1');
+  });
+
+  it('singles: loser who is sittingOut is not added to queue; winner who is sittingOut steps down', () => {
+    const state = {
+      queue: ['Q1', 'Q2'],
+      courtSlots: [
+        { id: 'court-0', name: 'Court 1', onCourt: ['P1', 'P2'] },
+      ],
+      sittingOut: ['P1', 'P2'],
+    };
+    const result = planMultiCourtResult(state, 'court-0', ['P1', 'P2'], 'A', 'singles');
+    expect(result).not.toBeNull();
+    // Loser P2 was in sittingOut -> not in queue
+    expect(result!.queue).not.toContain('P2');
+    // Winner P1 was in sittingOut -> stepped down, not on court
+    expect(result!.courtSlots[0].onCourt).not.toContain('P1');
+  });
+});
 });

@@ -1,5 +1,6 @@
 import React from 'react';
 import type { CourtSlot } from '@/lib/sessionService';
+import { accountPlayers } from '@/app/queue/lib/queueTransitions';
 
 type GameMode = 'singles' | 'doubles';
 
@@ -9,6 +10,9 @@ interface Props {
   queue: string[];
   selectedCourtId: string;
   onSelectCourt: (courtId: string) => void;
+  sittingOut?: string[];
+  players?: string[];
+  priorityPlayers?: string[];
 }
 
 export function resolveSelectedCourt(courtSlots: CourtSlot[], selectedCourtId: string) {
@@ -25,12 +29,29 @@ export function LiveCourtStatus({
   queue,
   selectedCourtId,
   onSelectCourt,
+  sittingOut = [],
+  players,
+  priorityPlayers = [],
 }: Props) {
   const selectedCourt = resolveSelectedCourt(courtSlots, selectedCourtId);
   const playersNeeded = gameMode === 'doubles' ? 4 : 2;
   const hasMatch = (selectedCourt?.onCourt.length ?? 0) >= playersNeeded;
-  const onCourt = new Set(courtSlots.flatMap(court => court.onCourt));
-  const waitingQueue = queue.filter(player => !onCourt.has(player));
+
+  const accounting = accountPlayers({
+    gameMode,
+    players: players ?? [...new Set([...courtSlots.flatMap(court => court.onCourt), ...queue, ...sittingOut])],
+    queue,
+    courtSlots,
+    sittingOut,
+  });
+
+  const breakSet = new Set(accounting.onBreak);
+  const rawWaitingQueue = accounting.queued.filter(p => !breakSet.has(p));
+  const prioritySet = new Set(priorityPlayers);
+  const priorityWaiting = priorityPlayers.filter(p => rawWaitingQueue.includes(p));
+  const otherWaiting = rawWaitingQueue.filter(p => !prioritySet.has(p));
+  const waitingQueue = [...priorityWaiting, ...otherWaiting];
+  const onBreak = Array.from(accounting.onBreak);
   const nextPlayers = getNextPlayers(waitingQueue, gameMode);
 
   if (!selectedCourt) {
@@ -127,6 +148,10 @@ export function LiveCourtStatus({
             {nextPlayers.map((player, index) => (
               <span key={`${index}-${player}`} className="w-queue-chip">
                 <span className="w-queue-num">#{index + 1}</span> {player}
+                {prioritySet.has(player) && (
+                  <span className="w-status-pill w-status-pill--priority">Next up</span>
+                )}
+                <span className="w-status-pill w-status-pill--on-deck">On deck</span>
               </span>
             ))}
             {waitingQueue.length > nextPlayers.length && (
@@ -137,6 +162,22 @@ export function LiveCourtStatus({
           <span className="w-muted">All active players are assigned.</span>
         )}
       </div>
+
+      {onBreak.length > 0 && (
+        <div className="w-on-break">
+          <div>
+            <span className="w-court-focus-kicker">On break ({onBreak.length})</span>
+          </div>
+          <div className="w-break-chips">
+            {onBreak.map(player => (
+              <span key={`w-break-${player}`} className="w-break-chip">
+                <span>{player}</span>
+                <span className="w-status-pill w-status-pill--on-break">On break</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 }

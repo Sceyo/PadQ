@@ -9,7 +9,7 @@ import {
   Sun, Moon, ArrowLeft,
   Star, Sparkles, RefreshCw, Layers,
   BarChart2, Wifi, WifiOff,
-  UserX, ArrowUp,
+  UserX, ArrowUp, SlidersHorizontal,
 } from 'lucide-react';
 import useQueue, {
   suggestNextDoublesMatch,
@@ -61,6 +61,15 @@ import {
 } from './lib/singlesPoolEngine';
 import { V1_RELEASE } from './lib/releaseConfig';
 import { planMultiCourtResult } from './lib/multiCourtResult';
+import { formatEtaLabel } from './lib/etaEngine';
+import {
+  toggleSitOutTransition,
+  removeFromQueueTransition,
+  confirmSubTransition,
+  replaceCalledPlayerTransition,
+  accountPlayers,
+  consumePriority,
+} from './lib/queueTransitions';
 
 // ── Components ───────────────────────────────────────────────
 import { PlayerLabel } from './components/atoms/PlayerLabel';
@@ -80,6 +89,7 @@ import {
   ManualQueuePanel,
   PartnerPanel,
 } from './components/LiveManagement/LiveManagement';
+import { PlayerActionMenu } from './components/PlayerActionMenu/PlayerActionMenu';
 import { SmartSuggestions } from './components/SmartSuggestions/SmartSuggestions';
 import { SessionBar } from './components/SessionBar/SessionBar';
 import { CourtTabs } from './components/CourtTabs/CourtTabs';
@@ -102,6 +112,8 @@ interface UndoSnapshot {
   poolSinglesState?: PoolSinglesState;
   singlesFormat?:    'pool' | 'king';
   courtSlots?:       CourtSlot[];
+  priorityPlayers?:  string[];
+  sittingOut?:       string[];
 }
 
 // Deep-copy helpers so undo doesn't share references with live state
@@ -335,6 +347,14 @@ function QueueSystemContent() {
 
   // ── Substitute / absent player ─────────────────────────────
   const [substituteFor, setSubstituteFor] = useState<string | null>(null);
+  const [multiCourtSubConfirmed, setMultiCourtSubConfirmed] = useState(false);
+  const [localHasScoredPoints, setLocalHasScoredPoints] = useState(false);
+  const [selectedPlayerAction, setSelectedPlayerAction] = useState<{
+    player: string;
+    zone: 'playing' | 'waiting' | 'break';
+  } | null>(null);
+  const [showHostTools, setShowHostTools] = useState(true);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   // ── Skilled brackets — persisted in localStorage ──────────
   const [skilledBrackets,   setSkilledBrackets]   = useState<SkilledBrackets>(() => loadSkilledBrackets());
@@ -343,11 +363,17 @@ function QueueSystemContent() {
 
   // ── Sit-out state ──────────────────────────────────────────
   const [localSittingOut, setLocalSittingOut] = useState<string[]>([]);
+  const [localPriorityPlayers, setLocalPriorityPlayers] = useState<string[]>([]);
 
   useEffect(() => {
     if (!session.isConnected) return;
     setLocalSittingOut(session.sittingOut ?? []);
   }, [session.sittingOut, session.isConnected]);
+
+  useEffect(() => {
+    if (!session.isConnected) return;
+    setLocalPriorityPlayers(session.priorityPlayers ?? []);
+  }, [session.priorityPlayers, session.isConnected]);
 
   // Keep bracket assignments in sync when players are removed from the session
   useEffect(() => {
@@ -361,15 +387,74 @@ function QueueSystemContent() {
   }, [players]);
 
   const activeSittingOut = session.isConnected ? (session.sittingOut ?? []) : localSittingOut;
+  const activePriorityPlayers = session.isConnected ? (session.priorityPlayers ?? []) : localPriorityPlayers;
 
-  // ── Toast notification (replaces alert()) ─────────────────
+  // ── Toast notification with Undo & pause-on-hover ──────────
+  interface MatchToast {
+    message: string;
+    subMessage?: string;
+    canUndo?: boolean;
+  }
+  const [matchToast, setMatchToast] = useState<MatchToast | null>(null);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const showToast = useCallback((msg: string) => {
-    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
-    setToastMsg(msg);
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3000);
+  const toastRemainingRef = useRef<number>(6000);
+  const toastStartRef = useRef<number>(0);
+  const isToastPausedRef = useRef<boolean>(false);
+
+  const clearToastTimer = useCallback(() => {
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
   }, []);
+
+  const dismissToast = useCallback(() => {
+    clearToastTimer();
+    setMatchToast(null);
+    setToastMsg(null);
+    isToastPausedRef.current = false;
+  }, [clearToastTimer]);
+
+  const showMatchToast = useCallback((toast: MatchToast, duration = 6000) => {
+    clearToastTimer();
+    setMatchToast(toast);
+    toastRemainingRef.current = duration;
+    toastStartRef.current = Date.now();
+    isToastPausedRef.current = false;
+
+    toastTimerRef.current = setTimeout(() => {
+      setMatchToast(null);
+    }, duration);
+  }, [clearToastTimer]);
+
+  const pauseToastTimer = useCallback(() => {
+    if (isToastPausedRef.current || (!matchToast && !toastMsg)) return;
+    clearToastTimer();
+    const elapsed = Date.now() - toastStartRef.current;
+    toastRemainingRef.current = Math.max(1000, toastRemainingRef.current - elapsed);
+    isToastPausedRef.current = true;
+  }, [clearToastTimer, matchToast, toastMsg]);
+
+  const resumeToastTimer = useCallback(() => {
+    if (!isToastPausedRef.current || (!matchToast && !toastMsg)) return;
+    isToastPausedRef.current = false;
+    toastStartRef.current = Date.now();
+    toastTimerRef.current = setTimeout(() => {
+      setMatchToast(null);
+      setToastMsg(null);
+    }, toastRemainingRef.current);
+  }, [matchToast, toastMsg]);
+
+  const showToast = useCallback((msg: string) => {
+    showMatchToast({ message: msg, canUndo: false }, 3000);
+  }, [showMatchToast]);
+
+  const handleUndoLastMatchRef = useRef<() => void>(() => {});
+  const handleToastUndo = useCallback(() => {
+    dismissToast();
+    handleUndoLastMatchRef.current();
+  }, [dismissToast]);
 
   // ── Inline confirm dialog (replaces native confirm()) ──────
   type ConfirmAction =
@@ -402,11 +487,18 @@ function QueueSystemContent() {
   // Players not on any court (the shared waiting queue in multi-court mode)
   const waitingPlayers = useMemo(() => {
     if (courtSlots.length === 0) return [];
-    const onCourtSet = new Set(courtSlots.flatMap(c => c.onCourt));
-    return queue.filter(
-      p => !onCourtSet.has(p) && !activeSittingOut.includes(p)
-    );
-  }, [courtSlots, queue, activeSittingOut]);
+    const queued = accountPlayers({
+      gameMode: gameMode ?? 'doubles',
+      players,
+      queue,
+      courtSlots,
+      sittingOut: activeSittingOut,
+    }).queued;
+    const prioritySet = new Set(activePriorityPlayers);
+    const priorityQueued = activePriorityPlayers.filter(p => queued.includes(p));
+    const restQueued = queued.filter(p => !prioritySet.has(p));
+    return [...priorityQueued, ...restQueued];
+  }, [players, courtSlots, queue, activeSittingOut, activePriorityPlayers]);
 
   const handleGoLive = (live: boolean) => {
     setIsLiveLocal(live);
@@ -416,9 +508,15 @@ function QueueSystemContent() {
   // Save each accepted point immediately. The former debounce left the last
   // point vulnerable if the host refreshed before its timer fired.
   const handleScoreChange = (score: LiveScoreState | null) => {
+    setLocalHasScoredPoints(Boolean(score && (score.scoreA > 0 || score.scoreB > 0)));
     if (!session.sessionId) return;
     void session.syncField({ liveScore: score });
   };
+  const isSingleCourtReplaceBlocked = courtSlots.length === 0 && (
+    localHasScoredPoints ||
+    (session.liveScore?.scoreA ?? 0) > 0 ||
+    (session.liveScore?.scoreB ?? 0) > 0
+  );
 
   // Persisted state
   const [localQueueMode,        setLocalQueueMode]        = useState<QueueMode>('default');
@@ -506,9 +604,14 @@ function QueueSystemContent() {
   }, [activeQueueMode, gameMode, queue, playAllRel]);
   const firstFour = useMemo(() => queue.slice(0, 4), [queue]);
   const waitingForNext = useMemo(() => {
+    if (courtSlots.length > 0) return waitingPlayers;
     const onCourtCount = gameMode === 'doubles' ? 4 : 2;
-    return queue.slice(onCourtCount).filter(p => !activeSittingOut.includes(p));
-  }, [queue, gameMode, activeSittingOut]);
+    const rawWaiting = queue.slice(onCourtCount).filter(p => !activeSittingOut.includes(p));
+    const prioritySet = new Set(activePriorityPlayers);
+    const priorityWaiting = activePriorityPlayers.filter(p => rawWaiting.includes(p));
+    const restWaiting = rawWaiting.filter(p => !prioritySet.has(p));
+    return [...priorityWaiting, ...restWaiting];
+  }, [courtSlots.length, waitingPlayers, queue, gameMode, activeSittingOut, activePriorityPlayers]);
 
   // Load club roster from localStorage on mount
   useEffect(() => { setRoster(loadRoster()); }, []);
@@ -716,59 +819,52 @@ function QueueSystemContent() {
   // ── Sit-out handler ────────────────────────────────────────
   const handleToggleSitOut = (name: string) => {
     const isSittingOut = activeSittingOut.includes(name);
-    const newSittingOut = isSittingOut
-      ? activeSittingOut.filter(n => n !== name)
-      : [...activeSittingOut, name];
-    // Sitting out: remove from queue. Returning: add to back of queue.
-    const newQueue = isSittingOut ? [...queue, name] : queue.filter(n => n !== name);
-    setLocalSittingOut(newSittingOut);
-    setQueue(newQueue);
-
-    if (gameMode === 'singles') {
-      if (singlesFormat === 'pool') {
-        if (isSittingOut) {
-          const ns = addPlayerToPoolSinglesWaiting(poolSinglesStateRef.current, name);
-          poolSinglesStateRef.current = ns;
-          setPoolSinglesStateUI(ns);
-        } else {
-          const ns = removePlayerFromPoolSinglesState(poolSinglesStateRef.current, name);
-          poolSinglesStateRef.current = ns;
-          setPoolSinglesStateUI(ns);
-        }
-      } else {
-        if (isSittingOut) {
-          const ns = addPlayerToSinglesWaiting(singlesStateRef.current, name);
-          singlesStateRef.current = ns;
-          setSinglesStateUI(ns);
-        } else {
-          const ns: SinglesState = {
-            ...singlesStateRef.current,
-            king: singlesStateRef.current.king === name ? null : singlesStateRef.current.king,
-            queue: singlesStateRef.current.queue.filter(p => p !== name),
-            waitingQueue: singlesStateRef.current.waitingQueue.filter(p => p !== name),
-          };
-          singlesStateRef.current = ns;
-          setSinglesStateUI(ns);
-        }
-      }
-    } else if (gameMode === 'doubles') {
-      if (isSittingOut) {
-        const ns = addPlayerToWaiting(paddleStateRef.current, name);
-        paddleStateRef.current = ns;
-        setPaddleStateUI(ns);
-      } else {
-        const ns: PaddleState = {
-          ...paddleStateRef.current,
-          w1: paddleStateRef.current.w1.filter(p => p !== name),
-          l1: paddleStateRef.current.l1.filter(p => p !== name),
-          waitingQueue: paddleStateRef.current.waitingQueue.filter(p => p !== name),
-        };
-        paddleStateRef.current = ns;
-        setPaddleStateUI(ns);
+    if (!isSittingOut) {
+      const onCourtCount = gameMode === 'doubles' ? 4 : 2;
+      const isPlayerOnCourt = courtSlots.length > 0
+        ? courtSlots.some(slot => slot.onCourt.includes(name))
+        : queue.slice(0, onCourtCount).includes(name);
+      if (isPlayerOnCourt) {
+        handleMarkAbsent(name);
+        return;
       }
     }
+    const result = toggleSitOutTransition(
+      {
+        gameMode: gameMode ?? 'singles',
+        singlesFormat,
+        players,
+        queue,
+        courtSlots,
+        sittingOut: activeSittingOut,
+        priorityPlayers: activePriorityPlayers,
+        singlesState: singlesStateRef.current,
+        paddleState: paddleStateRef.current,
+        poolSinglesState: poolSinglesStateRef.current,
+      },
+      name,
+    );
+    const newSittingOut = result.sittingOut;
+    const newQueue = result.queue;
+    const newPriorityPlayers = result.priorityPlayers ?? [];
+    setLocalSittingOut(newSittingOut);
+    setLocalPriorityPlayers(newPriorityPlayers);
+    setQueue(newQueue);
 
-    if (session.sessionId) session.syncField({ sittingOut: newSittingOut, queue: newQueue });
+    if (result.poolSinglesState) {
+      poolSinglesStateRef.current = result.poolSinglesState;
+      setPoolSinglesStateUI(result.poolSinglesState);
+    }
+    if (result.singlesState) {
+      singlesStateRef.current = result.singlesState;
+      setSinglesStateUI(result.singlesState);
+    }
+    if (result.paddleState) {
+      paddleStateRef.current = result.paddleState;
+      setPaddleStateUI(result.paddleState);
+    }
+
+    if (session.sessionId) session.syncField({ sittingOut: newSittingOut, queue: newQueue, priorityPlayers: newPriorityPlayers });
 
     // Recalculate rest thresholds when active player count changes in skilled mode
     if (activeQueueMode === 'skilled' && skilledState) {
@@ -795,6 +891,12 @@ function QueueSystemContent() {
       setLocalCourtSlots(snap.courtSlots);
       courtSlotsRef.current = snap.courtSlots;
     }
+    if (snap.priorityPlayers !== undefined) {
+      setLocalPriorityPlayers(snap.priorityPlayers);
+    }
+    if (snap.sittingOut !== undefined) {
+      setLocalSittingOut(snap.sittingOut);
+    }
     // Trim local history immediately — also removes from Firestore via
     // deleteLatestHistoryEntry called inside session.undoLastMatch.
     setLocalHistory(prev => prev.slice(1));
@@ -802,6 +904,8 @@ function QueueSystemContent() {
       session.undoLastMatch({
         queue: snap.queue,
         ...(snap.courtSlots ? { courtSlots: snap.courtSlots } : {}),
+        ...(snap.priorityPlayers !== undefined ? { priorityPlayers: snap.priorityPlayers } : {}),
+        ...(snap.sittingOut !== undefined ? { sittingOut: snap.sittingOut } : {}),
         ...(gameMode === 'doubles'
           ? { doublesEngineState: serializePaddleState(snap.paddleState) as unknown as Record<string, unknown> }
           : {
@@ -814,94 +918,98 @@ function QueueSystemContent() {
     undoSnapshotRef.current = null;
     setHasUndo(false);
   };
+  handleUndoLastMatchRef.current = handleUndoLastMatch;
 
   // ── Absent player → substitute ─────────────────────────────
-  const handleMarkAbsent = (player: string) => { setSubstituteFor(player); };
+  const handleMarkAbsent = (player: string) => {
+    if (isSingleCourtReplaceBlocked) {
+      showToast('Cannot replace player after scoring has started');
+      return;
+    }
+    setMultiCourtSubConfirmed(false);
+    setSubstituteFor(player);
+  };
 
-  const handleConfirmSub = (replacement: string) => {
+  const handleConfirmSub = (replacement?: string) => {
     if (!substituteFor) return;
-    const absent    = substituteFor;
-    const absentIdx = queue.indexOf(absent);
-    const repIdx    = queue.indexOf(replacement);
-    if (absentIdx === -1 || repIdx === -1) return;
-    const newQueue = [...queue];
-    newQueue[absentIdx] = replacement;
-    newQueue.splice(repIdx, 1);
-    const newSittingOut = [...activeSittingOut, absent];
-    setQueue(newQueue);
-    setLocalSittingOut(newSittingOut);
+    if (isSingleCourtReplaceBlocked) {
+      showToast('Cannot replace player after scoring has started');
+      setSubstituteFor(null);
+      return;
+    }
+    const absent = substituteFor;
+    const result = replaceCalledPlayerTransition(
+      {
+        gameMode: gameMode ?? 'singles',
+        singlesFormat,
+        players,
+        queue,
+        courtSlots,
+        sittingOut: activeSittingOut,
+        priorityPlayers: activePriorityPlayers,
+        singlesState: singlesStateRef.current,
+        paddleState: paddleStateRef.current,
+        poolSinglesState: poolSinglesStateRef.current,
+      },
+      absent,
+      replacement,
+    );
+    if (!result) {
+      showToast('No eligible waiting players available to substitute');
+      return;
+    }
+    undoSnapshotRef.current = {
+      queue: [...queue],
+      paddleState: clonePaddleState(paddleStateRef.current),
+      singlesState: cloneSinglesState(singlesStateRef.current),
+      poolSinglesState: clonePoolSinglesState(poolSinglesStateRef.current),
+      singlesFormat,
+      courtSlots: courtSlots.map(c => ({ ...c, onCourt: [...c.onCourt] })),
+      priorityPlayers: [...activePriorityPlayers],
+      sittingOut: [...activeSittingOut],
+    };
+    setHasUndo(true);
 
-    if (gameMode === 'singles') {
-      if (singlesFormat === 'pool') {
-        let ns = removePlayerFromPoolSinglesState(poolSinglesStateRef.current, absent);
-        ns = addPlayerToPoolSinglesWaiting(ns, replacement);
-        poolSinglesStateRef.current = ns;
-        setPoolSinglesStateUI(ns);
-      } else {
-        const wasKing = singlesStateRef.current.king === absent;
-        const ns: SinglesState = {
-          ...singlesStateRef.current,
-          king: wasKing ? replacement : singlesStateRef.current.king,
-          // If absent was in engine queue (challenger), replace them; remove replacement from wherever they sat
-          queue: singlesStateRef.current.queue
-            .filter(p => p !== replacement)
-            .map(p => p === absent ? replacement : p),
-          waitingQueue: singlesStateRef.current.waitingQueue.filter(p => p !== absent && p !== replacement),
-        };
-        singlesStateRef.current = ns;
-        setSinglesStateUI(ns);
-      }
-    } else if (gameMode === 'doubles') {
-      const ns: PaddleState = {
-        ...paddleStateRef.current,
-        w1: paddleStateRef.current.w1.filter(p => p !== absent),
-        l1: paddleStateRef.current.l1.filter(p => p !== absent),
-        waitingQueue: paddleStateRef.current.waitingQueue.filter(p => p !== absent),
-      };
-      paddleStateRef.current = ns;
-      setPaddleStateUI(ns);
+    setQueue(result.queue);
+    queueRef.current = result.queue;
+    setLocalSittingOut(result.sittingOut);
+    if (result.priorityPlayers !== undefined) {
+      setLocalPriorityPlayers(result.priorityPlayers);
+    }
+    if (result.courtSlots) {
+      setLocalCourtSlots(result.courtSlots);
+      courtSlotsRef.current = result.courtSlots;
     }
 
-    if (session.sessionId) session.syncField({ queue: newQueue, sittingOut: newSittingOut });
+    if (result.poolSinglesState) {
+      poolSinglesStateRef.current = result.poolSinglesState;
+      setPoolSinglesStateUI(result.poolSinglesState);
+    }
+    if (result.singlesState) {
+      singlesStateRef.current = result.singlesState;
+      setSinglesStateUI(result.singlesState);
+    }
+    if (result.paddleState) {
+      paddleStateRef.current = result.paddleState;
+      setPaddleStateUI(result.paddleState);
+    }
+
+    if (session.sessionId) {
+      session.syncField({
+        queue: result.queue,
+        sittingOut: result.sittingOut,
+        ...(result.priorityPlayers !== undefined ? { priorityPlayers: result.priorityPlayers } : {}),
+        ...(result.courtSlots ? { courtSlots: result.courtSlots } : {}),
+      });
+    }
     setSubstituteFor(null);
+    setMultiCourtSubConfirmed(false);
+    showMatchToast({
+      message: `Replaced ${absent}`,
+      canUndo: true,
+    });
   };
 
-  // ── Sit Next — promote a waiting player to the front of the waiting pool ──
-  const handleSitNext = (player: string) => {
-    const onCourtCount = gameMode === 'doubles' ? 4 : 2;
-    const playerIdx = queue.indexOf(player);
-    if (playerIdx === -1 || playerIdx <= onCourtCount) return;
-    const newQueue = [...queue];
-    newQueue.splice(playerIdx, 1);
-    newQueue.splice(onCourtCount, 0, player);
-    setQueue(newQueue);
-
-    if (gameMode === 'singles') {
-      const { queue: eq, waitingQueue: wq } = singlesStateRef.current;
-      const inMain = eq.includes(player);
-      const ns: SinglesState = {
-        ...singlesStateRef.current,
-        queue: inMain ? [player, ...eq.filter(p => p !== player)] : eq,
-        waitingQueue: inMain ? wq : [player, ...wq.filter(p => p !== player)],
-      };
-      singlesStateRef.current = ns;
-      setSinglesStateUI(ns);
-    } else if (gameMode === 'doubles') {
-      const { w1, l1, waitingQueue: wq } = paddleStateRef.current;
-      const inW1 = w1.includes(player);
-      const inL1 = !inW1 && l1.includes(player);
-      const ns: PaddleState = {
-        ...paddleStateRef.current,
-        w1: inW1 ? [player, ...w1.filter(p => p !== player)] : w1,
-        l1: inL1 ? [player, ...l1.filter(p => p !== player)] : l1,
-        waitingQueue: !inW1 && !inL1 ? [player, ...wq.filter(p => p !== player)] : wq,
-      };
-      paddleStateRef.current = ns;
-      setPaddleStateUI(ns);
-    }
-
-    if (session.sessionId) session.syncField({ queue: newQueue });
-  };
 
   const handleSinglesMatch = (winner: string, score?: string, courtId?: string) => {
     const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
@@ -924,7 +1032,7 @@ function QueueSystemContent() {
         timestamp: new Date().toLocaleTimeString(),
       };
       const planned = planMultiCourtResult(
-        { queue: queueRef.current, courtSlots: currentSlots, sittingOut: activeSittingOut },
+        { queue: queueRef.current, courtSlots: currentSlots, sittingOut: activeSittingOut, priorityPlayers: activePriorityPlayers },
         courtId,
         [...slot.onCourt],
         winningSide,
@@ -941,6 +1049,9 @@ function QueueSystemContent() {
       queueRef.current = planned.queue;
       setLocalCourtSlots(planned.courtSlots);
       courtSlotsRef.current = planned.courtSlots;
+      if (planned.priorityPlayers !== undefined) {
+        setLocalPriorityPlayers(planned.priorityPlayers);
+      }
       setLocalHistory(previous => [entry, ...previous]);
 
       if (session.sessionId) {
@@ -983,6 +1094,10 @@ function QueueSystemContent() {
             setModalScore(undefined);
             setModalOpen(true);
           }
+          showMatchToast({
+            message: `${slot.name}: ${winner} won${score ? ` (${score})` : ''}`,
+            canUndo: true,
+          });
         }).finally(() => processingCourtIdsRef.current.delete(courtId));
       } else {
         recordCareerResult(entry.players, entry.winner);
@@ -994,6 +1109,10 @@ function QueueSystemContent() {
           setModalScore(undefined);
           setModalOpen(true);
         }
+        showMatchToast({
+          message: `${slot.name}: ${winner} won${score ? ` (${score})` : ''}`,
+          canUndo: true,
+        });
         processingCourtIdsRef.current.delete(courtId);
       }
       return;
@@ -1003,6 +1122,7 @@ function QueueSystemContent() {
     isProcessingMatchRef.current = true;
     const [p1, p2] = [queue[0], queue[1]];
     const previousQueue = [...queue];
+    const previousPriorityPlayers = [...activePriorityPlayers];
     const previousPaddleState = clonePaddleState(paddleStateRef.current);
     const previousSinglesState = cloneSinglesState(singlesStateRef.current);
     const previousPoolSinglesState = clonePoolSinglesState(poolSinglesStateRef.current);
@@ -1012,6 +1132,7 @@ function QueueSystemContent() {
       singlesState: previousSinglesState,
       poolSinglesState: previousPoolSinglesState,
       singlesFormat,
+      priorityPlayers: previousPriorityPlayers,
     };
     setHasUndo(true);
     if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
@@ -1035,12 +1156,18 @@ function QueueSystemContent() {
           loser,
           activePlayers,
           skillMap,
+          activePriorityPlayers,
         );
         poolSinglesStateRef.current = nextState;
         setPoolSinglesStateUI(nextState);
         newQueue = poolQueue;
       } else {
-        const { nextState, newQueue: singlesQueue } = advanceSinglesState(singlesStateRef.current, winner, activePlayers);
+        const { nextState, newQueue: singlesQueue } = advanceSinglesState(
+          singlesStateRef.current,
+          winner,
+          activePlayers,
+          activePriorityPlayers,
+        );
         singlesStateRef.current = nextState;
         setSinglesStateUI(nextState);
         newQueue = singlesQueue;
@@ -1050,6 +1177,9 @@ function QueueSystemContent() {
       const loser = winner === p1 ? p2 : p1;
       newQueue = [loser, ...rest, winner];
     }
+    const nextPriority = consumePriority(activePriorityPlayers, [p1, p2, ...newQueue.slice(0, 2)]);
+    setLocalPriorityPlayers(nextPriority);
+    setLocalHasScoredPoints(false);
     setQueue(newQueue);
     queueRef.current = newQueue;
     const entry: MatchHistoryEntry = {
@@ -1064,6 +1194,10 @@ function QueueSystemContent() {
       setModalWinner(`${winner} wins!`);
       setModalScore(score);
       setModalOpen(true);
+      showMatchToast({
+        message: `${winner} won${score ? ` (${score})` : ''}`,
+        canUndo: true,
+      });
     };
 
     if (!session.sessionId) {
@@ -1080,7 +1214,7 @@ function QueueSystemContent() {
         }
       : {};
     void session.commitMatchResult(
-      { queue: newQueue, liveScore: null, ...enginePatch },
+      { queue: newQueue, priorityPlayers: nextPriority, liveScore: null, ...enginePatch },
       entry,
     ).then(result => {
       const message = matchResultFailureMessage(result);
@@ -1089,6 +1223,7 @@ function QueueSystemContent() {
         return;
       }
       setLocalHistory(current => current.filter(item => item.id !== entry.id));
+      setLocalPriorityPlayers(previousPriorityPlayers);
       setQueue(previousQueue);
       queueRef.current = previousQueue;
       paddleStateRef.current = previousPaddleState;
@@ -1108,6 +1243,7 @@ function QueueSystemContent() {
     if (isProcessingMatchRef.current) return false;
     isProcessingMatchRef.current = true;
     const previousQueue = [...queue];
+    const previousPriorityPlayers = [...activePriorityPlayers];
     const previousPaddleState = clonePaddleState(paddleStateRef.current);
     const previousSinglesState = cloneSinglesState(singlesStateRef.current);
     const previousPoolSinglesState = clonePoolSinglesState(poolSinglesStateRef.current);
@@ -1118,6 +1254,7 @@ function QueueSystemContent() {
       singlesState: previousSinglesState,
       poolSinglesState: previousPoolSinglesState,
       singlesFormat,
+      priorityPlayers: previousPriorityPlayers,
     };
     setHasUndo(true);
     if (activeQueueMode === 'playall') recordPlayAllDoubles(a, b);
@@ -1135,7 +1272,14 @@ function QueueSystemContent() {
         ])
       );
       const activePlayers = players.filter(p => !activeSittingOut.includes(p));
-      const { nextState, newQueue: paddleQueue } = advancePaddleState(paddleStateRef.current, winnerTeam, loserTeam, activePlayers, skillMap);
+      const { nextState, newQueue: paddleQueue } = advancePaddleState(
+        paddleStateRef.current,
+        winnerTeam,
+        loserTeam,
+        activePlayers,
+        skillMap,
+        activePriorityPlayers,
+      );
       paddleStateRef.current = nextState;
       setPaddleStateUI(nextState);
       newQueue = paddleQueue;
@@ -1143,6 +1287,9 @@ function QueueSystemContent() {
       const rest = queue.slice(4);
       newQueue = [...loserTeam, ...rest, ...winnerTeam];
     }
+    const nextPriority = consumePriority(activePriorityPlayers, [...a, ...b, ...newQueue.slice(0, 4)]);
+    setLocalPriorityPlayers(nextPriority);
+    setLocalHasScoredPoints(false);
     setQueue(newQueue);
     queueRef.current = newQueue;
     const entry: MatchHistoryEntry = {
@@ -1157,6 +1304,10 @@ function QueueSystemContent() {
       setModalWinner(`${winnerNames} win!`);
       setModalScore(score);
       setModalOpen(true);
+      showMatchToast({
+        message: `${winnerNames} won${score ? ` (${score})` : ''}`,
+        canUndo: true,
+      });
     };
 
     try {
@@ -1168,6 +1319,7 @@ function QueueSystemContent() {
       const result = await session.commitMatchResult(
         {
           queue: newQueue,
+          priorityPlayers: nextPriority,
           liveScore: null,
           doublesEngineState: serializePaddleState(paddleStateRef.current) as unknown as Record<string, unknown>,
         },
@@ -1180,6 +1332,7 @@ function QueueSystemContent() {
       }
 
       setLocalHistory(current => current.filter(item => item.id !== entry.id));
+      setLocalPriorityPlayers(previousPriorityPlayers);
       setQueue(previousQueue);
       queueRef.current = previousQueue;
       paddleStateRef.current = previousPaddleState;
@@ -1209,6 +1362,7 @@ function QueueSystemContent() {
       paddleState:  clonePaddleState(paddleStateRef.current),
       singlesState: cloneSinglesState(singlesStateRef.current),
       courtSlots:   currentSlots.map(c => ({ ...c, onCourt: [...c.onCourt] })),
+      priorityPlayers: [...activePriorityPlayers],
     };
     setHasUndo(true);
 
@@ -1223,19 +1377,28 @@ function QueueSystemContent() {
     );
     const activePlayers = players.filter(p => !lockedSet.has(p) && !activeSittingOut.includes(p));
 
-    const selection = rotateMultiCourtDoubles(
-      queueRef.current.filter(player => activePlayers.includes(player)),
-      slot.onCourt,
-      lockedPartnersRef.current,
+    const planned = planMultiCourtResult(
+      {
+        queue: queueRef.current,
+        courtSlots: currentSlots,
+        lockedPartners: (session.lockedPartners ?? []).map(([a, b]) => ({ a, b })),
+        sittingOut: activeSittingOut,
+        priorityPlayers: activePriorityPlayers,
+      },
+      courtId,
+      [...slot.onCourt],
+      side,
+      'doubles',
     );
-    const nextOnCourt = selection.onCourt;
-    const nextWaiting = selection.waiting;
-
-    const updatedSlots = currentSlots.map(c =>
-      c.id === courtId ? { ...c, onCourt: nextOnCourt } : c
-    );
-
-    const newQueue = nextWaiting;
+    if (!planned) {
+      processingCourtIdsRef.current.delete(courtId);
+      return;
+    }
+    const updatedSlots = planned.courtSlots;
+    const newQueue = planned.queue;
+    if (planned.priorityPlayers !== undefined) {
+      setLocalPriorityPlayers(planned.priorityPlayers);
+    }
 
     const winnerNames = winnerTeam.join(' & ');
     const entry: MatchHistoryEntry = {
@@ -1295,6 +1458,10 @@ function QueueSystemContent() {
           setModalScore(undefined);
           setModalOpen(true);
         }
+        showMatchToast({
+          message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
+          canUndo: true,
+        });
       }).finally(() => processingCourtIdsRef.current.delete(courtId));
     } else {
       recordCareerResult(entry.players, entry.winner);
@@ -1306,6 +1473,10 @@ function QueueSystemContent() {
         setModalScore(undefined);
         setModalOpen(true);
       }
+      showMatchToast({
+        message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
+        canUndo: true,
+      });
       processingCourtIdsRef.current.delete(courtId);
     }
   };
@@ -1416,8 +1587,14 @@ function QueueSystemContent() {
     if (score) {
       showToast(`${court.name}: ${winnerNames} win (${score})`);
     } else {
-      setModalWinner(`${winnerNames} win!`); setModalScore(undefined); setModalOpen(true);
+      setModalWinner(`${winnerNames} win!`);
+      setModalScore(undefined);
+      setModalOpen(true);
     }
+    showMatchToast({
+      message: `${court.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
+      canUndo: true,
+    });
     isProcessingMatchRef.current = false;
   };
 
@@ -1447,18 +1624,20 @@ function QueueSystemContent() {
     if (players.length >= V1_RELEASE.maxPlayers) { showToast(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
     if (trimmedName.length === 0 || trimmedName.length > 60) { showToast('Player names must be 60 characters or fewer'); return; }
     const np = [...players, trimmedName], nq = [...queue, trimmedName];
+    const nextPriority = [...activePriorityPlayers, trimmedName];
     setPlayers(np); setQueue(nq);
+    setLocalPriorityPlayers(nextPriority);
     if (activeQueueMode === 'default' && gameMode === 'doubles') {
       const newPaddleState = addPlayerToWaiting(paddleStateRef.current, trimmedName);
       paddleStateRef.current = newPaddleState;
       setPaddleStateUI(newPaddleState);
     } else if (activeQueueMode === 'default' && gameMode === 'singles') {
       if (singlesFormat === 'pool') {
-        const newPoolState = addPlayerToPoolSinglesWaiting(poolSinglesStateRef.current, trimmedName);
+        const newPoolState = addPlayerToPoolSinglesWaiting(poolSinglesStateRef.current, trimmedName, true);
         poolSinglesStateRef.current = newPoolState;
         setPoolSinglesStateUI(newPoolState);
       } else {
-        const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, trimmedName);
+        const newSinglesState = addPlayerToSinglesWaiting(singlesStateRef.current, trimmedName, true);
         singlesStateRef.current = newSinglesState;
         setSinglesStateUI(newSinglesState);
       }
@@ -1470,7 +1649,7 @@ function QueueSystemContent() {
         return recalculateRestEngine(afterAdd, activeCount);
       });
     }
-    if (session.sessionId) session.syncField({ players: np, queue: nq });
+    if (session.sessionId) session.syncField({ players: np, queue: nq, priorityPlayers: nextPriority });
   };
 
   const handleMoveWaitingPlayer = (playerName: string, direction: -1 | 1) => {
@@ -1479,6 +1658,10 @@ function QueueSystemContent() {
     const targetIdx = curIdx + direction;
     if (targetIdx < 0 || targetIdx >= waitingPlayers.length) return;
     const otherPlayer = waitingPlayers[targetIdx];
+
+    const isPlayerPriority = activePriorityPlayers.includes(playerName);
+    const isOtherPriority = activePriorityPlayers.includes(otherPlayer);
+    if (isPlayerPriority !== isOtherPriority) return;
 
     const qIdx1 = queue.indexOf(playerName);
     const qIdx2 = queue.indexOf(otherPlayer);
@@ -1957,10 +2140,37 @@ function QueueSystemContent() {
           defaultVariant="host"
         />
         {V1_RELEASE.showLegacyCourtCoordinator && showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
-        {toastMsg && (
-          <div className="toast-notification" role="alert">
-            <span>{toastMsg}</span>
-            <button className="toast-dismiss" onClick={() => setToastMsg(null)}>✕</button>
+        {(matchToast || toastMsg) && (
+          <div
+            className="toast-notification toast-notification--enhanced"
+            role="alert"
+            onMouseEnter={pauseToastTimer}
+            onMouseLeave={resumeToastTimer}
+            onTouchStart={pauseToastTimer}
+            onTouchEnd={resumeToastTimer}
+          >
+            <div className="toast-content">
+              <span className="toast-msg">{matchToast?.message ?? toastMsg}</span>
+              {matchToast?.subMessage && <span className="toast-submsg">{matchToast.subMessage}</span>}
+            </div>
+            {matchToast?.canUndo && (
+              <button
+                type="button"
+                className="toast-undo-btn"
+                onClick={handleToastUndo}
+                aria-label="Undo last match"
+              >
+                Undo
+              </button>
+            )}
+            <button
+              type="button"
+              className="toast-dismiss"
+              onClick={dismissToast}
+              aria-label="Dismiss notification"
+            >
+              ✕
+            </button>
           </div>
         )}
         {pendingConfirm && (
@@ -2059,47 +2269,102 @@ function QueueSystemContent() {
             </div>
 
             {canControl && (
-              <div className="live-tools-row">
-                <AddPlayerPanel onAdd={handleAddPlayerLive} />
-                {!isSkilled && (
-                  <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
-                    onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
-                    onRemove={i => { const nq = queue.filter((_, j) => j !== i); setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
-                  />
-                )}
-                {!isSkilled && gameMode === 'doubles' && courtSlots.length > 0 && (
-                  <PartnerPanel
-                    players={players}
-                    playerGroups={[queue, ...courtSlots.map(court => court.onCourt)]}
-                    pairs={lockedPartners}
-                    onChange={handlePartnerPairsChange}
-                  />
-                )}
-                {courtSlots.length > 0 && (
-                  <button
-                    type="button"
-                    className={`live-panel-toggle score-toggle-btn ${scorePromptEnabled ? 'score-toggle-btn--on' : ''}`}
-                    onClick={handleToggleScorePrompt}
-                    title={scorePromptEnabled ? 'Match score input is enabled — tap to record winners only' : 'Match score input is disabled — tap to enable direct score input'}
-                  >
-                    <Trophy size={13} />
-                    <span>Match Scores: <strong>{scorePromptEnabled ? 'ON' : 'OFF'}</strong></span>
-                  </button>
-                )}
+              <div className="host-tools-bar">
+                <button
+                  type="button"
+                  className="host-tools-toggle"
+                  onClick={() => setShowHostTools(s => !s)}
+                  aria-expanded={showHostTools}
+                >
+                  <SlidersHorizontal size={14} />
+                  <span>Host Controls {showHostTools ? '▴' : '▾'}</span>
+                </button>
+              </div>
+            )}
+
+            {canControl && showHostTools && (
+              <div className="host-tools-drawer">
+                <div className="live-tools-row">
+                  <AddPlayerPanel onAdd={handleAddPlayerLive} />
+                  {!isSkilled && (
+                    <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
+                      onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}
+                      onRemove={i => {
+                        const res = removeFromQueueTransition(
+                          { gameMode: gameMode ?? 'singles', players, queue, courtSlots, sittingOut: activeSittingOut },
+                          i,
+                        );
+                        setQueue(res.queue);
+                        if (session.sessionId) session.syncField({ queue: res.queue });
+                      }}
+                    />
+                  )}
+                  {!isSkilled && gameMode === 'doubles' && courtSlots.length > 0 && (
+                    <PartnerPanel
+                      players={players}
+                      playerGroups={[queue, ...courtSlots.map(court => court.onCourt)]}
+                      pairs={lockedPartners}
+                      onChange={handlePartnerPairsChange}
+                    />
+                  )}
+                  {courtSlots.length > 0 && (
+                    <div className="score-mode-wrap">
+                      <button
+                        type="button"
+                        className={`live-panel-toggle score-toggle-btn ${scorePromptEnabled ? 'score-toggle-btn--on' : ''}`}
+                        onClick={handleToggleScorePrompt}
+                        title={scorePromptEnabled ? 'Match score input is enabled — tap to record winners only' : 'Match score input is disabled — tap to enable direct score input'}
+                      >
+                        <Trophy size={13} />
+                        <span>Match Scores: <strong>{scorePromptEnabled ? 'ON' : 'OFF'}</strong></span>
+                      </button>
+                      <span className="score-mode-hint">
+                        {scorePromptEnabled
+                          ? 'On: enter score before selecting winner'
+                          : 'Off: tap winner directly'}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
             {canControl && !isSkilled && (
-              <SitOutPanel players={players} sittingOut={activeSittingOut} onToggle={handleToggleSitOut} />
+              <SitOutPanel
+                players={players}
+                sittingOut={activeSittingOut}
+                onToggle={handleToggleSitOut}
+                onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
+              />
             )}
 
-            {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />}
-            {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
-              singlesFormat === 'pool' ? (
-                <PoolSinglesStatusPanel poolState={poolSinglesStateUI} allPlayers={players} />
-              ) : (
-                <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
-              )
+            {session.isHost && (
+              <div className="diagnostics-bar">
+                <button
+                  type="button"
+                  className="diagnostics-toggle-btn"
+                  onClick={() => setShowDiagnostics(d => !d)}
+                  aria-expanded={showDiagnostics}
+                >
+                  <SlidersHorizontal size={12} />
+                  <span>Diagnostics {showDiagnostics ? '▴' : '▾'}</span>
+                </button>
+                {showDiagnostics && (
+                  <div className="diagnostics-panel" role="region" aria-label="Engine Diagnostics">
+                    <div className="diagnostics-header">Engine State (Host Only)</div>
+                    {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && (
+                      <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />
+                    )}
+                    {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
+                      singlesFormat === 'pool' ? (
+                        <PoolSinglesStatusPanel poolState={poolSinglesStateUI} allPlayers={players} />
+                      ) : (
+                        <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
+                      )
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             {/* ═══════════════════════════════════════════════════
                 SKILLED MODE LAYOUT
@@ -2262,19 +2527,32 @@ function QueueSystemContent() {
                       statsMap={statsMap}
                       isHost={canControl}
                       onWin={handleSinglesCourtWinClick}
+                      onMarkAbsent={canControl ? handleMarkAbsent : undefined}
+                      onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'playing' })}
                     />
                   ))}
                 </div>
                 <div className="waiting-queue-panel">
-                  <h3 className="pairings-label">Waiting Queue ({queue.length})</h3>
-                  {queue.length === 0
+                  <h3 className="pairings-label">Waiting Queue ({waitingPlayers.length})</h3>
+                  {waitingPlayers.length === 0
                     ? <p className="muted-hint">All players are on a court.</p>
                     : (
                       <div className="waiting-players-list">
-                        {queue.map((p, i) => (
-                          <div key={`wait-${i}-${p}`} className="waiting-player-row">
+                        {waitingPlayers.map((p, i) => (
+                          <div
+                            key={`wait-${i}-${p}`}
+                            className="waiting-player-row"
+                            onClick={() => setSelectedPlayerAction({ player: p, zone: 'waiting' })}
+                            style={{ cursor: 'pointer' }}
+                          >
                             <span className="waiting-num">#{i + 1}</span>
                             <PlayerLabel name={p} statsMap={statsMap} />
+                            {activePriorityPlayers.includes(p) && (
+                              <span className="status-pill status-pill--priority">Next up</span>
+                            )}
+                            {formatEtaLabel(i + 1, 2, courtSlots.length > 0) && (
+                              <span className="status-pill status-pill--on-deck">{formatEtaLabel(i + 1, 2, courtSlots.length > 0)}</span>
+                            )}
                           </div>
                         ))}
                       </div>
@@ -2288,14 +2566,44 @@ function QueueSystemContent() {
               <div className="match-section">
                 <h3 className="match-section-title"><Swords size={14} /> Current Match</h3>
                 <div className="current-match-players">
-                  <div className="player-with-absent">
+                  <div
+                    className="player-with-absent"
+                    onClick={() => setSelectedPlayerAction({ player: queue[0], zone: 'playing' })}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <PlayerLabel name={queue[0]} statsMap={statsMap} />
-                    {canControl && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[0])} title="Mark absent" type="button"><UserX size={11} /></button>}
+                    {canControl && (
+                      <button
+                        className="absent-mini-btn"
+                        onClick={(e) => { e.stopPropagation(); handleMarkAbsent(queue[0]); }}
+                        disabled={isSingleCourtReplaceBlocked}
+                        title={isSingleCourtReplaceBlocked ? 'Cannot replace player after scoring has started' : "Can't play now"}
+                        aria-label={`Can't play now: Replace ${queue[0]}`}
+                        type="button"
+                      >
+                        <UserX size={11} />
+                      </button>
+                    )}
                   </div>
                   <span className="vs-sep">vs</span>
-                  <div className="player-with-absent">
+                  <div
+                    className="player-with-absent"
+                    onClick={() => setSelectedPlayerAction({ player: queue[1], zone: 'playing' })}
+                    style={{ cursor: 'pointer' }}
+                  >
                     <PlayerLabel name={queue[1]} statsMap={statsMap} />
-                    {canControl && <button className="absent-mini-btn" onClick={() => handleMarkAbsent(queue[1])} title="Mark absent" type="button"><UserX size={11} /></button>}
+                    {canControl && (
+                      <button
+                        className="absent-mini-btn"
+                        onClick={(e) => { e.stopPropagation(); handleMarkAbsent(queue[1]); }}
+                        disabled={isSingleCourtReplaceBlocked}
+                        title={isSingleCourtReplaceBlocked ? 'Cannot replace player after scoring has started' : "Can't play now"}
+                        aria-label={`Can't play now: Replace ${queue[1]}`}
+                        type="button"
+                      >
+                        <UserX size={11} />
+                      </button>
+                    )}
                   </div>
                 </div>
                 <ScoreBoard labelA={queue[0]} labelB={queue[1]} disabled={!canControl}
@@ -2347,6 +2655,8 @@ function QueueSystemContent() {
                       isHost={canControl}
                       onWin={handleCourtWinClick}
                       onEdit={canControl ? (id) => setSwapCourtId(id) : undefined}
+                      onMarkAbsent={canControl ? handleMarkAbsent : undefined}
+                      onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'playing' })}
                     />
                   ))}
                 </div>
@@ -2357,17 +2667,37 @@ function QueueSystemContent() {
                     : (
                       <div className="waiting-players-list">
                         {waitingPlayers.map((p, i) => (
-                          <div key={`wait-${i}-${p}`} className="waiting-player-row">
+                          <div
+                            key={`wait-${i}-${p}`}
+                            className="waiting-player-row"
+                            onClick={() => setSelectedPlayerAction({ player: p, zone: 'waiting' })}
+                            style={{ cursor: 'pointer' }}
+                          >
                             <span className="waiting-num">#{i + 1}</span>
                             <PlayerLabel name={p} statsMap={statsMap} />
+                            {activePriorityPlayers.includes(p) && (
+                              <span className="status-pill status-pill--priority">Next up</span>
+                            )}
+                            {formatEtaLabel(i + 1, 4, courtSlots.length > 0) && (
+                              <span className="status-pill status-pill--on-deck">{formatEtaLabel(i + 1, 4, courtSlots.length > 0)}</span>
+                            )}
                             {canControl && (
-                              <div className="waiting-reorder-btns">
+                              <div className="waiting-reorder-btns" onClick={e => e.stopPropagation()}>
                                 <button
                                   type="button"
                                   className="waiting-reorder-btn"
-                                  disabled={i === 0}
+                                  disabled={
+                                    i === 0 ||
+                                    (!activePriorityPlayers.includes(p) &&
+                                      activePriorityPlayers.includes(waitingPlayers[i - 1]))
+                                  }
                                   onClick={() => handleMoveWaitingPlayer(p, -1)}
-                                  title="Move up in queue"
+                                  title={
+                                    !activePriorityPlayers.includes(p) &&
+                                    activePriorityPlayers.includes(waitingPlayers[i - 1])
+                                      ? 'Returning and new players go first.'
+                                      : 'Move up in queue'
+                                  }
                                   aria-label={`Move ${p} up in queue`}
                                 >
                                   ▲
@@ -2375,9 +2705,18 @@ function QueueSystemContent() {
                                 <button
                                   type="button"
                                   className="waiting-reorder-btn"
-                                  disabled={i === waitingPlayers.length - 1}
+                                  disabled={
+                                    i === waitingPlayers.length - 1 ||
+                                    (activePriorityPlayers.includes(p) &&
+                                      !activePriorityPlayers.includes(waitingPlayers[i + 1]))
+                                  }
                                   onClick={() => handleMoveWaitingPlayer(p, 1)}
-                                  title="Move down in queue"
+                                  title={
+                                    activePriorityPlayers.includes(p) &&
+                                    !activePriorityPlayers.includes(waitingPlayers[i + 1])
+                                      ? 'Returning and new players go first.'
+                                      : 'Move down in queue'
+                                  }
                                   aria-label={`Move ${p} down in queue`}
                                 >
                                   ▼
@@ -2408,54 +2747,59 @@ function QueueSystemContent() {
                     persistedScore={canControl ? (session.liveScore ?? null) : null}
                     scoreReady={!session.sessionId || session.isConnected}
                     onMarkAbsent={canControl ? handleMarkAbsent : undefined}
+                    replaceDisabled={isSingleCourtReplaceBlocked}
                   />
                 )}
                 {gameMode === 'doubles' && queue.length < 4 && <p className="muted-hint">Not enough players for a match.</p>}
 
-                {/* Substitute picker — appears when host marks a player absent */}
-                {canControl && substituteFor !== null && (
-                  <div className="sub-picker-panel">
-                    <div className="sub-picker-header">
-                      <span className="sub-picker-label">Replace <strong>{substituteFor}</strong> with:</span>
-                      <button className="sub-cancel-btn" onClick={() => setSubstituteFor(null)} type="button">✕ Cancel</button>
-                    </div>
-                    <div className="sub-picker-options">
-                      {waitingForNext.map(p => (
-                        <button key={p} className="sub-pick-btn" onClick={() => handleConfirmSub(p)} type="button">
-                          <PlayerLabel name={p} statsMap={statsMap} />
-                        </button>
-                      ))}
-                      {waitingForNext.length === 0 && (
-                        <span className="muted-hint">No waiting players available.</span>
-                      )}
-                    </div>
-                  </div>
-                )}
+
 
                 <div className="pairings-container">
                   <h3 className="pairings-label">Upcoming Matches</h3>
                   {gameMode === 'singles' && <SinglesTable queue={queue} statsMap={statsMap} />}
                   {gameMode === 'doubles' && <DoublesTable queue={queue} statsMap={statsMap} />}
 
-                  {/* Sit Next — host can bump a waiting player to the front */}
-                  {canControl && waitingForNext.length >= 2 && (
-                    <div className="sit-next-section">
-                      <span className="sit-next-title">Waiting — tap ▲ to move a player up next</span>
-                      {waitingForNext.map((p, i) => (
-                        <div key={p} className="sit-next-row">
-                          <span className="sit-next-pos">#{i + 1}</span>
-                          <PlayerLabel name={p} statsMap={statsMap} />
-                          {i > 0 && (
-                            <button className="sit-next-btn" onClick={() => handleSitNext(p)} title="Move to front of waiting pool" type="button">
-                              <ArrowUp size={11} /> Next
-                            </button>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+
                 </div>
               </>
+            )}
+            {/* Substitute picker — appears when host marks a player absent (single-court or multi-court) */}
+            {canControl && substituteFor !== null && (
+              <div className="sub-picker-panel" role="region" aria-label="Replace called player">
+                <div className="sub-picker-header">
+                  <span className="sub-picker-label">Replace <strong>{substituteFor}</strong> with:</span>
+                  <button className="sub-cancel-btn" onClick={() => { setSubstituteFor(null); setMultiCourtSubConfirmed(false); }} type="button">✕ Cancel</button>
+                </div>
+                {!multiCourtSubConfirmed ? (
+                  <div className="sub-picker-confirm">
+                    <p className="confirm-message">This match may already be underway. Replace anyway?</p>
+                    <div className="confirm-actions">
+                      <button className="confirm-btn confirm-btn--warn" onClick={() => setMultiCourtSubConfirmed(true)} type="button">
+                        Replace anyway
+                      </button>
+                      <button className="confirm-btn confirm-btn--cancel" onClick={() => { setSubstituteFor(null); setMultiCourtSubConfirmed(false); }} type="button">
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="sub-picker-options">
+                    {waitingForNext.length > 0 && (
+                      <button className="sub-pick-btn sub-pick-btn--auto" onClick={() => handleConfirmSub()} type="button">
+                        Auto-select next eligible ({waitingForNext[0]})
+                      </button>
+                    )}
+                    {waitingForNext.map(p => (
+                      <button key={p} className="sub-pick-btn" onClick={() => handleConfirmSub(p)} type="button">
+                        <PlayerLabel name={p} statsMap={statsMap} />
+                      </button>
+                    ))}
+                    {waitingForNext.length === 0 && (
+                      <span className="muted-hint">No waiting players available.</span>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             {gameMode === 'singles' && queue.length < 2 && <p className="muted-hint">Not enough players for a match.</p>}
             </>
@@ -2496,10 +2840,37 @@ function QueueSystemContent() {
         defaultVariant="host"
       />
       {V1_RELEASE.showLegacyCourtCoordinator && showCoordinator && <CoordinatorOverlay courts={courts} onClose={() => setShowCoordinator(false)} />}
-      {toastMsg && (
-        <div className="toast-notification" role="alert">
-          <span>{toastMsg}</span>
-          <button className="toast-dismiss" onClick={() => setToastMsg(null)}>✕</button>
+      {(matchToast || toastMsg) && (
+        <div
+          className="toast-notification toast-notification--enhanced"
+          role="alert"
+          onMouseEnter={pauseToastTimer}
+          onMouseLeave={resumeToastTimer}
+          onTouchStart={pauseToastTimer}
+          onTouchEnd={resumeToastTimer}
+        >
+          <div className="toast-content">
+            <span className="toast-msg">{matchToast?.message ?? toastMsg}</span>
+            {matchToast?.subMessage && <span className="toast-submsg">{matchToast.subMessage}</span>}
+          </div>
+          {matchToast?.canUndo && (
+            <button
+              type="button"
+              className="toast-undo-btn"
+              onClick={handleToastUndo}
+              aria-label="Undo last match"
+            >
+              Undo
+            </button>
+          )}
+          <button
+            type="button"
+            className="toast-dismiss"
+            onClick={dismissToast}
+            aria-label="Dismiss notification"
+          >
+            ✕
+          </button>
         </div>
       )}
       {pendingConfirm && (
@@ -2520,6 +2891,68 @@ function QueueSystemContent() {
           </div>
         </div>
       )}
+      <PlayerActionMenu
+        player={selectedPlayerAction?.player ?? null}
+        zone={selectedPlayerAction?.zone ?? 'waiting'}
+        isHost={canControl}
+        isPriority={selectedPlayerAction ? activePriorityPlayers.includes(selectedPlayerAction.player) : false}
+        canMoveUp={(() => {
+          if (!selectedPlayerAction || selectedPlayerAction.zone !== 'waiting') return false;
+          const idx = waitingPlayers.indexOf(selectedPlayerAction.player);
+          if (idx <= 0) return false;
+          const isPrio = activePriorityPlayers.includes(selectedPlayerAction.player);
+          const prevIsPrio = activePriorityPlayers.includes(waitingPlayers[idx - 1]);
+          return isPrio || !prevIsPrio;
+        })()}
+        canMoveDown={(() => {
+          if (!selectedPlayerAction || selectedPlayerAction.zone !== 'waiting') return false;
+          const idx = waitingPlayers.indexOf(selectedPlayerAction.player);
+          if (idx < 0 || idx >= waitingPlayers.length - 1) return false;
+          const isPrio = activePriorityPlayers.includes(selectedPlayerAction.player);
+          const nextIsPrio = activePriorityPlayers.includes(waitingPlayers[idx + 1]);
+          return !isPrio || nextIsPrio;
+        })()}
+        moveUpDisabledReason={(() => {
+          if (!selectedPlayerAction || selectedPlayerAction.zone !== 'waiting') return undefined;
+          const idx = waitingPlayers.indexOf(selectedPlayerAction.player);
+          if (idx > 0) {
+            const isPrio = activePriorityPlayers.includes(selectedPlayerAction.player);
+            const prevIsPrio = activePriorityPlayers.includes(waitingPlayers[idx - 1]);
+            if (!isPrio && prevIsPrio) return 'Returning and new players go first.';
+          }
+          return undefined;
+        })()}
+        onClose={() => setSelectedPlayerAction(null)}
+        onCantPlayNow={() => {
+          if (selectedPlayerAction) {
+            handleMarkAbsent(selectedPlayerAction.player);
+          }
+        }}
+        onTakeBreak={() => {
+          if (selectedPlayerAction) {
+            const p = selectedPlayerAction.player;
+            handleToggleSitOut(p);
+            showToast(`${p} is on break. They'll be Next up when they return.`);
+          }
+        }}
+        onBackIn={() => {
+          if (selectedPlayerAction) {
+            const p = selectedPlayerAction.player;
+            handleToggleSitOut(p);
+            showToast(`${p} is back and will play next.`);
+          }
+        }}
+        onMoveUp={() => {
+          if (selectedPlayerAction) {
+            handleMoveWaitingPlayer(selectedPlayerAction.player, -1);
+          }
+        }}
+        onMoveDown={() => {
+          if (selectedPlayerAction) {
+            handleMoveWaitingPlayer(selectedPlayerAction.player, 1);
+          }
+        }}
+      />
     </div>
   );
 }

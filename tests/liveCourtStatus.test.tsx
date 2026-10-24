@@ -112,4 +112,61 @@ describe('Live Court Status', () => {
     expect(correctedFinished).toBe(false);
     expect(winCalled).toBe(false);
   });
+
+  it('renders On break (N) and excludes sittingOut players from waiting queue and on-deck', () => {
+    const html = renderToStaticMarkup(
+      <LiveCourtStatus
+        courtSlots={courts}
+        gameMode="doubles"
+        queue={['A', 'B', 'M', 'N', 'O', 'P', 'Q']}
+        sittingOut={['M', 'Z']}
+        selectedCourtId="court-3"
+        onSelectCourt={() => undefined}
+      />,
+    );
+
+    // M was in queue, but because M is in sittingOut, M must be in On break and NOT in next up
+    expect(html).toContain('On break (2)');
+    expect(html).toContain('>M</span>');
+    expect(html).toContain('>Z</span>');
+    expect(html).toContain('w-status-pill--on-break');
+    expect(html).toContain('On break');
+
+    // Next up should start with N, not M!
+    expect(html).toContain('#1</span> N');
+    expect(html).toContain('w-status-pill--on-deck');
+    expect(html).toContain('On deck');
+  });
+
+  it('omits On break section when sittingOut is empty', () => {
+    const html = renderToStaticMarkup(
+      <LiveCourtStatus
+        courtSlots={courts}
+        gameMode="doubles"
+        queue={['A', 'B', 'M', 'N', 'O', 'P', 'Q']}
+        sittingOut={[]}
+        selectedCourtId="court-3"
+        onSelectCourt={() => undefined}
+      />,
+    );
+
+    expect(html).not.toContain('On break');
+    expect(html).not.toContain('w-on-break');
+  });
+  it('renders Priority status pill for returning priority players', () => {
+    const html = renderToStaticMarkup(
+      <LiveCourtStatus
+        courtSlots={courts}
+        gameMode="doubles"
+        queue={['A', 'B', 'N', 'O', 'P', 'Q']}
+        sittingOut={[]}
+        priorityPlayers={['N']}
+        selectedCourtId="court-3"
+        onSelectCourt={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('w-status-pill--priority');
+    expect(html).toContain('Next up');
+  });
 });

@@ -11,6 +11,7 @@ export interface MultiCourtResultState {
   courtSlots: MultiCourtSlot[];
   lockedPartners?: Array<{ a: string; b: string }>;
   sittingOut?: string[];
+  priorityPlayers?: string[];
 }
 
 export interface PlannedCourtResult {
@@ -19,6 +20,7 @@ export interface PlannedCourtResult {
   courtName: string;
   players: string;
   winner: string;
+  priorityPlayers?: string[];
 }
 
 export function planMultiCourtResult(
@@ -43,17 +45,60 @@ export function planMultiCourtResult(
     player => !unavailable.has(player) && !occupiedElsewhere.has(player),
   );
 
+  const priorityList = state.priorityPlayers ?? [];
+  const prioritySet = new Set(priorityList);
+  const eligiblePriority = priorityList.filter(
+    p => eligibleWaiting.includes(p) && !unavailable.has(p) && !occupiedElsewhere.has(p),
+  );
+  const remainingEligible = eligibleWaiting.filter(p => !prioritySet.has(p));
+  const orderedWaiting = [...eligiblePriority, ...remainingEligible];
+
   if (gameMode === 'singles') {
     const [playerA, playerB] = slot.onCourt;
     const winner = winningSide === 'A' ? playerA : playerB;
     const loser = winningSide === 'A' ? playerB : playerA;
-    const nextChallenger = eligibleWaiting[0];
-    const nextOnCourt = nextChallenger ? [winner, nextChallenger] : [winner, loser];
-    const queue = nextChallenger
-      ? [...state.queue.filter(player => player !== nextChallenger), loser]
-      : [...state.queue];
+
+    const isWinnerAvailable = !unavailable.has(winner);
+    const isLoserAvailable = !unavailable.has(loser);
+
+    let nextOnCourt: string[];
+    let consumedWaitingCount: number;
+
+    if (isWinnerAvailable) {
+      const nextChallenger = orderedWaiting[0];
+      if (nextChallenger) {
+        nextOnCourt = [winner, nextChallenger];
+        consumedWaitingCount = 1;
+      } else if (isLoserAvailable) {
+        nextOnCourt = [winner, loser];
+        consumedWaitingCount = 0;
+      } else {
+        nextOnCourt = [winner, ''];
+        consumedWaitingCount = 0;
+      }
+    } else {
+      // Winner is sitting out -> steps down to break
+      const challengerA = orderedWaiting[0] ?? '';
+      const challengerB = orderedWaiting[1] ?? (isLoserAvailable ? loser : '');
+      nextOnCourt = [challengerA, challengerB];
+      consumedWaitingCount = (orderedWaiting[0] ? 1 : 0) + (orderedWaiting[1] ? 1 : 0);
+    }
+
+    const consumedChallengers = new Set(orderedWaiting.slice(0, consumedWaitingCount));
+    const remainingWaiting = state.queue.filter(
+      player => !consumedChallengers.has(player) && !unavailable.has(player),
+    );
+    const queue = isLoserAvailable && !nextOnCourt.includes(loser)
+      ? [...remainingWaiting, loser]
+      : remainingWaiting;
+
     const courtSlots = state.courtSlots.map(court =>
       court.id === courtId ? { ...court, onCourt: nextOnCourt } : court,
+    );
+
+    const nextOnCourtSet = new Set(nextOnCourt.filter(Boolean));
+    const nextPriorityPlayers = priorityList.filter(
+      p => !nextOnCourtSet.has(p) && !unavailable.has(p),
     );
 
     return {
@@ -62,6 +107,7 @@ export function planMultiCourtResult(
       courtName: slot.name,
       players: `${playerA} vs ${playerB}`,
       winner,
+      priorityPlayers: nextPriorityPlayers,
     };
   }
 
@@ -71,16 +117,25 @@ export function planMultiCourtResult(
   const lockedPartners: LockedPartnerPair[] = (state.lockedPartners ?? []).map(
     pair => [pair.a, pair.b],
   );
-  const next = rotateMultiCourtDoubles(eligibleWaiting, slot.onCourt, lockedPartners);
+
+  // Defensively exclude any finisher who is sittingOut so they do not re-enter queue or court
+  const availableFinishers = slot.onCourt.filter(player => !unavailable.has(player));
+  const next = rotateMultiCourtDoubles(orderedWaiting, availableFinishers, lockedPartners);
   const courtSlots = state.courtSlots.map(court =>
     court.id === courtId ? { ...court, onCourt: next.onCourt } : court,
   );
 
+  const nextOnCourtSet = new Set(next.onCourt);
+  const nextPriorityPlayers = priorityList.filter(
+    p => !nextOnCourtSet.has(p) && !unavailable.has(p),
+  );
+
   return {
-    queue: next.waiting,
+    queue: next.waiting.filter(player => !unavailable.has(player)),
     courtSlots,
     courtName: slot.name,
     players: `${teamA.join(' & ')} vs ${teamB.join(' & ')}`,
     winner,
+    priorityPlayers: nextPriorityPlayers,
   };
 }
