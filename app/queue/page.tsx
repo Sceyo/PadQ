@@ -1635,26 +1635,6 @@ function QueueSystemContent() {
     if (session.sessionId) session.syncField({ queue: newQueue });
   };
 
-  const handleMoveWaitingPlayer = (playerName: string, direction: -1 | 1) => {
-    const curIdx = waitingPlayers.indexOf(playerName);
-    if (curIdx === -1) return;
-    const targetIdx = curIdx + direction;
-    if (targetIdx < 0 || targetIdx >= waitingPlayers.length) return;
-    const otherPlayer = waitingPlayers[targetIdx];
-
-    const qIdx1 = queue.indexOf(playerName);
-    const qIdx2 = queue.indexOf(otherPlayer);
-    if (qIdx1 === -1 || qIdx2 === -1) return;
-
-    const newQueue = [...queue];
-    newQueue[qIdx1] = otherPlayer;
-    newQueue[qIdx2] = playerName;
-
-    setQueue(newQueue);
-    queueRef.current = newQueue;
-    if (session.sessionId) session.syncField({ queue: newQueue });
-  };
-
   const handlePartnerPairsChange = (nextPairs: [string, string][]) => {
     const playerSet = new Set(players);
     const used = new Set<string>();
