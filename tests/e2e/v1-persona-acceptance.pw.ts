@@ -27,8 +27,8 @@ test('25-player rush preserves registration order and a middle departure', async
     await host.getByRole('button', { name: /Start Queue/ }).click();
     await expect(host.locator('.session-bar--host')).toContainText('Connected', { timeout: 30_000 });
 
-    const initialWaiting = await host.locator('.waiting-player-row').allTextContents();
-    expect(initialWaiting.map(text => text.replace(/^#\d+/, '').replace(/[▲▼]/g, '').trim())).toEqual(RUSH_PLAYERS.slice(12));
+    const initialWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
+    expect(initialWaiting.map(text => text.trim())).toEqual(RUSH_PLAYERS.slice(12));
 
     await host.getByTitle('Settings').click();
     await host.getByRole('button', { name: 'Start', exact: true }).click();
@@ -45,8 +45,8 @@ test('25-player rush preserves registration order and a middle departure', async
     const departingPlayer = RUSH_PLAYERS[18];
     await host.locator('.mqp-btn--remove').filter({ hasText: departingPlayer }).click();
 
-    const remainingWaiting = await host.locator('.waiting-player-row').allTextContents();
-    expect(remainingWaiting.map(text => text.replace(/^#\d+/, '').replace(/[▲▼]/g, '').trim())).toEqual([
+    const remainingWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
+    expect(remainingWaiting.map(text => text.trim())).toEqual([
       ...RUSH_PLAYERS.slice(12, 18),
       ...RUSH_PLAYERS.slice(19),
     ]);
