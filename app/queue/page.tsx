@@ -2352,7 +2352,7 @@ function QueueSystemContent() {
                 {showDiagnostics && (
                   <div className="diagnostics-panel" role="region" aria-label="Engine Diagnostics">
                     <div className="diagnostics-header">Engine State (Host Only)</div>
-                    {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && (
+                    {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && courtSlots.length === 0 && (
                       <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />
                     )}
                     {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
@@ -2361,6 +2361,19 @@ function QueueSystemContent() {
                       ) : (
                         <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
                       )
+                    )}
+                    {courtSlots.length > 0 && (
+                      <div className="diagnostics-multicourt" style={{ padding: '8px 12px', fontSize: '0.82rem' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary, #e2e8f0)', marginBottom: '4px' }}>
+                          Multi-Court Queue Rotation ({courtSlots.length} {courtSlots.length === 1 ? 'court' : 'courts'})
+                        </div>
+                        <div style={{ color: 'var(--text-secondary, #94a3b8)', lineHeight: '1.5' }}>
+                          <div>Courts active: {courtSlots.map(c => `${c.name} (${c.onCourt.filter(Boolean).length}/${gameMode === 'singles' ? 2 : 4})`).join(' • ')}</div>
+                          <div>Waiting in queue: {waitingPlayers.length}</div>
+                          {activePriorityPlayers.length > 0 && <div>Priority players: {activePriorityPlayers.join(', ')}</div>}
+                          {activeSittingOut.length > 0 && <div>On break: {activeSittingOut.join(', ')}</div>}
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}

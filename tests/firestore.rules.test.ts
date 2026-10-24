@@ -1090,6 +1090,63 @@ suite('Firestore V1 production rules', () => {
         lastActiveAt: serverTimestamp(),
       }));
     });
+
+    it('accepts revisioned update containing sittingOut alongside queue, courtSlots, and priorityPlayers (20-player headroom)', async () => {
+      const host = env.authenticatedContext('host-so-rev').firestore();
+      const ref = doc(host, 'sessions', 'S7REV2');
+      const p20 = Array.from({ length: 20 }, (_, i) => `P${String(i + 1).padStart(2, '0')}`);
+      const initialCourtSlots = [
+        { id: 'c1', name: 'Court 1', onCourt: p20.slice(0, 4) },
+      ];
+
+      // Seed 20-player session with initial court and queue
+      await assertSucceeds(setDoc(ref, sessionData('host-so-rev', {
+        players: p20,
+        queue: p20.slice(4),
+        courtSlots: initialCourtSlots,
+        sittingOut: [],
+        priorityPlayers: [],
+      })));
+
+      // Host sits out a player and replaces on court with priority player:
+      // updates courtSlots, priorityPlayers, queue, sittingOut, revision simultaneously
+      await assertSucceeds(updateDoc(ref, {
+        courtSlots: [
+          { id: 'c1', name: 'Court 1', onCourt: [p20[0], p20[1], p20[2], p20[4]] },
+        ],
+        priorityPlayers: [p20[5]],
+        queue: p20.slice(6),
+        sittingOut: [p20[3]],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Host returns sat-out player to queue and clears sittingOut in a revisioned update
+      await assertSucceeds(updateDoc(ref, {
+        queue: [...p20.slice(6), p20[3]],
+        sittingOut: [],
+        revision: 2,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: sittingOut containing player not in roster is rejected
+      await assertFails(updateDoc(ref, {
+        sittingOut: ['P99_UNKNOWN'],
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: sittingOut containing duplicate player is rejected
+      await assertFails(updateDoc(ref, {
+        sittingOut: [p20[0], p20[0]],
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
   });
 });
 
