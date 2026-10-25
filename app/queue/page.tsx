@@ -2265,6 +2265,14 @@ function QueueSystemContent() {
                       }}
                     />
                   )}
+                  {!isSkilled && (
+                    <SitOutPanel
+                      players={players}
+                      sittingOut={activeSittingOut}
+                      onToggle={handleToggleSitOut}
+                      onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
+                    />
+                  )}
                   {!isSkilled && gameMode === 'doubles' && courtSlots.length > 0 && (
                     <PartnerPanel
                       players={players}
@@ -2293,15 +2301,6 @@ function QueueSystemContent() {
                   )}
                 </div>
               </div>
-            )}
-
-            {canControl && !isSkilled && (
-              <SitOutPanel
-                players={players}
-                sittingOut={activeSittingOut}
-                onToggle={handleToggleSitOut}
-                onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
-              />
             )}
 
             {session.isHost && (
