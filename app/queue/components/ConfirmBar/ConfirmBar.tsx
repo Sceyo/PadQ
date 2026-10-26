@@ -16,6 +16,11 @@ interface Props {
   sideALabel?: string;
   sideBLabel?: string;
   isScoreZeroAndEnabled?: boolean;
+  scoreEnabled?: boolean;
+  isGameWon?: boolean;
+  targetLimit?: number;
+  isEndEarly?: boolean;
+  onToggleEndEarly?: (active: boolean) => void;
 }
 
 export function ConfirmBar({
@@ -31,9 +36,24 @@ export function ConfirmBar({
   sideALabel,
   sideBLabel,
   isScoreZeroAndEnabled = false,
+  scoreEnabled = true,
+  isGameWon = false,
+  targetLimit = 11,
+  isEndEarly = false,
+  onToggleEndEarly,
 }: Props) {
   const isSaving = stage === 'saving' || stage === 'slow';
   const isFailed = stage === 'failed';
+
+  const isScoringActive = Boolean(scoreEnabled);
+  const isWinnerLocked = isScoringActive && !isGameWon && !isEndEarly;
+  const isButtonsDisabled = disabled || isScoreZeroAndEnabled || isWinnerLocked;
+
+  const buttonTooltip = isScoreZeroAndEnabled
+    ? 'Enter score above or switch Match Scores off in Host Tools (≡)'
+    : isWinnerLocked
+    ? `Playing to ${targetLimit}. Winner selection unlocks at game point, or tap 'End match early'.`
+    : undefined;
 
   return (
     <footer
@@ -61,11 +81,16 @@ export function ConfirmBar({
                 fontWeight: 700,
                 letterSpacing: '0.06em',
                 textTransform: 'uppercase',
-                color: isScoreZeroAndEnabled ? 'var(--status-warn, #f59e0b)' : 'var(--text-muted, #94a3b8)',
+                color: isScoreZeroAndEnabled
+                  ? 'var(--status-warn, #f59e0b)'
+                  : isEndEarly
+                  ? 'var(--status-warn, #f59e0b)'
+                  : 'var(--text-muted, #94a3b8)',
               }}
             >
-              WHO WON?
+              {isEndEarly ? 'END MATCH EARLY · WHO WON?' : 'WHO WON?'}
             </span>
+
             {isScoreZeroAndEnabled && (
               <span
                 style={{
@@ -81,24 +106,79 @@ export function ConfirmBar({
                 Score is 0–0 · Enter score above or turn Match Scores off
               </span>
             )}
+
+            {!isScoreZeroAndEnabled && isWinnerLocked && onToggleEndEarly && (
+              <button
+                type="button"
+                onClick={() => onToggleEndEarly(true)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--accent-primary, #6366f1)',
+                  fontSize: '0.75rem',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  textDecoration: 'underline',
+                  padding: '2px 4px',
+                }}
+              >
+                End match early
+              </button>
+            )}
+
+            {isEndEarly && onToggleEndEarly && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span
+                  style={{
+                    fontSize: '0.6875rem',
+                    fontWeight: 700,
+                    color: 'var(--status-warn, #f59e0b)',
+                    background: 'rgba(245, 158, 11, 0.12)',
+                    border: '1px solid rgba(245, 158, 11, 0.25)',
+                    padding: '2px 8px',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  Ending early{scoreLabel ? ` (${scoreLabel})` : ''}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onToggleEndEarly(false)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted, #94a3b8)',
+                    fontSize: '0.6875rem',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    textDecoration: 'underline',
+                    padding: '2px 4px',
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3, 12px)' }}>
             <button
               type="button"
               onClick={() => onChooseWinner('A')}
-              disabled={disabled || isScoreZeroAndEnabled}
-              title={isScoreZeroAndEnabled ? 'Enter score above or switch Match Scores off in Host Tools (≡)' : undefined}
+              disabled={isButtonsDisabled}
+              title={buttonTooltip}
               style={{
                 height: 'var(--tap-min, 48px)',
                 minHeight: 'var(--tap-min, 44px)',
                 borderRadius: 'var(--r-md, 14px)',
-                border: '1.5px solid var(--line-subtle, #252d47)',
+                border: isEndEarly
+                  ? '1.5px solid rgba(245, 158, 11, 0.4)'
+                  : '1.5px solid var(--line-subtle, #252d47)',
                 background: 'var(--surface-bg-alt, #1a2035)',
                 color: 'var(--text-primary, #f8fafc)',
                 fontSize: 'var(--fs-sm, 0.9375rem)',
                 fontWeight: 700,
-                cursor: (disabled || isScoreZeroAndEnabled) ? 'not-allowed' : 'pointer',
-                opacity: (disabled || isScoreZeroAndEnabled) ? 0.35 : 1,
+                cursor: isButtonsDisabled ? 'not-allowed' : 'pointer',
+                opacity: isButtonsDisabled ? 0.35 : 1,
                 transition: 'border-color 0.15s ease, opacity 0.15s ease',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -111,19 +191,21 @@ export function ConfirmBar({
             <button
               type="button"
               onClick={() => onChooseWinner('B')}
-              disabled={disabled || isScoreZeroAndEnabled}
-              title={isScoreZeroAndEnabled ? 'Enter score above or switch Match Scores off in Host Tools (≡)' : undefined}
+              disabled={isButtonsDisabled}
+              title={buttonTooltip}
               style={{
                 height: 'var(--tap-min, 48px)',
                 minHeight: 'var(--tap-min, 44px)',
                 borderRadius: 'var(--r-md, 14px)',
-                border: '1.5px solid var(--line-subtle, #252d47)',
+                border: isEndEarly
+                  ? '1.5px solid rgba(245, 158, 11, 0.4)'
+                  : '1.5px solid var(--line-subtle, #252d47)',
                 background: 'var(--surface-bg-alt, #1a2035)',
                 color: 'var(--text-primary, #f8fafc)',
                 fontSize: 'var(--fs-sm, 0.9375rem)',
                 fontWeight: 700,
-                cursor: (disabled || isScoreZeroAndEnabled) ? 'not-allowed' : 'pointer',
-                opacity: (disabled || isScoreZeroAndEnabled) ? 0.35 : 1,
+                cursor: isButtonsDisabled ? 'not-allowed' : 'pointer',
+                opacity: isButtonsDisabled ? 0.35 : 1,
                 transition: 'border-color 0.15s ease, opacity 0.15s ease',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -134,6 +216,19 @@ export function ConfirmBar({
               {sideBLabel ?? 'Team B'}
             </button>
           </div>
+          {!isScoreZeroAndEnabled && isWinnerLocked && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '0.6875rem',
+                color: 'var(--text-muted, #94a3b8)',
+              }}
+            >
+              Playing to {targetLimit} · Winner selection unlocks at game point
+            </div>
+          )}
         </div>
       ) : (
         /* State B: WINNER CHOSEN -> EXACTLY ONE CONFIRM RESULT BAR */
@@ -147,14 +242,31 @@ export function ConfirmBar({
             }}
           >
             <div>
-              <div
-                style={{
-                  fontSize: 'var(--fs-sm, 0.9375rem)',
-                  fontWeight: 700,
-                  color: 'var(--text-primary, #f8fafc)',
-                }}
-              >
-                {winnerLabel} won{scoreLabel ? ` ${scoreLabel}` : ''}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span
+                  style={{
+                    fontSize: 'var(--fs-sm, 0.9375rem)',
+                    fontWeight: 700,
+                    color: 'var(--text-primary, #f8fafc)',
+                  }}
+                >
+                  {winnerLabel} won{scoreLabel ? ` ${scoreLabel}` : ''}
+                </span>
+                {isEndEarly && (
+                  <span
+                    style={{
+                      fontSize: '0.6875rem',
+                      fontWeight: 700,
+                      color: 'var(--status-warn, #f59e0b)',
+                      background: 'rgba(245, 158, 11, 0.12)',
+                      border: '1px solid rgba(245, 158, 11, 0.25)',
+                      padding: '1px 6px',
+                      borderRadius: '9999px',
+                    }}
+                  >
+                    Ended early
+                  </span>
+                )}
               </div>
               {nextUpLabel && (
                 <div

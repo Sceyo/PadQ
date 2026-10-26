@@ -99,7 +99,7 @@ describe('SingleCourtScreen component suite', () => {
     expect(onScoreAdjust).toHaveBeenCalledWith('A', 1);
   });
 
-  it('transforms sticky bar from WHO WON? into Confirm result upon selecting a winner', () => {
+  it('auto-selects winner when target score is reached (11–9)', () => {
     render(
       <SingleCourtScreen
         court={{
@@ -117,13 +117,52 @@ describe('SingleCourtScreen component suite', () => {
       />
     );
 
-    expect(screen.getByText('WHO WON?')).toBeDefined();
-    const teamABtn = screen.getByText('Team A');
-    fireEvent.click(teamABtn);
+    expect(screen.getByText(/john & ben won 11–9/i)).toBeDefined();
+    expect(screen.getByText('Confirm result')).toBeDefined();
 
-    // Morphs into single Confirm result
-    expect(screen.queryByText('WHO WON?')).toBeNull();
-    expect(screen.getByText(/john & ben won/)).toBeDefined();
+    // Tapping Change returns to WHO WON? where winner buttons are unlocked since limit was reached
+    fireEvent.click(screen.getByText('Change'));
+    expect(screen.getByText('WHO WON?')).toBeDefined();
+    const teamBBtn = screen.getByRole('button', { name: 'Team B' }) as HTMLButtonElement;
+    expect(teamBBtn.disabled).toBe(false);
+    fireEvent.click(teamBBtn);
+    expect(screen.getByText(/jerome & tyson won/i)).toBeDefined();
+  });
+
+  it('disables winner selection while match is in progress and unlocks upon tapping End match early', () => {
+    render(
+      <SingleCourtScreen
+        court={{
+          ...mockCourt,
+          score: { ...mockCourt.score, scoreA: 7, scoreB: 4 },
+        }}
+        queue={mockQueue}
+        onMatchComplete={vi.fn()}
+        onScoreAdjust={vi.fn()}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    // Buttons are locked during in-progress scoring
+    expect(screen.getByText(/Playing to 11 · Winner selection unlocks at game point/i)).toBeDefined();
+    const teamABtn = screen.getByRole('button', { name: 'Team A' }) as HTMLButtonElement;
+    expect(teamABtn.disabled).toBe(true);
+
+    // Tap "End match early" to unlock for injuries/time limits
+    const endEarlyBtn = screen.getByRole('button', { name: /End match early/i });
+    fireEvent.click(endEarlyBtn);
+
+    expect(screen.getByText(/Ending early \(7–4\)/i)).toBeDefined();
+    expect(teamABtn.disabled).toBe(false);
+
+    // Selecting winner now works and marks ended early
+    fireEvent.click(teamABtn);
+    expect(screen.getByText('Ended early')).toBeDefined();
+    expect(screen.getByText(/john & ben won 7–4/i)).toBeDefined();
     expect(screen.getByText('Confirm result')).toBeDefined();
   });
 

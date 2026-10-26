@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RotateCcw, Check, X } from 'lucide-react';
 import { CourtView } from '../CourtView/CourtView';
 import { ScoreRow } from '../ScoreRow/ScoreRow';
@@ -84,6 +84,7 @@ export function SingleCourtScreen({
   const canSubtractB = isHost && scoreB > 0;
 
   const handleScoreAdjust = (side: 'A' | 'B', delta: number) => {
+    setUserUnselectedWinner(false);
     onScoreAdjust(side, delta);
   };
 
@@ -119,6 +120,43 @@ export function SingleCourtScreen({
   const isScoreZeroAndEnabled = Boolean(
     court.score.enabled && court.score.scoreA === 0 && court.score.scoreB === 0
   );
+
+  // Option 1: End match early state & auto-select winner when limit is reached
+  const [isEndEarlyActive, setIsEndEarlyActive] = useState(false);
+  const [userUnselectedWinner, setUserUnselectedWinner] = useState(false);
+
+  // Auto-select winner when game reaches target limit
+  useEffect(() => {
+    if (
+      court.score.enabled &&
+      isGameWon &&
+      matchFlow.stage === 'idle' &&
+      !matchFlow.winner &&
+      !userUnselectedWinner
+    ) {
+      matchFlow.chooseWinner(isWonA ? 'A' : 'B', currentScoreLabel);
+    }
+  }, [court.score.enabled, isGameWon, isWonA, isWonB, matchFlow.stage, matchFlow.winner, userUnselectedWinner, currentScoreLabel]);
+
+  // If score drops below winning threshold during live adjustment, clear auto-selected winner
+  useEffect(() => {
+    if (court.score.enabled && !isGameWon && !isEndEarlyActive && matchFlow.winner && matchFlow.stage === 'ready') {
+      matchFlow.clearWinner();
+    }
+  }, [court.score.enabled, isGameWon, isEndEarlyActive, matchFlow]);
+
+  // Reset user manual selection override when game is no longer won
+  useEffect(() => {
+    if (!isGameWon) {
+      setUserUnselectedWinner(false);
+    }
+  }, [isGameWon]);
+
+  // Reset early-ending state on new match or court change
+  useEffect(() => {
+    setIsEndEarlyActive(false);
+    setUserUnselectedWinner(false);
+  }, [court.id, teamA.players.join(','), teamB.players.join(',')]);
 
   // Compute move up / move down eligibility
   const waitingQueueNames = [
@@ -381,7 +419,7 @@ export function SingleCourtScreen({
                 padding: '8px 12px',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
+                justifyContent: 'center',
                 gap: '8px',
                 fontSize: 'var(--fs-xs, 0.8125rem)',
                 color: 'var(--status-success, #22c55e)',
@@ -389,25 +427,6 @@ export function SingleCourtScreen({
               }}
             >
               <span>🎉 Game Over · {isWonA ? (isSingles ? teamA.players[0] : teamA.players.join(' & ')) : (isSingles ? teamB.players[0] : teamB.players.join(' & '))} reached limit ({scoreA}–{scoreB})!</span>
-              {isHost && matchFlow.stage === 'idle' && (
-                <button
-                  type="button"
-                  onClick={() => matchFlow.chooseWinner(isWonA ? 'A' : 'B')}
-                  style={{
-                    background: 'var(--status-success, #22c55e)',
-                    color: '#ffffff',
-                    border: 'none',
-                    borderRadius: 'var(--r-pill, 9999px)',
-                    padding: '4px 12px',
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                    fontSize: 'var(--fs-xs, 0.8125rem)',
-                    flexShrink: 0,
-                  }}
-                >
-                  Select Winner
-                </button>
-              )}
             </div>
           )}
 
@@ -457,16 +476,32 @@ export function SingleCourtScreen({
           scoreLabel={currentScoreLabel}
           onChooseWinner={(side) => {
             if (isScoreZeroAndEnabled) return;
+            if (court.score.enabled && !isGameWon && !isEndEarlyActive) return;
+            setUserUnselectedWinner(false);
             matchFlow.chooseWinner(side, currentScoreLabel);
           }}
-          onClearWinner={matchFlow.clearWinner}
+          onClearWinner={() => {
+            setUserUnselectedWinner(true);
+            matchFlow.clearWinner();
+          }}
           onConfirm={() => {
             if (isScoreZeroAndEnabled) return;
+            if (court.score.enabled && !isGameWon && !isEndEarlyActive) return;
             matchFlow.confirmResult();
           }}
           sideALabel={sideALabel}
           sideBLabel={sideBLabel}
           isScoreZeroAndEnabled={isScoreZeroAndEnabled}
+          scoreEnabled={court.score.enabled}
+          isGameWon={isGameWon}
+          targetLimit={baseLimit}
+          isEndEarly={isEndEarlyActive}
+          onToggleEndEarly={(active) => {
+            setIsEndEarlyActive(active);
+            if (!active && matchFlow.winner && !isGameWon) {
+              matchFlow.clearWinner();
+            }
+          }}
         />
       )}
 
