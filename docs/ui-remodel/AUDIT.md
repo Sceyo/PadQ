@@ -1,36 +1,34 @@
 # Phase 0 Audit: Mobile-First Frontend Remodel of PadQ
 
 Date: Oct 26, 2026  
-Branch: `UI-Overhaul` (cut from `main` @ 76de06b)  
-Scope: Frontend presentation layer audit (no backend/engine/Firestore modifications)  
-Rule: **Read-only audit & baseline validation before touching layout/styles.**
+Branch: `UI-Overhaul` (synced with `origin/matchup-differential` @ `b18085a`)  
+Scope: Frontend presentation layer audit (backend/engine/Firestore read-only)
 
 ---
 
 ## 1. Executive Summary & Baseline Metrics
 
-The codebase has been inspected and audited against the responsive guardrails ported from Watch Cebu (`tests/responsiveGuards.test.ts`).
+The codebase has been inspected and audited on `UI-Overhaul` with the latest fixes from `matchup-differential` merged.
 
-- **TypeScript check (`tsc --noEmit`):** Clean (0 errors).
-- **ESLint (`npm run lint`):** 0 errors, 70 warnings (mostly unused vars & legacy effect setState warnings).
-- **Vitest Suite:** 34 test files passing (365 unit/scenario tests green, 37 Firestore rules skipped for emulator).
+- **Git Base:** `UI-Overhaul` merged with `origin/matchup-differential`.
+- **TypeScript (`tsc --noEmit`):** Clean (0 errors).
+- **ESLint (`npm run lint`):** 0 errors, 71 warnings (unused vars & legacy effect setState warnings).
+- **Vitest Suite:** 34 test files passing (367 unit/scenario tests green, 38 Firestore rules skipped for emulator).
 - **Responsive Guards:**
-  - 2 Current Guards: Contrast passes (white on `#5457e0` is ≥4.5:1). `score-player-name` on `.score-player-name` caught legacy `white-space: nowrap; text-overflow: ellipsis;` in `QueueSystem.css:527` (tracked for Phase 1 fix).
-  - 9 Target Guards: All failing as expected (`it.fails`), establishing our exact targets and offenders inventory.
+  - `CURRENT guards`: 2 pass (`score player names wrap`, `contrast computed`).
+  - `TARGET guards`: 9 failing as expected (`it.fails`), establishing exact baseline targets.
 
 ---
 
 ## 2. Screen & Component Inventory
 
-PadQ currently renders 4 primary screen modes orchestrated within `app/queue/page.tsx` (2,969 lines):
-
 | Screen / Mode | Current Orchestration | Rendered Components | Mobile Defect / Ergonomic Issue |
 |---|---|---|---|
 | **Setup View** (`players.length === 0`) | `SetupView.tsx` | Roster panel, court count picker, player input list | Inputs under 16px trigger iOS auto-zoom; button sizes <44px. |
-| **Single-Court Doubles** | `DoublesMatch.tsx` + `ScoreBoard.tsx` | `PlayerLabel`, `ScoreBoard`, inline `Form Teams`, inline winner selector, `.floating-confirm-wrap` | 1) Inline team toggling is confusing.<br>2) Plus button on left/stacked.<br>3) Applying result... status does nothing.<br>4) Confirm button renders below the fold. |
-| **Multi-Court Doubles** (`courtSlots.length > 0`) | `CourtCard.tsx` (grid) + `CourtScoreModal.tsx` | `CourtTabs`, `CourtCard`, `CourtSwapModal`, `CourtScoreModal`, `waiting-players-list` | 1) CourtCard works well visually but modal overlays are fixed.<br>2) Mini user-replace icon (`10px`) is hard to tap.<br>3) Modals need viewport flex centering/sheet alignment. |
+| **Single-Court Doubles** | `DoublesMatch.tsx` + `ScoreBoard.tsx` | `PlayerLabel`, `ScoreBoard`, inline `Form Teams`, inline winner selector, `.floating-confirm-wrap` | 1) Inline team toggling is confusing.<br>2) Plus button on left/stacked.<br>3) Confirm bar rendered below screen.<br>4) Touch targets <44px. |
+| **Multi-Court Doubles** (`courtSlots.length > 0`) | `CourtCard.tsx` (grid) + `CourtScoreModal.tsx` | `CourtCard` (Note: `CourtTabs` is legacy coordinator only, not in active V1 flow), `CourtSwapModal`, `CourtScoreModal`, `waiting-players-list` | 1) Modals not viewport-flex-centered.<br>2) Mini user-replace icon (10px) is hard to tap.<br>3) Match Score prompt flow needs bottom sheet alignment. |
 | **Singles Mode** (`gameMode === 'singles'`) | `Current Match` + `ScoreBoard.tsx` / `SinglesCourtCard.tsx` | `ScoreBoard`, `SinglesTable`, `PoolSinglesStatusPanel` | Inline scoring vs winner conflict. |
-| **Spectator View** (`/watch/[sessionId]`) | `app/watch/page.tsx` + `ScoreBoard.tsx` | `ScoreBoard` (viewer mode), standings table | Viewer player names use `nowrap` + ellipsis causing clipped player text. |
+| **Spectator View** (`app/watch/[sessionId]/page.tsx`) | `app/watch/[sessionId]/page.tsx` + `ScoreBoard.tsx` | `ScoreBoard` (viewer mode), standings table | Viewer player names use `nowrap` + ellipsis (`QueueSystem.css:1130`) causing clipped player text. |
 
 ---
 
@@ -44,12 +42,12 @@ Target Z-Index Scale:
 - `1100`: Dialogs & Bottom Sheets
 - `1200`: Toast notifications
 
-### Current Inconsistencies Identified:
-| Popup / Overlay | Current Location | Current Z-Index | Target Action in Remodel |
+### Inconsistencies & Current Render State:
+| Popup / Overlay | Current Location | Current Z-Index | Current Render Status / Action |
 |---|---|---|---|
 | `.toast-notification` | `QueueSystem.css:761` | `9999` | Move to `1200` via `OverlayHost` |
 | `.recap-modal-overlay` | `RecapModal.module.css:7` | `9999` | Move to `1000` backdrop, card at `1100` |
-| `.floating-confirm-wrap` | `QueueSystem.css:1270` | `9500` | Consolidate into sticky bottom bar (`z-index: 200`) |
+| `.floating-confirm-wrap` | `QueueSystem.css:4477` / `DoublesMatch.tsx:202` | `9500` | **CONFIRMED RENDERED**: Rendered in `DoublesMatch.tsx:202` wrapping `.floating-confirm-bar`. Consolidate into sticky bottom bar (`z-index: 200`). |
 | `.confirm-overlay` | `QueueSystem.css:1238` | `9100` | Move to `OverlayHost` (`1000 / 1100`) |
 | `.gear-menu-panel` | `QueueSystem.css:86` | `100` | Move to floating flex sheet on mobile (`1100`) |
 | `.coord-overlay` | `QueueSystem.css:1840` | `900` | Deprecate/gate (legacy coordinator) |
@@ -57,7 +55,7 @@ Target Z-Index Scale:
 
 ---
 
-## 4. CSS Breakpoints & Viewport Violations
+## 4. CSS Breakpoints, Viewport & Sizing Audit
 
 ### Media Queries (`@media`) in `QueueSystem.css`:
 Current widths in use:
@@ -67,34 +65,52 @@ Current widths in use:
 - `641px` (line 1290)
 - `860px` (lines 452, 606, 1215, 1308)
 
-**Action:** Standardize on **one mobile breakpoint (`768px`)** and one optional desktop two-column breakpoint (`1024px`).
+**Action:** Standardize strictly on **one mobile breakpoint (`768px`)** and one optional desktop two-column breakpoint (`1024px`).
 
 ### Viewport Heights (`100vh` without `dvh`):
-- `html, body` (line 7): `min-height: 100vh;`
-- `.queue-system` (line 33): `min-height: 100vh;`
-- `.guide-modal` (line 622, 1378): `max-height: 85vh;`
+- `html, body` (`QueueSystem.css:7`): `min-height: 100vh;`
+- `.queue-system` (`QueueSystem.css:33`): `min-height: 100vh;`
+- `.guide-modal` (`QueueSystem.css:622`, `1378`): `max-height: 85vh;`
 - `.recap-modal-card` (`RecapModal.module.css:32`): `max-height: 90vh;`
 
 **Action:** Adopt `100dvh` / `85dvh` throughout with `100vh` fallback.
 
-### Inputs under 16px (Triggering iOS Zoom on Focus):
-- `.input-group input` (`QueueSystem.css:73`): `font-size: 0.95rem` (~15.2px)
-- `.live-form input` (`QueueSystem.css:1516`): `font-size: 0.85rem` (~13.6px)
-- `.score-custom-input` (`QueueSystem.css:582`): `font-size: 0.85rem` (~13.6px)
-- `.setup-field-input` (`SetupView.module.css:76`): `font-size: 0.9rem` (~14.4px)
-- `.gear-recovery-input` (`QueueSystem.css:176`): `font-size: 0.85rem` (~13.6px)
+### Inputs under 16px (11 Selectors Identified in `QueueSystem.css`):
+1. `.input-group input`: `font-size: .95rem` (15.2px)
+2. `.live-form input`: `font-size: .83rem` (13.28px)
+3. `.score-custom-input`: `font-size: .8rem` (12.8px)
+4. `.session-join-input`: `font-size: 0.9rem` (14.4px)
+5. `.session-join-input::placeholder`: `font-size: 0.75rem` (12px)
+6. `.input-group input`: `font-size: 0.88rem` (14.08px)
+7. `.setup-field-input`: `font-size: 0.85rem` (13.6px)
+8. `.skilled-inline-input`: `font-size: .84rem` (13.44px)
+9. `.skilled-filter-input`: `font-size: .83rem` (13.28px)
+10. `.skilled-new-input`: `font-size: .83rem` (13.28px)
+11. `.gear-recovery-input`: `font-size: .8rem` (12.8px)
 
 **Action:** Set all mobile inputs to `font-size: 16px` (`1rem`) to prevent Safari zoom.
 
 ### Touch Targets under 44px:
-- `.waiting-reorder-btn` (`QueueSystem.css:385`): `height: 24px; width: 24px`
-- `.score-reset-btn` (`QueueSystem.css:571`): `height: 28px`
-- `.help-btn` (`QueueSystem.css:60`): `height: 32px; width: 32px`
-- `.recap-modal-close-btn` (`RecapModal.module.css:66`): `height: 32px; width: 32px`
-- `.partner-player-btn` (`QueueSystem.css:1680`): `height: 38px`
+- `.waiting-reorder-btn` (`QueueSystem.css:385`): `24px × 24px`
+- `.score-reset-btn` (`QueueSystem.css:571`): `28px`
+- `.help-btn` (`QueueSystem.css:60`): `32px × 32px`
+- `.recap-modal-close-btn` (`RecapModal.module.css:66`): `32px × 32px`
+- `.partner-player-btn` (`QueueSystem.css:1680`): `38px`
 - Absent replacement mini buttons: `UserX` at `10px` hit area
 
 **Action:** Ensure all tap targets have at least `min-height: 44px; min-width: 44px` padding/hit area.
+
+### Icon-Only Buttons Missing Accessible Name (`aria-label` / `title`):
+- `ScoreBoard.tsx`: `<button className="score-custom-ok" onClick={applyCustomLimit}><Check size={12} /></button>` (missing `aria-label`)
+- `SetupView.tsx`: `<button onClick={onAddPlayer} className="add-btn"><UserPlus size={15} /></button>` (missing `aria-label`)
+
+### Non-Button Elements with `onClick`:
+- `CourtScoreModal.tsx:91`: `<div className={styles.overlay} onClick={onCancel}>` (Backdrop)
+- `CourtSwapModal.tsx:67`: `<div className={styles.overlay} onClick={onClose}>` (Backdrop)
+- `PlayerActionMenu.tsx:51`: `<div className="player-menu-backdrop" onClick={onClose}>` (Backdrop)
+- `UserGuideModal.tsx:54`: `<div className="modal-overlay" onClick={handleClose}>` (Backdrop)
+- `WinnerModal.tsx:25`: `<div className="modal-overlay" onClick={onClose}>` (Backdrop)
+- `page.tsx:2663`: `<div className="waiting-reorder-btns" onClick={e => e.stopPropagation()}>` (Container)
 
 ---
 
@@ -102,59 +118,93 @@ Current widths in use:
 
 | Location | String | Replacement |
 |---|---|---|
-| `app/queue/components/DoublesMatch/DoublesMatch.tsx:137` | `<h3><Swords size={15} /> Form Teams</h3>` | `Edit teams` / `Now playing` |
-| `app/queue/components/SitOutPanel/SitOutPanel.tsx:56-59` | `"Sit Out"` | `"Take a break"` |
-| `app/queue/page.tsx:2333` | `<SitOutPanel ... />` | Rename UI label to `BreakPanel` / `Take a break` |
-| `app/queue/components/CourtCard/CourtCard.tsx:60` | `"Can't play now: Replace ${p}"` | Keep accessible `"Can't play now"` |
+| `DoublesMatch.tsx:137` | `<h3><Swords size={15} /> Form Teams</h3>` | `Edit teams` / `Now playing` |
+| `SitOutPanel.tsx:32` | `title="Sit out player"` | `"Take a break"` |
+| `page.tsx:2270` | `<SitOutPanel ... />` | Rename UI label to `Take a break` |
+| `CourtCard.tsx:60` | `"Can't play now: Replace ${p}"` | Keep accessible `"Can't play now"` |
 
 ---
 
-## 6. Proposed Pure View-Model Adapters (`app/queue/lib/viewModels.ts`)
+## 6. Single-vs-Multi Court Forks in `page.tsx` (21 Identified)
 
-To decouple `app/queue/page.tsx` handlers from rendering and unify single vs multi-court layout:
+| Line | Branch Condition | Purpose |
+|---|---|---|
+| 489 | `if (courtSlots.length === 0) return [];` | Get on-court players |
+| 515 | `isSingleCourtReplaceBlocked = courtSlots.length === 0 && ...` | Prevent replace if scoring active on single court |
+| 575 | `const defs = courtSlots.length > 0 ...` | Generate skilled court defs |
+| 607 | `if (courtSlots.length > 0) return waitingPlayers;` | Waiting queue determination |
+| 810 | `const defs = courtSlots.length > 0 ...` | Skilled matchmaking fill |
+| 824 | `const isPlayerOnCourt = courtSlots.length > 0 ...` | Toggle sit out safety check |
+| 2205 | `courtSlots.length === 0` | Singles default queue layout |
+| 2214 | `courtSlots.length > 0` | Singles multi-court layout |
+| 2276 | `courtSlots.length > 0` | Partner panel toggle |
+| 2284 | `courtSlots.length > 0` | Score mode toggle |
+| 2320 | `courtSlots.length === 0` | Doubles paddle status diagnostics |
+| 2323 | `courtSlots.length === 0` | Singles status diagnostics |
+| 2330 | `courtSlots.length > 0` | Multi-court diagnostics summary |
+| 2492 | `courtSlots.length > 0` | Singles multi-court card grid |
+| 2531 | `formatEtaLabel(..., courtSlots.length > 0)` | Singles multi-court ETA calculation |
+| 2543 | `courtSlots.length === 0 && queue.length >= 2` | Singles single-court match board |
+| 2624 | `courtSlots.length > 0 ? (Multi-court) : (Single-court)` | Main doubles match section split |
+| 2659 | `formatEtaLabel(..., courtSlots.length > 0)` | Doubles multi-court ETA calculation |
 
-```ts
-export interface CourtTeamModel {
-  side: 'A' | 'B';
-  label: string;
-  players: string[];
-}
+---
 
-export interface CourtViewModel {
-  id: string;
-  name: string;
-  status: 'playing' | 'ready' | 'waiting';
-  teams: [CourtTeamModel, CourtTeamModel];
-  score: {
-    enabled: boolean;
-    limit: number;
-    scoreA: number;
-    scoreB: number;
-    hasStarted: boolean;
-  };
-  pendingWinner: 'A' | 'B' | null;
-  canEdit: boolean;
-}
+## 7. `app/queue/page.tsx` Handler Map (Grouped by Concern)
 
-export interface QueueViewModel {
-  nextUp: Array<{ name: string; priority?: boolean }>;
-  waiting: Array<{ name: string; etaLabel?: string }>;
-  onBreak: Array<{ name: string }>;
+### A. Match Flow & Result Life Cycle:
+- `handleDoublesMatch` (L1225): Records doubles winner, updates career stats, calls `advancePaddleState`
+- `handleSinglesMatch` (L1014): Records singles winner, calls `advanceSinglesState`
+- `handleCourtMatch` (L1332): Multi-court match completion via `planMultiCourtResult`
+- `handleCourtWinClick` (L1457): Multi-court winner trigger (opens score modal or completes)
+- `handleSinglesCourtWinClick` (L1477): Singles multi-court winner trigger
+- `handleConfirmCourtScore` (L1497): Saves court score from `CourtScoreModal`
+- `handleScoreChange` (L510): Syncs live scoreboard state to session
+- `handleToggleScorePrompt` (L222): Toggles Match Scores on/off
+- `handleUndoLastMatch` (L877): Restores snapshot for queue, paddleState, courtSlots, sittingOut
+
+### B. Queue & Player Operations:
+- `handleMarkAbsent` (L924): Replaces called player via `replaceCalledPlayerTransition`
+- `handleConfirmSub` (L933): Confirms substitute player
+- `handleToggleSitOut` (L820): Moves player to/from `sittingOut` via `toggleSitOutTransition`
+- `handleSwapPlayers` (L1515): Swaps team positions on a court
+- `handleMoveWaitingPlayer` (L1621): Reorders waiting queue manually
+- `handlePartnerPairsChange` (L1645): Updates locked partner pairs
+
+### C. Host Tools & Live Management:
+- `handleAddPlayerLive` (L1587): Adds new player to active session roster and queue
+- `handleStartQueue` (L681): Initializes session from setup screen
+- `handleFullReset` / `handleHardReset` (L1666, 1668): Clears or ends session
+- `handleGoLive` (L503): Toggles session live state
+- `showToast` / `showMatchToast` / `dismissToast` / `handleToastUndo` (L405-454): Toast notifications
+
+### D. Setup & Roster Management:
+- `handleSaveToRoster` (L1739): Saves current players to local roster
+- `handleRosterToggle` / `handleSelectAllRoster` / `handleAddFromRoster` (L1745-1761): Roster selection in setup
+- `handleRemoveFromRosterUI` / `handleSetRosterSkill` (L1770, 1776): Roster editing
+
+---
+
+## 8. Baseline Responsive Offender Counts (`tests/fixtures/responsive-baseline.json`)
+
+```json
+{
+  "nonStandardBreakpoints": ["480px", "600px", "640px", "641px", "860px"],
+  "inputsUnder16px": 11,
+  "buttonsUnder44px": 6,
+  "vhWithoutDvh": 4,
+  "zindexViolations": 6,
+  "bannedVocabularyOccurrences": 4
 }
 ```
 
 ---
 
-## 7. Strangler Implementation & Delivery Gating
+## 9. Strangler Implementation Plan & Safety Gates
 
-1. **Flag:** Add compile-time flag `mobileFirstShell: false` in `app/queue/lib/releaseConfig.ts`.
+1. **Kill Switch:** `V1_RELEASE.mobileFirstShell = false` in `releaseConfig.ts`.
 2. **Phase 1 Foundations:**
-   - Create `app/queue/styles/tokens.css` (semantic colors, spacing, z-index, radii).
-   - Export `viewport: Viewport = { themeColor: '#0b0d17', viewportFit: 'cover' }` in `app/layout.tsx`.
-   - Implement `OverlayHost` (`Toast`, `Dialog`, `BottomSheet`) with keyboard trap, focus return, and `dvh` scroll lock.
-   - Flip passing guard tests in `tests/responsiveGuards.test.ts`.
-
----
-
-**Owner Sign-Off Gate:**  
-Phase 0 complete. Awaiting user confirmation to begin Phase 1 Foundations on branch `UI-Overhaul`.
+   - Tokens in `app/queue/styles/tokens.css`.
+   - `viewport` export (`themeColor`, `viewportFit: 'cover'`) in `app/layout.tsx` + safe-area insets.
+   - `OverlayHost` (`Toast`, `Dialog`, `BottomSheet`) with focus trap, Escape, scroll lock.
+   - Guard test ratchet committed in `tests/fixtures/responsive-baseline.json`.
