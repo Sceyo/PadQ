@@ -1,18 +1,22 @@
 'use client';
 
 import React from 'react';
+import { PlayerLabel } from '../atoms/PlayerLabel';
 import type { QueueViewModel } from '../../lib/viewModels';
+import type { PlayerStat } from '../../lib/types';
 
 interface Props {
   queue: QueueViewModel;
-  onSelectPlayer: (name: string) => void;
+  onSelectPlayer: (name: string, zone?: 'waiting' | 'break') => void;
   onReturnFromBreak?: (name: string) => void;
+  statsMap?: Record<string, PlayerStat>;
 }
 
 export function QueuePanel({
   queue,
   onSelectPlayer,
-  onReturnFromBreak,
+  onReturnFromBreak: _onReturnFromBreak,
+  statsMap,
 }: Props) {
   return (
     <section
@@ -65,7 +69,7 @@ export function QueuePanel({
               <button
                 key={`next-${p.name}`}
                 type="button"
-                onClick={() => onSelectPlayer(p.name)}
+                onClick={() => onSelectPlayer(p.name, 'waiting')}
                 style={{
                   minHeight: 'var(--tap-min, 44px)',
                   padding: 'var(--sp-1_5, 6px) var(--sp-3_5, 14px)',
@@ -76,10 +80,13 @@ export function QueuePanel({
                   fontSize: 'var(--fs-sm, 0.9375rem)',
                   fontWeight: 600,
                   cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                   transition: 'border-color 0.15s ease',
                 }}
               >
-                {p.name}
+                <PlayerLabel name={p.name} statsMap={statsMap} showRank={false} />
               </button>
             ))
           )}
@@ -110,7 +117,7 @@ export function QueuePanel({
               <button
                 key={`waiting-${p.name}`}
                 type="button"
-                onClick={() => onSelectPlayer(p.name)}
+                onClick={() => onSelectPlayer(p.name, 'waiting')}
                 style={{
                   minHeight: 'var(--tap-min, 44px)',
                   padding: 'var(--sp-1_5, 6px) var(--sp-3_5, 14px)',
@@ -127,7 +134,7 @@ export function QueuePanel({
                   transition: 'border-color 0.15s ease',
                 }}
               >
-                <span>{p.name}</span>
+                <PlayerLabel name={p.name} statsMap={statsMap} showRank={false} />
                 {p.etaLabel && (
                   <span style={{ fontSize: 'var(--fs-xs, 0.8125rem)', color: 'var(--text-muted, #94a3b8)' }}>
                     · {p.etaLabel}
@@ -163,7 +170,7 @@ export function QueuePanel({
               <button
                 key={`break-${p.name}`}
                 type="button"
-                onClick={() => onReturnFromBreak?.(p.name)}
+                onClick={() => onSelectPlayer(p.name, 'break')}
                 style={{
                   minHeight: 'var(--tap-min, 44px)',
                   padding: 'var(--sp-1_5, 6px) var(--sp-3_5, 14px)',
@@ -180,9 +187,9 @@ export function QueuePanel({
                   transition: 'border-color 0.15s ease',
                 }}
               >
-                <span>{p.name}</span>
+                <PlayerLabel name={p.name} statsMap={statsMap} showRank={false} />
                 <span style={{ color: 'var(--accent-primary, #5457e0)', fontWeight: 700 }}>
-                  · Back in
+                  · Break
                 </span>
               </button>
             ))

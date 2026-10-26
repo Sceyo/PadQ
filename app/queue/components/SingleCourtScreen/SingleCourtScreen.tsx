@@ -10,6 +10,7 @@ import { EditTeamsDialog } from '../EditTeamsDialog/EditTeamsDialog';
 import { PlayerMenu } from '../PlayerMenu/PlayerMenu';
 import { useMatchFlow } from '../../hooks/useMatchFlow';
 import type { CourtViewModel, QueueViewModel } from '../../lib/viewModels';
+import type { PlayerStat } from '../../lib/types';
 
 interface Props {
   court: CourtViewModel;
@@ -21,7 +22,11 @@ interface Props {
   onPlayerTakeBreak: (name: string) => void;
   onPlayerRemove: (name: string) => void;
   onReturnFromBreak: (name: string) => void;
+  onMoveWaitingPlayer?: (name: string, direction: -1 | 1) => void;
+  onScoreLimitChange?: (limit: number) => void;
+  onResetScore?: () => void;
   isHost?: boolean;
+  statsMap?: Record<string, PlayerStat>;
 }
 
 export function SingleCourtScreen({
@@ -34,12 +39,19 @@ export function SingleCourtScreen({
   onPlayerTakeBreak,
   onPlayerRemove,
   onReturnFromBreak,
+  onMoveWaitingPlayer,
+  onScoreLimitChange,
+  onResetScore,
   isHost = true,
+  statsMap,
 }: Props) {
   const matchFlow = useMatchFlow({ onSave: onMatchComplete });
 
-  // Dialog & Modal state
-  const [selectedPlayerForMenu, setSelectedPlayerForMenu] = useState<string | null>(null);
+  // Dialog & Modal state: track player and their zone
+  const [selectedPlayerForMenu, setSelectedPlayerForMenu] = useState<{
+    name: string;
+    zone: 'playing' | 'waiting' | 'break';
+  } | null>(null);
   const [replacingPlayer, setReplacingPlayer] = useState<string | null>(null);
   const [isEditTeamsOpen, setIsEditTeamsOpen] = useState(false);
 
@@ -50,14 +62,13 @@ export function SingleCourtScreen({
     onScoreAdjust(side, delta);
   };
 
-  const handlePlayerTap = (name: string) => {
+  const handlePlayerTap = (name: string, zone: 'playing' | 'waiting' | 'break' = 'playing') => {
     if (!isHost) return;
-    setSelectedPlayerForMenu(name);
+    setSelectedPlayerForMenu({ name, zone });
   };
 
   const onCourtPlayers = [...teamA.players, ...teamB.players];
   const waitingCandidateNames = queue.waiting.map(w => w.name);
-  // Include Next up players in waiting pool if not already in queue.waiting
   const allWaitingNames = [
     ...queue.nextUp.map(n => n.name),
     ...waitingCandidateNames.filter(name => !queue.nextUp.some(n => n.name === name)),
@@ -75,6 +86,17 @@ export function SingleCourtScreen({
     ? `${court.score.scoreA}–${court.score.scoreB}`
     : undefined;
 
+  // Compute move up / move down eligibility
+  const waitingQueueNames = [
+    ...queue.nextUp.map(n => n.name),
+    ...queue.waiting.map(w => w.name),
+  ];
+  const selectedIndex = selectedPlayerForMenu && selectedPlayerForMenu.zone === 'waiting'
+    ? waitingQueueNames.indexOf(selectedPlayerForMenu.name)
+    : -1;
+  const canMoveUp = selectedIndex > 0;
+  const canMoveDown = selectedIndex >= 0 && selectedIndex < waitingQueueNames.length - 1;
+
   return (
     <div
       style={{
@@ -90,8 +112,9 @@ export function SingleCourtScreen({
       <CourtView
         court={court}
         onEditTeams={() => setIsEditTeamsOpen(true)}
-        onSelectPlayer={handlePlayerTap}
+        onSelectPlayer={(name) => handlePlayerTap(name, 'playing')}
         disabled={!isHost}
+        statsMap={statsMap}
       />
 
       {/* 2. Score Card */}
@@ -125,18 +148,58 @@ export function SingleCourtScreen({
             >
               Score
             </h2>
-            <span
-              style={{
-                fontSize: 'var(--fs-xs, 0.8125rem)',
-                color: 'var(--text-muted, #94a3b8)',
-                background: 'var(--surface-elevated, #1a2035)',
-                border: '1px solid var(--line-subtle, #252d47)',
-                borderRadius: 'var(--r-pill, 9999px)',
-                padding: '2px 10px',
-              }}
-            >
-              Scoring on · to {court.score.limit}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {isHost && onScoreLimitChange ? (
+                <button
+                  type="button"
+                  onClick={() => onScoreLimitChange(court.score.limit === 11 ? 21 : 11)}
+                  style={{
+                    fontSize: 'var(--fs-xs, 0.8125rem)',
+                    color: 'var(--text-secondary, #cbd5e1)',
+                    background: 'var(--surface-elevated, #1a2035)',
+                    border: '1px solid var(--line-subtle, #252d47)',
+                    borderRadius: 'var(--r-pill, 9999px)',
+                    padding: '3px 10px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                  }}
+                  title="Switch score limit (11 / 21)"
+                >
+                  to {court.score.limit}
+                </button>
+              ) : (
+                <span
+                  style={{
+                    fontSize: 'var(--fs-xs, 0.8125rem)',
+                    color: 'var(--text-muted, #94a3b8)',
+                    background: 'var(--surface-elevated, #1a2035)',
+                    border: '1px solid var(--line-subtle, #252d47)',
+                    borderRadius: 'var(--r-pill, 9999px)',
+                    padding: '3px 10px',
+                  }}
+                >
+                  to {court.score.limit}
+                </span>
+              )}
+              {isHost && onResetScore && (court.score.scoreA > 0 || court.score.scoreB > 0) && (
+                <button
+                  type="button"
+                  onClick={onResetScore}
+                  style={{
+                    fontSize: 'var(--fs-xs, 0.8125rem)',
+                    color: 'var(--text-muted, #94a3b8)',
+                    background: 'var(--surface-elevated, #1a2035)',
+                    border: '1px solid var(--line-subtle, #252d47)',
+                    borderRadius: 'var(--r-pill, 9999px)',
+                    padding: '3px 8px',
+                    cursor: 'pointer',
+                  }}
+                  title="Reset score to 0–0"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2_5, 10px)' }}>
@@ -163,8 +226,9 @@ export function SingleCourtScreen({
       {/* 3. Queue Card */}
       <QueuePanel
         queue={queue}
-        onSelectPlayer={handlePlayerTap}
+        onSelectPlayer={(name, zone) => handlePlayerTap(name, zone ?? 'waiting')}
         onReturnFromBreak={onReturnFromBreak}
+        statsMap={statsMap}
       />
 
       {/* 4. Sticky Bottom Confirm Bar */}
@@ -186,7 +250,12 @@ export function SingleCourtScreen({
         <PlayerMenu
           isOpen={true}
           onClose={() => setSelectedPlayerForMenu(null)}
-          playerName={selectedPlayerForMenu}
+          playerName={selectedPlayerForMenu.name}
+          zone={selectedPlayerForMenu.zone}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          onMoveUp={onMoveWaitingPlayer ? (name) => onMoveWaitingPlayer(name, -1) : undefined}
+          onMoveDown={onMoveWaitingPlayer ? (name) => onMoveWaitingPlayer(name, 1) : undefined}
           onReplace={(name) => {
             setSelectedPlayerForMenu(null);
             setReplacingPlayer(name);
@@ -194,6 +263,10 @@ export function SingleCourtScreen({
           onTakeBreak={(name) => {
             setSelectedPlayerForMenu(null);
             onPlayerTakeBreak(name);
+          }}
+          onBackIn={(name) => {
+            setSelectedPlayerForMenu(null);
+            onReturnFromBreak(name);
           }}
           onRemove={(name) => {
             setSelectedPlayerForMenu(null);

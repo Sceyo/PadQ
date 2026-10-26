@@ -30,7 +30,7 @@ export function toSingleCourtViewModel(params: {
   queue: string[];
   suggestedTeamA?: string[] | null;
   suggestedTeamB?: string[] | null;
-  liveScore?: { scoreA: number; scoreB: number } | null;
+  liveScore?: { scoreA: number; scoreB: number; limit?: number; active?: boolean } | null;
   canEdit?: boolean;
 }): CourtViewModel {
   const { queue, suggestedTeamA, suggestedTeamB, liveScore, canEdit = true } = params;
@@ -41,6 +41,8 @@ export function toSingleCourtViewModel(params: {
   const scoreA = liveScore?.scoreA ?? 0;
   const scoreB = liveScore?.scoreB ?? 0;
   const hasStarted = scoreA > 0 || scoreB > 0;
+  const limit = liveScore?.limit ?? 11;
+  const enabled = liveScore?.active ?? true;
 
   return {
     id: 'court-1',
@@ -51,8 +53,8 @@ export function toSingleCourtViewModel(params: {
       { side: 'B', label: 'Team 2', players: teamB },
     ],
     score: {
-      enabled: true,
-      limit: 11,
+      enabled,
+      limit,
       scoreA,
       scoreB,
       hasStarted,
@@ -75,10 +77,11 @@ export function toSingleCourtQueueViewModel(params: {
     priority: priorityPlayers.includes(name),
   }));
 
-  const waiting = waitingList.map((name, idx) => ({
+  // Deduplication: waiting list displays players waiting after nextUp (index 4+)
+  const waiting = waitingList.slice(4).map((name, idx) => ({
     name,
     priority: priorityPlayers.includes(name),
-    etaLabel: formatEta ? (formatEta(idx + 1, 4, false) ?? undefined) : undefined,
+    etaLabel: formatEta ? (formatEta(idx + 5, 4, false) ?? undefined) : undefined,
   }));
 
   const onBreak = sittingOut.map(name => ({ name }));
@@ -102,10 +105,11 @@ export function toMultiCourtQueueViewModel(params: {
     priority: priorityPlayers.includes(name),
   }));
 
-  const waiting = waitingPlayers.map((name, idx) => ({
+  // Deduplication: waiting list displays players waiting after nextUp (index 4+)
+  const waiting = waitingPlayers.slice(4).map((name, idx) => ({
     name,
     priority: priorityPlayers.includes(name),
-    etaLabel: formatEta ? (formatEta(idx + 1, 4, true) ?? undefined) : undefined,
+    etaLabel: formatEta ? (formatEta(idx + 5, 4, true) ?? undefined) : undefined,
   }));
 
   const onBreak = sittingOut.map(name => ({ name }));

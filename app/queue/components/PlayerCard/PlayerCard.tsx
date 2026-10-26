@@ -1,15 +1,19 @@
 'use client';
 
 import React from 'react';
+import { ChevronRight } from 'lucide-react';
+import { PlayerLabel } from '../atoms/PlayerLabel';
+import type { PlayerStat } from '../../lib/types';
 
 interface Props {
   name: string;
   side: 'A' | 'B';
   onTap: (name: string) => void;
   disabled?: boolean;
+  statsMap?: Record<string, PlayerStat>;
 }
 
-export function PlayerCard({ name, side, onTap, disabled = false }: Props) {
+export function PlayerCard({ name, side, onTap, disabled = false, statsMap }: Props) {
   const isA = side === 'A';
   return (
     <button
@@ -41,20 +45,21 @@ export function PlayerCard({ name, side, onTap, disabled = false }: Props) {
           overflow: 'hidden',
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: '6px',
         }}
       >
-        {name}
+        <PlayerLabel name={name} statsMap={statsMap} showRank={false} />
       </span>
-      <span
+      <ChevronRight
+        size={16}
         style={{
           color: 'var(--text-muted, #94a3b8)',
-          fontSize: '1.25rem',
-          lineHeight: 1,
+          flexShrink: 0,
           marginLeft: 'var(--sp-2, 8px)',
         }}
-      >
-        ›
-      </span>
+      />
     </button>
   );
 }

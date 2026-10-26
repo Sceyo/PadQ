@@ -25,6 +25,7 @@ interface Props {
   onPlayerTakeBreak: (name: string) => void;
   onPlayerRemove: (name: string) => void;
   onReturnFromBreak: (name: string) => void;
+  onMoveWaitingPlayer?: (name: string, direction: -1 | 1) => void;
 }
 
 export function MultiCourtScreen({
@@ -39,10 +40,14 @@ export function MultiCourtScreen({
   onPlayerTakeBreak,
   onPlayerRemove,
   onReturnFromBreak,
+  onMoveWaitingPlayer,
 }: Props) {
   // Overlays state
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
-  const [selectedPlayerForMenu, setSelectedPlayerForMenu] = useState<string | null>(null);
+  const [selectedPlayerForMenu, setSelectedPlayerForMenu] = useState<{
+    name: string;
+    zone: 'playing' | 'waiting' | 'break';
+  } | null>(null);
   const [replacingPlayer, setReplacingPlayer] = useState<string | null>(null);
   const [pendingScoreMatch, setPendingScoreMatch] = useState<{
     courtId: string;
@@ -51,7 +56,6 @@ export function MultiCourtScreen({
     teamA: string[];
     teamB: string[];
   } | null>(null);
-
 
   const handleWinClick = (courtId: string, side: 'A' | 'B') => {
     if (!isHost) return;
@@ -80,6 +84,17 @@ export function MultiCourtScreen({
     ...queue.nextUp.map(n => n.name),
     ...waitingCandidateNames.filter(name => !queue.nextUp.some(n => n.name === name)),
   ];
+
+  // Compute move up / move down eligibility
+  const waitingQueueNames = [
+    ...queue.nextUp.map(n => n.name),
+    ...queue.waiting.map(w => w.name),
+  ];
+  const selectedIndex = selectedPlayerForMenu && selectedPlayerForMenu.zone === 'waiting'
+    ? waitingQueueNames.indexOf(selectedPlayerForMenu.name)
+    : -1;
+  const canMoveUp = selectedIndex > 0;
+  const canMoveDown = selectedIndex >= 0 && selectedIndex < waitingQueueNames.length - 1;
 
   return (
     <div
@@ -122,7 +137,7 @@ export function MultiCourtScreen({
               isHost={isHost}
               onWin={handleWinClick}
               onEdit={isHost ? (id) => setEditingCourtId(id) : undefined}
-              onSelectPlayer={isHost ? (p) => setSelectedPlayerForMenu(p) : undefined}
+              onSelectPlayer={isHost ? (p) => setSelectedPlayerForMenu({ name: p, zone: 'playing' }) : undefined}
             />
           ))}
         </div>
@@ -131,8 +146,9 @@ export function MultiCourtScreen({
       {/* 2. Unified Shared Queue Panel with ETAs */}
       <QueuePanel
         queue={queue}
-        onSelectPlayer={(p) => isHost && setSelectedPlayerForMenu(p)}
+        onSelectPlayer={(name, zone) => isHost && setSelectedPlayerForMenu({ name, zone: zone ?? 'waiting' })}
         onReturnFromBreak={onReturnFromBreak}
+        statsMap={statsMap}
       />
 
       {/* 3. Floating Score Modal when scorePromptEnabled */}
@@ -168,7 +184,12 @@ export function MultiCourtScreen({
         <PlayerMenu
           isOpen={true}
           onClose={() => setSelectedPlayerForMenu(null)}
-          playerName={selectedPlayerForMenu}
+          playerName={selectedPlayerForMenu.name}
+          zone={selectedPlayerForMenu.zone}
+          canMoveUp={canMoveUp}
+          canMoveDown={canMoveDown}
+          onMoveUp={onMoveWaitingPlayer ? (name) => onMoveWaitingPlayer(name, -1) : undefined}
+          onMoveDown={onMoveWaitingPlayer ? (name) => onMoveWaitingPlayer(name, 1) : undefined}
           onReplace={(name) => {
             setSelectedPlayerForMenu(null);
             setReplacingPlayer(name);
@@ -176,6 +197,10 @@ export function MultiCourtScreen({
           onTakeBreak={(name) => {
             setSelectedPlayerForMenu(null);
             onPlayerTakeBreak(name);
+          }}
+          onBackIn={(name) => {
+            setSelectedPlayerForMenu(null);
+            onReturnFromBreak(name);
           }}
           onRemove={(name) => {
             setSelectedPlayerForMenu(null);

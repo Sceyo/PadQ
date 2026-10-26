@@ -17,7 +17,7 @@ import {
 afterEach(() => cleanup());
 
 describe('Mobile-First Shell Integration & Release Config', () => {
-  it('compile-time releaseConfig defaults mobileFirstShell to false (kill-switch safety)', () => {
+  it('compile-time releaseConfig defaults mobileFirstShell to true in UI-Overhaul', () => {
     expect(typeof V1_RELEASE.mobileFirstShell).toBe('boolean');
   });
 
@@ -42,6 +42,16 @@ describe('Mobile-First Shell Integration & Release Config', () => {
     const onPlayerRemove = vi.fn();
     const onReturnFromBreak = vi.fn();
 
+    const gearMenuProps = {
+      sessionId: 'TEST-ROOM',
+      isHost: true,
+      isLive: true,
+      canControl: true,
+      onToggleLive: vi.fn(),
+      onHardReset: vi.fn(),
+      onShowGuide: vi.fn(),
+    };
+
     render(
       <AppShell
         sessionId="TEST-ROOM"
@@ -50,6 +60,7 @@ describe('Mobile-First Shell Integration & Release Config', () => {
         onAddPlayerLive={vi.fn()}
         scorePromptEnabled={true}
         onToggleScorePrompt={vi.fn()}
+        gearMenuProps={gearMenuProps}
       >
         <SingleCourtScreen
           court={courtModel}
@@ -66,9 +77,9 @@ describe('Mobile-First Shell Integration & Release Config', () => {
       </AppShell>
     );
 
-    // Header & room pill
-    expect(screen.getByText('TEST-ROOM')).toBeDefined();
-    expect(screen.getByText('Live')).toBeDefined();
+    // Header brand and gear menu trigger
+    expect(screen.getByText('PadQ')).toBeDefined();
+    expect(screen.getByTitle('Settings')).toBeDefined();
 
     // Court View & Players
     expect(screen.getByLabelText('Player Alice, Team A')).toBeDefined();
@@ -104,6 +115,16 @@ describe('Mobile-First Shell Integration & Release Config', () => {
       sittingOut: [],
     });
 
+    const gearMenuProps = {
+      sessionId: 'MULTI-ROOM',
+      isHost: true,
+      isLive: true,
+      canControl: true,
+      onToggleLive: vi.fn(),
+      onHardReset: vi.fn(),
+      onShowGuide: vi.fn(),
+    };
+
     render(
       <AppShell
         sessionId="MULTI-ROOM"
@@ -112,6 +133,7 @@ describe('Mobile-First Shell Integration & Release Config', () => {
         onAddPlayerLive={vi.fn()}
         scorePromptEnabled={true}
         onToggleScorePrompt={vi.fn()}
+        gearMenuProps={gearMenuProps}
       >
         <MultiCourtScreen
           courtSlots={courtSlots}

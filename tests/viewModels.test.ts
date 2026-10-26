@@ -64,9 +64,10 @@ describe('viewModels pure mappers', () => {
       expect(queueModel.nextUp[0].priority).toBe(true);
       expect(queueModel.nextUp[1].priority).toBe(false);
 
-      // waiting is all 5 (P5..P9)
-      expect(queueModel.waiting.length).toBe(5);
-      expect(queueModel.waiting[0].etaLabel).toBe('~5m');
+      // Deduplicated waiting is remaining players after nextUp (P9)
+      expect(queueModel.waiting.length).toBe(1);
+      expect(queueModel.waiting[0].name).toBe('P9');
+      expect(queueModel.waiting[0].etaLabel).toBe('~25m');
 
       // onBreak
       expect(queueModel.onBreak).toEqual([{ name: 'Resting1' }]);
@@ -84,8 +85,10 @@ describe('viewModels pure mappers', () => {
 
       expect(queueModel.nextUp.map(p => p.name)).toEqual(['W1', 'W2', 'W3', 'W4']);
       expect(queueModel.nextUp[0].priority).toBe(true);
-      expect(queueModel.waiting.length).toBe(5);
-      expect(queueModel.waiting[0].etaLabel).toBe('ETA 3m');
+      // Deduplicated waiting is remaining players after nextUp (W5)
+      expect(queueModel.waiting.length).toBe(1);
+      expect(queueModel.waiting[0].name).toBe('W5');
+      expect(queueModel.waiting[0].etaLabel).toBe('ETA 15m');
       expect(queueModel.onBreak).toEqual([{ name: 'B1' }, { name: 'B2' }]);
     });
   });

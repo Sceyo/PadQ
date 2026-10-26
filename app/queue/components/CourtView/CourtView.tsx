@@ -3,12 +3,14 @@
 import React from 'react';
 import { PlayerCard } from '../PlayerCard/PlayerCard';
 import type { CourtViewModel } from '../../lib/viewModels';
+import type { PlayerStat } from '../../lib/types';
 
 interface Props {
   court: CourtViewModel;
   onEditTeams?: () => void;
   onSelectPlayer: (player: string) => void;
   disabled?: boolean;
+  statsMap?: Record<string, PlayerStat>;
 }
 
 export function CourtView({
@@ -16,6 +18,7 @@ export function CourtView({
   onEditTeams,
   onSelectPlayer,
   disabled = false,
+  statsMap,
 }: Props) {
   const teamA = court.teams[0];
   const teamB = court.teams[1];
@@ -111,6 +114,7 @@ export function CourtView({
               side="A"
               onTap={onSelectPlayer}
               disabled={disabled}
+              statsMap={statsMap}
             />
           ))}
         </div>
@@ -137,6 +141,7 @@ export function CourtView({
               side="B"
               onTap={onSelectPlayer}
               disabled={disabled}
+              statsMap={statsMap}
             />
           ))}
         </div>

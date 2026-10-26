@@ -1,36 +1,62 @@
 'use client';
 
 import React, { useState } from 'react';
+import {
+  ArrowLeft,
+  SlidersHorizontal,
+  History,
+  Sun,
+  Moon,
+  Swords,
+  BarChart2,
+} from 'lucide-react';
+import { GearMenu, type GearMenuProps } from '../GearMenu/GearMenu';
 import { HostToolsSheet } from '../HostToolsSheet/HostToolsSheet';
 import { OverlayHost } from '../OverlayHost/OverlayHost';
 import styles from './AppShell.module.css';
 
 interface Props {
-  sessionId: string | null;
+  sessionId?: string | null;
   isHost: boolean;
   isConnected: boolean;
   children: React.ReactNode;
   onAddPlayerLive: (name: string) => void;
   scorePromptEnabled: boolean;
   onToggleScorePrompt: () => void;
-  onOpenGearMenu?: () => void;
+  gearMenuProps?: GearMenuProps;
   onBackHome?: () => void;
   activeTab?: 'queue' | 'analytics';
   onTabChange?: (tab: 'queue' | 'analytics') => void;
+  showHistory?: boolean;
+  onToggleHistory?: () => void;
+  darkMode?: boolean;
+  onToggleDarkMode?: () => void;
+  partnerPanelNode?: React.ReactNode;
+  manualQueuePanelNode?: React.ReactNode;
+  sitOutPanelNode?: React.ReactNode;
+  diagnosticsNode?: React.ReactNode;
 }
 
 export function AppShell({
-  sessionId,
+  sessionId: _sessionId,
   isHost,
   isConnected,
   children,
   onAddPlayerLive,
   scorePromptEnabled,
   onToggleScorePrompt,
-  onOpenGearMenu,
+  gearMenuProps,
   onBackHome,
   activeTab = 'queue',
   onTabChange,
+  showHistory = false,
+  onToggleHistory,
+  darkMode = true,
+  onToggleDarkMode,
+  partnerPanelNode,
+  manualQueuePanelNode,
+  sitOutPanelNode,
+  diagnosticsNode,
 }: Props) {
   const [isHostToolsOpen, setIsHostToolsOpen] = useState(false);
 
@@ -47,25 +73,28 @@ export function AppShell({
                 onClick={onBackHome}
                 aria-label="Back to home"
               >
-                ←
+                <ArrowLeft size={16} />
               </button>
             )}
             <span className={styles.brandTitle}>PadQ</span>
-
-            {sessionId && (
-              <div className={styles.roomPill}>
-                <span className={styles.roomCode}>{sessionId}</span>
-                {isHost && <span className={styles.hostBadge}>HOST</span>}
-              </div>
+            {isConnected && (
+              <span className={styles.liveDot} title="Live session connected" aria-label="Live session" />
             )}
           </div>
 
           <div className={styles.headerRight}>
-            {/* Live Status Chip */}
-            <div className={styles.statusChip}>
-              <span className={`${styles.statusDot} ${isConnected ? styles.statusDotLive : styles.statusDotOffline}`} />
-              <span className={styles.statusLabel}>{isConnected ? 'Live' : 'Connecting'}</span>
-            </div>
+            {/* History Toggle Button */}
+            {onToggleHistory && (
+              <button
+                type="button"
+                className={`${styles.iconBtn} ${showHistory ? styles.iconBtnActive : ''}`}
+                onClick={onToggleHistory}
+                aria-label="Match history"
+                title="Match history"
+              >
+                <History size={17} />
+              </button>
+            )}
 
             {/* Host Tools Button */}
             {isHost && (
@@ -76,22 +105,25 @@ export function AppShell({
                 aria-label="Host Tools"
                 title="Host Tools"
               >
-                🎛️
+                <SlidersHorizontal size={17} />
               </button>
             )}
 
-            {/* Gear Menu Button */}
-            {onOpenGearMenu && (
+            {/* Theme Toggle Button */}
+            {onToggleDarkMode && (
               <button
                 type="button"
                 className={styles.iconBtn}
-                onClick={onOpenGearMenu}
-                aria-label="Settings and QR share"
-                title="Settings"
+                onClick={onToggleDarkMode}
+                aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+                title={darkMode ? 'Light mode' : 'Dark mode'}
               >
-                ⚙️
+                {darkMode ? <Sun size={17} /> : <Moon size={17} />}
               </button>
             )}
+
+            {/* Gear Menu */}
+            {gearMenuProps && <GearMenu {...gearMenuProps} />}
           </div>
         </header>
 
@@ -105,7 +137,8 @@ export function AppShell({
               aria-selected={activeTab === 'queue'}
               role="tab"
             >
-              ⚔️ Queue
+              <Swords size={15} />
+              <span>Queue</span>
             </button>
             <button
               type="button"
@@ -114,7 +147,8 @@ export function AppShell({
               aria-selected={activeTab === 'analytics'}
               role="tab"
             >
-              📊 Stats
+              <BarChart2 size={15} />
+              <span>Stats</span>
             </button>
           </nav>
         )}
@@ -131,6 +165,10 @@ export function AppShell({
           onAddPlayer={onAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}
           onToggleScorePrompt={onToggleScorePrompt}
+          partnerPanelNode={partnerPanelNode}
+          manualQueuePanelNode={manualQueuePanelNode}
+          sitOutPanelNode={sitOutPanelNode}
+          diagnosticsNode={diagnosticsNode}
         />
       </div>
     </OverlayHost>
