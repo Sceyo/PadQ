@@ -136,21 +136,72 @@ export function HostToolsSheet({
           </div>
           <button
             type="button"
+            role="switch"
+            aria-checked={scorePromptEnabled}
+            aria-label="Toggle Match Scores"
             onClick={onToggleScorePrompt}
-            aria-pressed={scorePromptEnabled}
             style={{
-              height: 'var(--tap-min, 44px)',
-              padding: '0 var(--sp-3_5, 14px)',
-              borderRadius: 'var(--r-pill, 9999px)',
-              border: '1.5px solid var(--line-subtle, #252d47)',
-              background: scorePromptEnabled ? 'var(--status-success-bg, rgba(34, 197, 94, 0.12))' : 'var(--surface-elevated, #1a2035)',
-              color: scorePromptEnabled ? 'var(--status-success, #22c55e)' : 'var(--text-muted, #94a3b8)',
-              fontSize: 'var(--fs-xs, 0.8125rem)',
-              fontWeight: 700,
+              background: 'none',
+              border: 'none',
+              padding: 0,
               cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              minHeight: '44px',
+              minWidth: '44px',
             }}
           >
-            {scorePromptEnabled ? 'ON' : 'OFF'}
+            <span
+              style={{
+                position: 'relative',
+                display: 'inline-flex',
+                alignItems: 'center',
+                width: '64px',
+                height: '32px',
+                borderRadius: '9999px',
+                background: scorePromptEnabled ? '#22c55e' : 'var(--surface-elevated, #2a324b)',
+                border: scorePromptEnabled ? '1px solid #16a34a' : '1px solid var(--line-subtle, #3b4461)',
+                transition: 'background-color 0.25s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.25s ease',
+                boxShadow: scorePromptEnabled ? '0 0 10px rgba(34, 197, 94, 0.35)' : 'inset 0 1px 3px rgba(0, 0, 0, 0.25)',
+                userSelect: 'none',
+                boxSizing: 'border-box',
+              }}
+            >
+              {/* Slider Track Text */}
+              <span
+                style={{
+                  position: 'absolute',
+                  left: scorePromptEnabled ? '11px' : 'auto',
+                  right: scorePromptEnabled ? 'auto' : '10px',
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  letterSpacing: '0.04em',
+                  color: scorePromptEnabled ? '#ffffff' : 'var(--text-muted, #94a3b8)',
+                  transition: 'opacity 0.2s ease',
+                  lineHeight: 1,
+                }}
+              >
+                {scorePromptEnabled ? 'ON' : 'OFF'}
+              </span>
+
+              {/* Slider Circle Knob */}
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '3px',
+                  left: '3px',
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: '#ffffff',
+                  boxShadow: '0 2px 4px rgba(0, 0, 0, 0.35)',
+                  transform: scorePromptEnabled ? 'translateX(32px)' : 'translateX(0)',
+                  transition: 'transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+                  display: 'block',
+                }}
+              />
+            </span>
           </button>
         </div>
 

@@ -115,6 +115,11 @@ export function SingleCourtScreen({
     ? `${court.score.scoreA}–${court.score.scoreB}`
     : undefined;
 
+  // Block confirming results when scoring is enabled but both scores are 0
+  const isScoreZeroAndEnabled = Boolean(
+    court.score.enabled && court.score.scoreA === 0 && court.score.scoreB === 0
+  );
+
   // Compute move up / move down eligibility
   const waitingQueueNames = [
     ...queue.nextUp.map(n => n.name),
@@ -450,11 +455,18 @@ export function SingleCourtScreen({
           winnerLabel={winnerLabel}
           nextUpLabel={nextUpLabel}
           scoreLabel={currentScoreLabel}
-          onChooseWinner={(side) => matchFlow.chooseWinner(side, currentScoreLabel)}
+          onChooseWinner={(side) => {
+            if (isScoreZeroAndEnabled) return;
+            matchFlow.chooseWinner(side, currentScoreLabel);
+          }}
           onClearWinner={matchFlow.clearWinner}
-          onConfirm={matchFlow.confirmResult}
+          onConfirm={() => {
+            if (isScoreZeroAndEnabled) return;
+            matchFlow.confirmResult();
+          }}
           sideALabel={sideALabel}
           sideBLabel={sideBLabel}
+          isScoreZeroAndEnabled={isScoreZeroAndEnabled}
         />
       )}
 

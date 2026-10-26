@@ -15,6 +15,7 @@ interface Props {
   disabled?: boolean;
   sideALabel?: string;
   sideBLabel?: string;
+  isScoreZeroAndEnabled?: boolean;
 }
 
 export function ConfirmBar({
@@ -29,6 +30,7 @@ export function ConfirmBar({
   disabled = false,
   sideALabel,
   sideBLabel,
+  isScoreZeroAndEnabled = false,
 }: Props) {
   const isSaving = stage === 'saving' || stage === 'slow';
   const isFailed = stage === 'failed';
@@ -52,22 +54,40 @@ export function ConfirmBar({
       {!winner ? (
         /* State A: WHO WON? */
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2, 8px)' }}>
-          <span
-            style={{
-              fontSize: 'var(--fs-xs, 0.8125rem)',
-              fontWeight: 700,
-              letterSpacing: '0.06em',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted, #94a3b8)',
-            }}
-          >
-            WHO WON?
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
+            <span
+              style={{
+                fontSize: 'var(--fs-xs, 0.8125rem)',
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                color: isScoreZeroAndEnabled ? 'var(--status-warn, #f59e0b)' : 'var(--text-muted, #94a3b8)',
+              }}
+            >
+              WHO WON?
+            </span>
+            {isScoreZeroAndEnabled && (
+              <span
+                style={{
+                  fontSize: '0.6875rem',
+                  fontWeight: 700,
+                  color: 'var(--status-warn, #f59e0b)',
+                  background: 'rgba(245, 158, 11, 0.12)',
+                  border: '1px solid rgba(245, 158, 11, 0.25)',
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                }}
+              >
+                Score is 0–0 · Enter score above or turn Match Scores off
+              </span>
+            )}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3, 12px)' }}>
             <button
               type="button"
               onClick={() => onChooseWinner('A')}
-              disabled={disabled}
+              disabled={disabled || isScoreZeroAndEnabled}
+              title={isScoreZeroAndEnabled ? 'Enter score above or switch Match Scores off in Host Tools (≡)' : undefined}
               style={{
                 height: 'var(--tap-min, 48px)',
                 minHeight: 'var(--tap-min, 44px)',
@@ -77,8 +97,9 @@ export function ConfirmBar({
                 color: 'var(--text-primary, #f8fafc)',
                 fontSize: 'var(--fs-sm, 0.9375rem)',
                 fontWeight: 700,
-                cursor: disabled ? 'default' : 'pointer',
-                transition: 'border-color 0.15s ease',
+                cursor: (disabled || isScoreZeroAndEnabled) ? 'not-allowed' : 'pointer',
+                opacity: (disabled || isScoreZeroAndEnabled) ? 0.35 : 1,
+                transition: 'border-color 0.15s ease, opacity 0.15s ease',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -90,7 +111,8 @@ export function ConfirmBar({
             <button
               type="button"
               onClick={() => onChooseWinner('B')}
-              disabled={disabled}
+              disabled={disabled || isScoreZeroAndEnabled}
+              title={isScoreZeroAndEnabled ? 'Enter score above or switch Match Scores off in Host Tools (≡)' : undefined}
               style={{
                 height: 'var(--tap-min, 48px)',
                 minHeight: 'var(--tap-min, 44px)',
@@ -100,8 +122,9 @@ export function ConfirmBar({
                 color: 'var(--text-primary, #f8fafc)',
                 fontSize: 'var(--fs-sm, 0.9375rem)',
                 fontWeight: 700,
-                cursor: disabled ? 'default' : 'pointer',
-                transition: 'border-color 0.15s ease',
+                cursor: (disabled || isScoreZeroAndEnabled) ? 'not-allowed' : 'pointer',
+                opacity: (disabled || isScoreZeroAndEnabled) ? 0.35 : 1,
+                transition: 'border-color 0.15s ease, opacity 0.15s ease',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -178,10 +201,26 @@ export function ConfirmBar({
             </div>
           )}
 
+          {isScoreZeroAndEnabled && (
+            <div
+              role="alert"
+              style={{
+                fontSize: 'var(--fs-xs, 0.8125rem)',
+                color: 'var(--status-warn, #f59e0b)',
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid rgba(245, 158, 11, 0.25)',
+                padding: '6px 12px',
+                borderRadius: 'var(--r-xs, 6px)',
+              }}
+            >
+              Score is 0–0. Enter points above or switch Match Scores off in Host Tools (≡).
+            </div>
+          )}
+
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isSaving}
+            disabled={isSaving || isScoreZeroAndEnabled}
             style={{
               width: '100%',
               height: 'var(--tap-min, 50px)',
@@ -196,13 +235,15 @@ export function ConfirmBar({
               alignItems: 'center',
               justifyContent: 'center',
               gap: 'var(--sp-2, 8px)',
-              cursor: isSaving ? 'wait' : 'pointer',
-              opacity: isSaving ? 0.8 : 1,
+              cursor: (isSaving || isScoreZeroAndEnabled) ? 'not-allowed' : 'pointer',
+              opacity: (isSaving || isScoreZeroAndEnabled) ? 0.45 : 1,
               transition: 'background 0.15s ease, transform 0.1s ease',
               boxShadow: 'var(--shadow-md, 0 4px 16px rgba(0,0,0,0.45))',
             }}
           >
-            {stage === 'slow'
+            {isScoreZeroAndEnabled
+              ? 'Enter score above to confirm'
+              : stage === 'slow'
               ? 'Still saving, check your connection…'
               : isSaving
               ? 'Saving…'

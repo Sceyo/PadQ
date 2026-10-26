@@ -102,7 +102,10 @@ describe('SingleCourtScreen component suite', () => {
   it('transforms sticky bar from WHO WON? into Confirm result upon selecting a winner', () => {
     render(
       <SingleCourtScreen
-        court={mockCourt}
+        court={{
+          ...mockCourt,
+          score: { ...mockCourt.score, scoreA: 11, scoreB: 9 },
+        }}
         queue={mockQueue}
         onMatchComplete={vi.fn()}
         onScoreAdjust={vi.fn()}
@@ -121,6 +124,57 @@ describe('SingleCourtScreen component suite', () => {
     // Morphs into single Confirm result
     expect(screen.queryByText('WHO WON?')).toBeNull();
     expect(screen.getByText(/john & ben won/)).toBeDefined();
+    expect(screen.getByText('Confirm result')).toBeDefined();
+  });
+
+  it('disables confirming and selecting winner when score is enabled but 0 on both sides', () => {
+    render(
+      <SingleCourtScreen
+        court={mockCourt}
+        queue={mockQueue}
+        onMatchComplete={vi.fn()}
+        onScoreAdjust={vi.fn()}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText(/Score is 0–0/i)).toBeDefined();
+    const teamABtn = screen.getByRole('button', { name: 'Team A' }) as HTMLButtonElement;
+    expect(teamABtn.disabled).toBe(true);
+
+    fireEvent.click(teamABtn);
+    // Should NOT transition into confirm result
+    expect(screen.queryByText('Confirm result')).toBeNull();
+    expect(screen.getByText('WHO WON?')).toBeDefined();
+  });
+
+  it('allows selecting winner with 0-0 score when scoring is switched OFF', () => {
+    render(
+      <SingleCourtScreen
+        court={{
+          ...mockCourt,
+          score: { ...mockCourt.score, enabled: false },
+        }}
+        queue={mockQueue}
+        onMatchComplete={vi.fn()}
+        onScoreAdjust={vi.fn()}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/Score is 0–0/i)).toBeNull();
+    const teamABtn = screen.getByRole('button', { name: 'Team A' }) as HTMLButtonElement;
+    expect(teamABtn.disabled).toBe(false);
+
+    fireEvent.click(teamABtn);
     expect(screen.getByText('Confirm result')).toBeDefined();
   });
 
