@@ -2085,8 +2085,7 @@ function QueueSystemContent() {
               )}
               <SmartSuggestions suggestions={suggestions} />
             </div>
-            {historyPanel}
-          </div>
+            </div>
         )}
         <WinnerModal isOpen={modalOpen} winner={modalWinner} score={modalScore} onClose={() => setModalOpen(false)} autoClose={autoClose} setAutoClose={setAutoClose} />
         <CourtScoreModal
@@ -2284,8 +2283,6 @@ function QueueSystemContent() {
           onBackHome={handleBackHome}
           activeTab={activeTab === 'analytics' ? 'analytics' : 'queue'}
           onTabChange={(t) => setActiveTab(t)}
-          showHistory={showHistory}
-          onToggleHistory={() => setShowHistory(h => !h)}
           darkMode={darkMode}
           onToggleDarkMode={() => setDarkMode(d => !d)}
           partnerPanelNode={

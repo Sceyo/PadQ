@@ -86,24 +86,24 @@ describe('AnalyticsDashboard component', () => {
     expect(firstRow?.querySelector('.freq-count')?.textContent).toContain('6 GP');
   });
 
-  it('renders mobile cards for career stats', () => {
-    const careerStats = {
-      Alice: { wins: 15, losses: 3, gamesPlayed: 18 },
-      Bob: { wins: 10, losses: 8, gamesPlayed: 18 },
-    };
+  it('renders match history items when switching to History tab', () => {
+    const history = [
+      { id: 1, mode: 'doubles (Court 1)', players: 'Alice & Bob vs Charlie & Dave', winner: 'Alice & Bob', score: '11-7', timestamp: '4:20 PM' },
+      { id: 2, mode: 'doubles (Court 2)', players: 'Eve & Frank vs Grace & Heidi', winner: 'Eve & Frank', score: '11-5', timestamp: '4:25 PM' },
+    ];
 
     const { getByText, container } = render(
-      <AnalyticsDashboard stats={mockStats} careerStats={careerStats} />
+      <AnalyticsDashboard stats={mockStats} history={history} />
     );
 
-    // Switch to Career tab
-    const careerTabBtn = getByText('Career');
-    fireEvent.click(careerTabBtn);
+    // Switch to History tab
+    const historyTabBtn = getByText('History');
+    fireEvent.click(historyTabBtn);
 
-    const mobileCards = container.querySelector('.analytics-mobile-cards');
-    expect(mobileCards).not.toBeNull();
-    const cards = mobileCards?.querySelectorAll('.analytics-player-card');
-    expect(cards?.length).toBe(2);
+    expect(getByText('Alice & Bob vs Charlie & Dave')).toBeDefined();
+    expect(getByText('11-7')).toBeDefined();
+    const historyItems = container.querySelectorAll('.history-item');
+    expect(historyItems.length).toBe(2);
   });
 
   it('renders mobile cards for skill bracket standings', () => {
