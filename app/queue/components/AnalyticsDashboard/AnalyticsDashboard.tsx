@@ -65,7 +65,7 @@ export const AnalyticsDashboard: React.FC<{
             className={`analytics-tab-btn ${tab === 'session' ? 'active' : ''}`}
             onClick={() => setTab('session')}
           >
-            Session
+            <Trophy size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />Session
           </button>
           <button
             className={`analytics-tab-btn ${tab === 'history' ? 'active' : ''}`}

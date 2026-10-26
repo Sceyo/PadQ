@@ -16,7 +16,7 @@
   padding-top: var(--safe-top, 0px);
   padding-left: max(var(--sp-3_5, 14px), var(--safe-left, 0px));
   padding-right: max(var(--sp-3_5, 14px), var(--safe-right, 0px));
-  background: rgba(11, 13, 23, 0.95);
+  background: var(--surface-bg, #0b0d17);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line-subtle, #252d47);

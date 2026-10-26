@@ -353,15 +353,15 @@ export function SingleCourtScreen({
           {isDeuce && (
             <div
               style={{
-                background: 'rgba(234, 179, 8, 0.12)',
-                border: '1px solid rgba(234, 179, 8, 0.35)',
+                background: 'var(--status-warn-bg, rgba(245, 158, 11, 0.15))',
+                border: '1px solid rgba(245, 158, 11, 0.35)',
                 borderRadius: 'var(--r-sm, 10px)',
                 padding: '6px 12px',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
                 fontSize: 'var(--fs-xs, 0.8125rem)',
-                color: '#fde047',
+                color: 'var(--status-warn, #f59e0b)',
                 fontWeight: 600,
               }}
             >
@@ -373,7 +373,7 @@ export function SingleCourtScreen({
           {isGameWon && (
             <div
               style={{
-                background: 'rgba(34, 197, 94, 0.12)',
+                background: 'var(--status-success-bg, rgba(34, 197, 94, 0.12))',
                 border: '1px solid rgba(34, 197, 94, 0.35)',
                 borderRadius: 'var(--r-sm, 10px)',
                 padding: '8px 12px',
@@ -382,7 +382,7 @@ export function SingleCourtScreen({
                 justifyContent: 'space-between',
                 gap: '8px',
                 fontSize: 'var(--fs-xs, 0.8125rem)',
-                color: '#86efac',
+                color: 'var(--status-success, #22c55e)',
                 fontWeight: 600,
               }}
             >
@@ -393,7 +393,7 @@ export function SingleCourtScreen({
                   onClick={() => matchFlow.chooseWinner(isWonA ? 'A' : 'B')}
                   style={{
                     background: 'var(--status-success, #22c55e)',
-                    color: '#090a12',
+                    color: '#ffffff',
                     border: 'none',
                     borderRadius: 'var(--r-pill, 9999px)',
                     padding: '4px 12px',

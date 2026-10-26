@@ -45,6 +45,20 @@ body.dark-mode {
   background:var(--card); border-radius:var(--r-lg);
   padding:32px; box-shadow:var(--sh-lg); position:relative;
 }
+
+.mobile-first-root {
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+  background: var(--surface-bg, #0b0d17);
+  color: var(--text-primary, #f8fafc);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
 .qs-loading{color:rgba(255,255,255,.8);font-size:1rem;margin-top:30vh;font-family:'Inter',sans-serif;}
 
 .dark-mode-toggle {

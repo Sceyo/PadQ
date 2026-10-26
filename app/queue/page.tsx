@@ -626,7 +626,10 @@ function QueueSystemContent() {
   useEffect(() => { setRoster(loadRoster()); }, []);
 
   // Side effects
-  useEffect(() => { document.body.classList.toggle('dark-mode', darkMode); }, [darkMode]);
+  useEffect(() => {
+    document.body.classList.toggle('dark-mode', darkMode);
+    document.documentElement.classList.toggle('dark-mode', darkMode);
+  }, [darkMode]);
   useLayoutEffect(() => { document.body.classList.add('dark-mode'); }, []);
   useEffect(() => { if (gameModeFromUrl) setGameMode(gameModeFromUrl); else router.push('/'); }, [gameModeFromUrl, setGameMode, router]);
   useEffect(() => {
@@ -2284,8 +2287,8 @@ function QueueSystemContent() {
   };
 
   return (
-    <div className={`queue-system game-view ${darkMode ? 'dark' : ''}`}>
-            {useMobileFirst ? (
+    <div className={useMobileFirst ? `mobile-first-root ${darkMode ? 'dark-mode' : ''}` : `queue-system game-view ${darkMode ? 'dark' : ''}`}>
+      {useMobileFirst ? (
         <AppShell
           sessionId={session.sessionId}
           isHost={session.isHost}
