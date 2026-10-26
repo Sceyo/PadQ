@@ -1,0 +1,205 @@
+'use client';
+
+import React from 'react';
+import type { MatchFlowStage } from '../../hooks/useMatchFlow';
+
+interface Props {
+  winner: 'A' | 'B' | null;
+  stage: MatchFlowStage;
+  winnerLabel: string;
+  nextUpLabel?: string;
+  scoreLabel?: string;
+  onChooseWinner: (side: 'A' | 'B') => void;
+  onClearWinner: () => void;
+  onConfirm: () => void;
+  disabled?: boolean;
+}
+
+export function ConfirmBar({
+  winner,
+  stage,
+  winnerLabel,
+  nextUpLabel,
+  scoreLabel,
+  onChooseWinner,
+  onClearWinner,
+  onConfirm,
+  disabled = false,
+}: Props) {
+  const isSaving = stage === 'saving' || stage === 'slow';
+  const isFailed = stage === 'failed';
+
+  return (
+    <footer
+      style={{
+        position: 'sticky',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        background: 'rgba(16, 20, 36, 0.96)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        borderTop: '1px solid var(--line-subtle, #252d47)',
+        padding: 'var(--sp-3, 12px) var(--sp-4, 16px) calc(var(--safe-bottom, 0px) + var(--sp-3, 12px))',
+        zIndex: 'var(--z-action-bar, 200)',
+        boxSizing: 'border-box',
+      }}
+    >
+      {!winner ? (
+        /* State A: WHO WON? */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2, 8px)' }}>
+          <span
+            style={{
+              fontSize: 'var(--fs-xs, 0.8125rem)',
+              fontWeight: 700,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--text-muted, #94a3b8)',
+            }}
+          >
+            WHO WON?
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-3, 12px)' }}>
+            <button
+              type="button"
+              onClick={() => onChooseWinner('A')}
+              disabled={disabled}
+              style={{
+                height: 'var(--tap-min, 48px)',
+                minHeight: 'var(--tap-min, 44px)',
+                borderRadius: 'var(--r-md, 14px)',
+                border: '1.5px solid var(--line-subtle, #252d47)',
+                background: 'var(--surface-elevated, #1a2035)',
+                color: 'var(--text-primary, #f8fafc)',
+                fontSize: 'var(--fs-sm, 0.9375rem)',
+                fontWeight: 700,
+                cursor: disabled ? 'default' : 'pointer',
+                transition: 'border-color 0.15s ease',
+              }}
+            >
+              Team A
+            </button>
+            <button
+              type="button"
+              onClick={() => onChooseWinner('B')}
+              disabled={disabled}
+              style={{
+                height: 'var(--tap-min, 48px)',
+                minHeight: 'var(--tap-min, 44px)',
+                borderRadius: 'var(--r-md, 14px)',
+                border: '1.5px solid var(--line-subtle, #252d47)',
+                background: 'var(--surface-elevated, #1a2035)',
+                color: 'var(--text-primary, #f8fafc)',
+                fontSize: 'var(--fs-sm, 0.9375rem)',
+                fontWeight: 700,
+                cursor: disabled ? 'default' : 'pointer',
+                transition: 'border-color 0.15s ease',
+              }}
+            >
+              Team B
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* State B: WINNER CHOSEN -> EXACTLY ONE CONFIRM RESULT BAR */
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2_5, 10px)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--sp-2, 8px)',
+            }}
+          >
+            <div>
+              <div
+                style={{
+                  fontSize: 'var(--fs-sm, 0.9375rem)',
+                  fontWeight: 700,
+                  color: 'var(--text-primary, #f8fafc)',
+                }}
+              >
+                {winnerLabel} won{scoreLabel ? ` ${scoreLabel}` : ''}
+              </div>
+              {nextUpLabel && (
+                <div
+                  style={{
+                    fontSize: 'var(--fs-xs, 0.8125rem)',
+                    color: 'var(--text-muted, #94a3b8)',
+                  }}
+                >
+                  Next on court: {nextUpLabel}
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={onClearWinner}
+              disabled={isSaving}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--accent-primary, #5457e0)',
+                fontSize: 'var(--fs-xs, 0.8125rem)',
+                fontWeight: 700,
+                padding: 'var(--sp-1, 4px) var(--sp-2, 8px)',
+                cursor: isSaving ? 'default' : 'pointer',
+                borderRadius: 'var(--r-xs, 6px)',
+              }}
+            >
+              Change
+            </button>
+          </div>
+
+          {isFailed && (
+            <div
+              role="alert"
+              style={{
+                fontSize: 'var(--fs-xs, 0.8125rem)',
+                color: '#f87171',
+                background: 'rgba(239, 68, 68, 0.12)',
+                padding: '6px 12px',
+                borderRadius: 'var(--r-xs, 6px)',
+              }}
+            >
+              Save failed. Check your connection and try again.
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={isSaving}
+            style={{
+              width: '100%',
+              height: 'var(--tap-min, 50px)',
+              minHeight: 'var(--tap-min, 44px)',
+              borderRadius: 'var(--r-md, 14px)',
+              border: 'none',
+              background: isFailed ? 'var(--status-danger, #ef4444)' : 'var(--accent-primary, #5457e0)',
+              color: '#ffffff',
+              fontSize: 'var(--fs-base, 1rem)',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 'var(--sp-2, 8px)',
+              cursor: isSaving ? 'wait' : 'pointer',
+              opacity: isSaving ? 0.8 : 1,
+              transition: 'background 0.15s ease, transform 0.1s ease',
+              boxShadow: 'var(--shadow-md, 0 4px 16px rgba(0,0,0,0.45))',
+            }}
+          >
+            {stage === 'slow'
+              ? 'Still saving, check your connection…'
+              : isSaving
+              ? 'Saving…'
+              : isFailed
+              ? 'Try Again'
+              : 'Confirm result'}
+          </button>
+        </div>
+      )}
+    </footer>
+  );
+}
