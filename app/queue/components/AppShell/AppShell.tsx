@@ -19,6 +19,7 @@ interface Props {
   sessionId?: string | null;
   isHost: boolean;
   isConnected: boolean;
+  isLive?: boolean;
   children: React.ReactNode;
   onAddPlayerLive: (name: string) => void;
   scorePromptEnabled: boolean;
@@ -39,6 +40,7 @@ export function AppShell({
   sessionId,
   isHost,
   isConnected,
+  isLive,
   children,
   onAddPlayerLive,
   scorePromptEnabled,
@@ -55,6 +57,7 @@ export function AppShell({
   diagnosticsNode,
 }: Props) {
   const [isHostToolsOpen, setIsHostToolsOpen] = useState(false);
+  const isBroadcastingLive = (isLive ?? gearMenuProps?.isLive ?? false) && Boolean(sessionId && isConnected);
 
   return (
     <OverlayHost>
@@ -83,7 +86,7 @@ export function AppShell({
               />
               <span className={styles.srOnly}>PadQ</span>
             </div>
-            {Boolean(sessionId && isConnected) && (
+            {isBroadcastingLive && (
               <span className={styles.liveBadge} title={`Live session connected (${sessionId})`} aria-label="Live session">
                 <span className={styles.liveDot} />
                 <span className={styles.liveText}>LIVE</span>

@@ -2293,6 +2293,7 @@ function QueueSystemContent() {
           sessionId={session.sessionId}
           isHost={session.isHost}
           isConnected={session.isConnected}
+          isLive={isLiveLocal}
           onAddPlayerLive={handleAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}
           onToggleScorePrompt={() => setScorePromptEnabled(p => !p)}
