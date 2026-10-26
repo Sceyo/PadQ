@@ -2176,7 +2176,7 @@ function QueueSystemContent() {
   // ── RENDER C — Default / Play-all / Skilled ──────────────
   const isSkilled = activeQueueMode === 'skilled';
 
-  if (V1_RELEASE.mobileFirstShell && !isSkilled && gameMode === 'doubles') {
+  if (V1_RELEASE.mobileFirstShell && !isSkilled && (gameMode ?? 'doubles') === 'doubles') {
     const isMultiCourt = courtSlots.length > 0;
     const singleCourtModel = toSingleCourtViewModel({
       queue,

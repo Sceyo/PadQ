@@ -15,5 +15,5 @@ export const V1_RELEASE = {
    * When false, the legacy shell and screens render unchanged.
    * When true, the new mobile-first presentation layer renders.
    */
-  mobileFirstShell: false,
+  mobileFirstShell: true,
 } as const;
