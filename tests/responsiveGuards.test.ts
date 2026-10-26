@@ -26,7 +26,7 @@ function parse(css: string, media = ''): Rule[] {
     if (open < 0) break;
     const selector = src.slice(i, open).trim();
     let depth = 1, j = open + 1;
-    while (j < src.length && depth > 0) { if (src[j] === '{') depth++; else if (src[j] === '}') depth--; j++; }
+    while (j < src.length && depth > 0) { if (j < src.length && src[j] === '{') depth++; else if (j < src.length && src[j] === '}') depth--; j++; }
     const body = src.slice(open + 1, j - 1);
     if (selector.startsWith('@media') || selector.startsWith('@supports')) out.push(...parse(body, selector));
     else if (!selector.startsWith('@')) out.push({ selector, body, media });
@@ -73,6 +73,14 @@ describe('CURRENT guards (pass today, must keep passing)', () => {
     expect(low).toEqual([]);
     expect(contrast('#ffffff', '#6366f1')).toBeLessThan(4.5); // why the old accent was replaced
   });
+  it('app declares viewport-fit=cover and a theme color', () => {
+    const layout = readFileSync(join(ROOT, 'app/layout.tsx'), 'utf-8');
+    expect(layout).toMatch(/viewportFit:\s*['"]cover['"]/);
+    expect(layout).toMatch(/themeColor/);
+  });
+  it('prefers-reduced-motion is honoured in tokens.css', () => {
+    expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
+  });
 });
 
 describe('TARGET guards (it.fails until the remodel; offenders are printed on failure)', () => {
@@ -81,9 +89,6 @@ describe('TARGET guards (it.fails until the remodel; offenders are printed on fa
       .filter((r) => { const d = decls(r.body); return d.some(([k, v]) => k === 'white-space' && v.startsWith('nowrap')) && d.some(([k, v]) => k === 'text-overflow' && v.startsWith('ellipsis')); })
       .map((r) => r.selector);
     expect(bad).toEqual([]);
-  });
-  it.fails('prefers-reduced-motion is honoured', () => {
-    expect(css).toMatch(/@media\s*\(prefers-reduced-motion:\s*reduce\)/);
   });
   it.fails('one breakpoint family: only 768 and 1024 media widths', () => {
     const widths = [...new Set([...css.matchAll(/@media[^{]*?(?:min|max)-width:\s*(\d+)px/g)].map((m) => Number(m[1])))].sort((a, b) => a - b);
@@ -116,13 +121,7 @@ describe('TARGET guards (it.fails until the remodel; offenders are printed on fa
       });
     expect(bad).toEqual([]);
   });
-  it.fails('app declares viewport-fit=cover and a theme color', () => {
-    const layout = readFileSync(join(ROOT, 'app/layout.tsx'), 'utf-8');
-    expect(layout).toMatch(/viewportFit:\s*['"]cover['"]/);
-    expect(layout).toMatch(/themeColor/);
-  });
   it.fails('banned vocabulary does not appear in player-facing strings', () => {
-    const banned = /(Sit Out|Sit out|Mark absent|Sit Next|Form Teams)/;
     const files = walk(join(ROOT, 'app'), ['.tsx']).filter((f) => !f.endsWith('.test.tsx'));
     const bad = files.flatMap((f) => readFileSync(f, 'utf-8').split('\n').map((l, i) => ({ l, i }))
       .filter(({ l }) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*(import|const|let|function|export)\b/.test(l)

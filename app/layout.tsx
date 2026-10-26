@@ -1,6 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { AuthResilienceBanner } from "@/components/AuthResilience/AuthResilienceBanner";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  themeColor: "#0b0d17",
+  viewportFit: "cover",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://pad-q.vercel.app"),
