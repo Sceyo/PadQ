@@ -98,10 +98,14 @@ export function SingleCourtScreen({
     ...waitingCandidateNames.filter(name => !queue.nextUp.some(n => n.name === name)),
   ];
 
+  const isSingles = teamA.players.length === 1 && teamB.players.length === 1;
+  const sideALabel = isSingles ? (teamA.players[0] ?? 'Player 1') : 'Team A';
+  const sideBLabel = isSingles ? (teamB.players[0] ?? 'Player 2') : 'Team B';
+
   const winnerLabel = matchFlow.winner === 'A'
-    ? teamA.players.join(' & ')
+    ? (isSingles ? (teamA.players[0] ?? 'Player 1') : teamA.players.join(' & '))
     : matchFlow.winner === 'B'
-    ? teamB.players.join(' & ')
+    ? (isSingles ? (teamB.players[0] ?? 'Player 2') : teamB.players.join(' & '))
     : '';
 
   const nextUpLabel = queue.nextUp.map(p => p.name).join(', ');
@@ -386,7 +390,7 @@ export function SingleCourtScreen({
                 fontWeight: 600,
               }}
             >
-              <span>🎉 Game Over · {isWonA ? teamA.players.join(' & ') : teamB.players.join(' & ')} reached limit ({scoreA}–{scoreB})!</span>
+              <span>🎉 Game Over · {isWonA ? (isSingles ? teamA.players[0] : teamA.players.join(' & ')) : (isSingles ? teamB.players[0] : teamB.players.join(' & '))} reached limit ({scoreA}–{scoreB})!</span>
               {isHost && matchFlow.stage === 'idle' && (
                 <button
                   type="button"
@@ -453,6 +457,8 @@ export function SingleCourtScreen({
           onChooseWinner={(side) => matchFlow.chooseWinner(side, currentScoreLabel)}
           onClearWinner={matchFlow.clearWinner}
           onConfirm={matchFlow.confirmResult}
+          sideALabel={sideALabel}
+          sideBLabel={sideBLabel}
         />
       )}
 

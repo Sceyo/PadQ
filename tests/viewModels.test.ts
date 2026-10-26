@@ -95,6 +95,27 @@ describe('viewModels pure mappers', () => {
       expect(court11_11.score.deuce).toBe(true);
       expect(court11_11.score.limit).toBe(13);
     });
+
+    it('supports singles gameMode with 2 players and 1v1 side labels', () => {
+      const court = toSingleCourtViewModel({
+        queue: ['Alice', 'Bob', 'Charlie'],
+        gameMode: 'singles',
+      });
+      expect(court.status).toBe('playing');
+      expect(court.teams[0].label).toBe('Player 1');
+      expect(court.teams[0].players).toEqual(['Alice']);
+      expect(court.teams[1].label).toBe('Player 2');
+      expect(court.teams[1].players).toEqual(['Bob']);
+      expect(court.canEdit).toBe(false); // Can't edit teams in 1v1 singles
+    });
+
+    it('sets waiting status in singles when fewer than 2 players', () => {
+      const court = toSingleCourtViewModel({
+        queue: ['Alice'],
+        gameMode: 'singles',
+      });
+      expect(court.status).toBe('waiting');
+    });
   });
 
   describe('toSingleCourtQueueViewModel', () => {
@@ -118,6 +139,20 @@ describe('viewModels pure mappers', () => {
 
       // onBreak
       expect(queueModel.onBreak).toEqual([{ name: 'Resting1' }]);
+    });
+
+    it('splits queue using 2-player batches when gameMode is singles', () => {
+      const queueModel = toSingleCourtQueueViewModel({
+        queue: ['P1', 'P2', 'P3', 'P4', 'P5'],
+        sittingOut: [],
+        gameMode: 'singles',
+        formatEta: (pos) => `~${pos * 5}m`,
+      });
+
+      // In singles, onCourt takes 2 (P1, P2), nextUp is next 2 (P3, P4)
+      expect(queueModel.nextUp.map(p => p.name)).toEqual(['P3', 'P4']);
+      // Waiting is remaining players (P5)
+      expect(queueModel.waiting.map(p => p.name)).toEqual(['P5']);
     });
   });
 

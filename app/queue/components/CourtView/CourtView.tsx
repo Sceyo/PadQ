@@ -22,6 +22,7 @@ export function CourtView({
 }: Props) {
   const teamA = court.teams[0];
   const teamB = court.teams[1];
+  const isSingles = teamA.players.length === 1 && teamB.players.length === 1;
 
   return (
     <section
@@ -70,7 +71,7 @@ export function CourtView({
           </span>
         </div>
 
-        {court.canEdit && onEditTeams && (
+        {court.canEdit && onEditTeams && !isSingles && (
           <button
             type="button"
             onClick={onEditTeams}
@@ -93,7 +94,7 @@ export function CourtView({
         )}
       </div>
 
-      {/* Team A */}
+      {/* Team / Player A */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-1_5, 6px)' }}>
         <span
           style={{
@@ -104,9 +105,9 @@ export function CourtView({
             color: 'var(--team-a-text, #4ade80)',
           }}
         >
-          TEAM A
+          {teamA.label.toUpperCase()}
         </span>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2_5, 10px)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isSingles ? '1fr' : '1fr 1fr', gap: 'var(--sp-2_5, 10px)' }}>
           {teamA.players.map((name) => (
             <PlayerCard
               key={`a-${name}`}
@@ -120,7 +121,7 @@ export function CourtView({
         </div>
       </div>
 
-      {/* Team B */}
+      {/* Team / Player B */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-1_5, 6px)' }}>
         <span
           style={{
@@ -131,9 +132,9 @@ export function CourtView({
             color: 'var(--team-b-text, #60a5fa)',
           }}
         >
-          TEAM B
+          {teamB.label.toUpperCase()}
         </span>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--sp-2_5, 10px)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isSingles ? '1fr' : '1fr 1fr', gap: 'var(--sp-2_5, 10px)' }}>
           {teamB.players.map((name) => (
             <PlayerCard
               key={`b-${name}`}

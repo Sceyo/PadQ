@@ -43,12 +43,20 @@ export function toSingleCourtViewModel(params: {
     active?: boolean;
   } | null;
   canEdit?: boolean;
+  gameMode?: 'singles' | 'doubles';
+  scoreEnabled?: boolean;
 }): CourtViewModel {
-  const { queue, suggestedTeamA, suggestedTeamB, liveScore, canEdit = true } = params;
-  const firstFour = queue.slice(0, 4);
-  const teamA = suggestedTeamA && suggestedTeamA.length === 2 ? suggestedTeamA : firstFour.slice(0, 2);
-  const teamB = suggestedTeamB && suggestedTeamB.length === 2 ? suggestedTeamB : firstFour.slice(2, 4);
-  const isPlaying = firstFour.length === 4;
+  const { queue, suggestedTeamA, suggestedTeamB, liveScore, canEdit = true, gameMode = 'doubles', scoreEnabled } = params;
+  const isSingles = gameMode === 'singles';
+  const onCourtCount = isSingles ? 2 : 4;
+  const onCourt = queue.slice(0, onCourtCount);
+  const teamA = isSingles
+    ? onCourt.slice(0, 1)
+    : (suggestedTeamA && suggestedTeamA.length === 2 ? suggestedTeamA : onCourt.slice(0, 2));
+  const teamB = isSingles
+    ? onCourt.slice(1, 2)
+    : (suggestedTeamB && suggestedTeamB.length === 2 ? suggestedTeamB : onCourt.slice(2, 4));
+  const isPlaying = onCourt.length === onCourtCount;
   const scoreA = liveScore?.scoreA ?? 0;
   const scoreB = liveScore?.scoreB ?? 0;
   const hasStarted = scoreA > 0 || scoreB > 0;
@@ -58,15 +66,15 @@ export function toSingleCourtViewModel(params: {
   const finished = isWonA || isWonB;
   const inDeuce = !finished && scoreA >= baseLimit - 1 && scoreB >= baseLimit - 1;
   const effectiveLimit = inDeuce ? Math.max(baseLimit, Math.min(scoreA, scoreB) + 2) : baseLimit;
-  const enabled = liveScore?.active ?? true;
+  const enabled = scoreEnabled !== undefined ? scoreEnabled : (liveScore?.active ?? true);
 
   return {
     id: 'court-1',
     name: 'Court 1',
     status: isPlaying ? 'playing' : 'waiting',
     teams: [
-      { side: 'A', label: 'Team 1', players: teamA },
-      { side: 'B', label: 'Team 2', players: teamB },
+      { side: 'A', label: isSingles ? 'Player 1' : 'Team 1', players: teamA },
+      { side: 'B', label: isSingles ? 'Player 2' : 'Team 2', players: teamB },
     ],
     score: {
       enabled,
@@ -80,7 +88,7 @@ export function toSingleCourtViewModel(params: {
       winner: finished ? (isWonA ? 'A' : 'B') : null,
     },
     pendingWinner: null,
-    canEdit: canEdit && !hasStarted,
+    canEdit: canEdit && !hasStarted && !isSingles,
   };
 }
 
@@ -89,19 +97,21 @@ export function toSingleCourtQueueViewModel(params: {
   priorityPlayers?: string[];
   sittingOut?: string[];
   formatEta?: (position: number, onCourtCount: number, isMultiCourt: boolean) => string | null;
+  gameMode?: 'singles' | 'doubles';
 }): QueueViewModel {
-  const { queue, priorityPlayers = [], sittingOut = [], formatEta } = params;
-  const waitingList = queue.slice(4);
-  const nextUp = waitingList.slice(0, 4).map(name => ({
+  const { queue, priorityPlayers = [], sittingOut = [], formatEta, gameMode = 'doubles' } = params;
+  const groupSize = gameMode === 'singles' ? 2 : 4;
+  const waitingList = queue.slice(groupSize);
+  const nextUp = waitingList.slice(0, groupSize).map(name => ({
     name,
     priority: priorityPlayers.includes(name),
   }));
 
-  // Deduplication: waiting list displays players waiting after nextUp (index 4+)
-  const waiting = waitingList.slice(4).map((name, idx) => ({
+  // Deduplication: waiting list displays players waiting after nextUp (index groupSize+)
+  const waiting = waitingList.slice(groupSize).map((name, idx) => ({
     name,
     priority: priorityPlayers.includes(name),
-    etaLabel: formatEta ? (formatEta(idx + 5, 4, false) ?? undefined) : undefined,
+    etaLabel: formatEta ? (formatEta(idx + groupSize + 1, groupSize, false) ?? undefined) : undefined,
   }));
 
   const onBreak = sittingOut.map(name => ({ name }));
@@ -118,18 +128,20 @@ export function toMultiCourtQueueViewModel(params: {
   priorityPlayers?: string[];
   sittingOut?: string[];
   formatEta?: (position: number, onCourtCount: number, isMultiCourt: boolean) => string | null;
+  gameMode?: 'singles' | 'doubles';
 }): QueueViewModel {
-  const { waitingPlayers, priorityPlayers = [], sittingOut = [], formatEta } = params;
-  const nextUp = waitingPlayers.slice(0, 4).map(name => ({
+  const { waitingPlayers, priorityPlayers = [], sittingOut = [], formatEta, gameMode = 'doubles' } = params;
+  const groupSize = gameMode === 'singles' ? 2 : 4;
+  const nextUp = waitingPlayers.slice(0, groupSize).map(name => ({
     name,
     priority: priorityPlayers.includes(name),
   }));
 
-  // Deduplication: waiting list displays players waiting after nextUp (index 4+)
-  const waiting = waitingPlayers.slice(4).map((name, idx) => ({
+  // Deduplication: waiting list displays players waiting after nextUp (index groupSize+)
+  const waiting = waitingPlayers.slice(groupSize).map((name, idx) => ({
     name,
     priority: priorityPlayers.includes(name),
-    etaLabel: formatEta ? (formatEta(idx + 5, 4, true) ?? undefined) : undefined,
+    etaLabel: formatEta ? (formatEta(idx + groupSize + 1, groupSize, true) ?? undefined) : undefined,
   }));
 
   const onBreak = sittingOut.map(name => ({ name }));

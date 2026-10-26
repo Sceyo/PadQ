@@ -2178,30 +2178,36 @@ function QueueSystemContent() {
   // ── RENDER C — Default / Play-all / Skilled ──────────────
   const isSkilled = activeQueueMode === 'skilled';
 
-    const useMobileFirst = V1_RELEASE.mobileFirstShell && !isSkilled && (gameMode ?? 'doubles') === 'doubles';
+  const useMobileFirst = V1_RELEASE.mobileFirstShell && !isSkilled;
   const isMultiCourt = courtSlots.length > 0;
+  const isSingles = (gameMode ?? 'doubles') === 'singles';
   const singleCourtModel = toSingleCourtViewModel({
     queue,
     suggestedTeamA: playAllSuggestion?.suggestedTeamA,
     suggestedTeamB: playAllSuggestion?.suggestedTeamB,
     liveScore: session.liveScore,
     canEdit: canControl,
+    gameMode: gameMode ?? 'doubles',
+    scoreEnabled: scorePromptEnabled,
   });
   const singleCourtQueueModel = toSingleCourtQueueViewModel({
     queue,
     priorityPlayers: activePriorityPlayers,
     sittingOut: activeSittingOut,
     formatEta: formatEtaLabel,
+    gameMode: gameMode ?? 'doubles',
   });
   const multiCourtQueueModel = toMultiCourtQueueViewModel({
     waitingPlayers,
     priorityPlayers: activePriorityPlayers,
     sittingOut: activeSittingOut,
     formatEta: formatEtaLabel,
+    gameMode: gameMode ?? 'doubles',
   });
 
   const handleSingleCourtSwapTeams = (newOnCourt: string[]) => {
-    const newQueue = [...newOnCourt, ...queue.slice(4)];
+    const onCourtCount = isSingles ? 2 : 4;
+    const newQueue = [...newOnCourt, ...queue.slice(onCourtCount)];
     setQueue(newQueue);
     queueRef.current = newQueue;
     if (session.sessionId) {
@@ -2210,13 +2216,17 @@ function QueueSystemContent() {
   };
 
   const handleSingleCourtScoreAdjust = (side: 'A' | 'B', delta: number) => {
-    const firstFour = queue.slice(0, 4);
-    const teamA = playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2
-      ? playAllSuggestion.suggestedTeamA
-      : firstFour.slice(0, 2);
-    const teamB = playAllSuggestion?.suggestedTeamB && playAllSuggestion.suggestedTeamB.length === 2
-      ? playAllSuggestion.suggestedTeamB
-      : firstFour.slice(2, 4);
+    const isSinglesMode = (gameMode ?? 'doubles') === 'singles';
+    const teamA = isSinglesMode
+      ? [queue[0] ?? 'Player 1']
+      : (playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2
+          ? playAllSuggestion.suggestedTeamA
+          : queue.slice(0, 2));
+    const teamB = isSinglesMode
+      ? [queue[1] ?? 'Player 2']
+      : (playAllSuggestion?.suggestedTeamB && playAllSuggestion.suggestedTeamB.length === 2
+          ? playAllSuggestion.suggestedTeamB
+          : queue.slice(2, 4));
 
     const prev = session.liveScore;
     const currentScoreA = prev?.scoreA ?? 0;
@@ -2252,6 +2262,11 @@ function QueueSystemContent() {
   };
 
   const handleSingleCourtMatchComplete = async (winner: 'A' | 'B', scoreStr?: string): Promise<boolean> => {
+    if ((gameMode ?? 'doubles') === 'singles') {
+      const winnerName = winner === 'A' ? queue[0] : queue[1];
+      handleSinglesMatch(winnerName, scoreStr);
+      return true;
+    }
     const firstFour = queue.slice(0, 4);
     const teamA = playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2
       ? playAllSuggestion.suggestedTeamA
@@ -2263,6 +2278,14 @@ function QueueSystemContent() {
   };
 
   const handleMultiCourtWin = async (courtId: string, side: 'A' | 'B', scoreStr?: string): Promise<boolean> => {
+    if ((gameMode ?? 'doubles') === 'singles') {
+      const slot = courtSlots.find(c => c.id === courtId);
+      if (slot && slot.onCourt.length >= 2) {
+        const winnerName = side === 'A' ? slot.onCourt[0] : slot.onCourt[1];
+        handleSinglesMatch(winnerName, scoreStr, courtId);
+        return true;
+      }
+    }
     handleCourtMatch(courtId, side, scoreStr);
     return true;
   };
@@ -2351,12 +2374,18 @@ function QueueSystemContent() {
                   Multi-Court Queue Rotation ({courtSlots.length} {courtSlots.length === 1 ? 'court' : 'courts'})
                 </div>
                 <div style={{ color: 'var(--text-secondary, #94a3b8)', lineHeight: '1.5' }}>
-                  <div>Courts active: {courtSlots.map(c => `${c.name} (${c.onCourt.filter(Boolean).length}/4)`).join(' • ')}</div>
+                  <div>Courts active: {courtSlots.map(c => `${c.name} (${c.onCourt.filter(Boolean).length}/${gameMode === 'singles' ? 2 : 4})`).join(' • ')}</div>
                   <div>Waiting in queue: {waitingPlayers.length}</div>
                   {activePriorityPlayers.length > 0 && <div>Priority players: {activePriorityPlayers.join(', ')}</div>}
                   {activeSittingOut.length > 0 && <div>On break: {activeSittingOut.join(', ')}</div>}
                 </div>
               </div>
+            ) : gameMode === 'singles' ? (
+              singlesFormat === 'pool' ? (
+                <PoolSinglesStatusPanel poolState={poolSinglesStateUI} allPlayers={players} />
+              ) : (
+                <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
+              )
             ) : (
               <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />
             )
@@ -2384,6 +2413,7 @@ function QueueSystemContent() {
               onPlayerRemove={handleRemovePlayerFromQueue}
               onReturnFromBreak={handleToggleSitOut}
               onMoveWaitingPlayer={handleMoveWaitingPlayer}
+              gameMode={gameMode ?? 'doubles'}
             />
           ) : (
             <SingleCourtScreen
@@ -2399,11 +2429,12 @@ function QueueSystemContent() {
               onMoveWaitingPlayer={handleMoveWaitingPlayer}
               onScoreLimitChange={(newLimit) => {
                 const prev = session.liveScore;
+                const isSinglesMode = (gameMode ?? 'doubles') === 'singles';
                 const nextLiveScore: LiveScoreState = {
                   scoreA: prev?.scoreA ?? 0,
                   scoreB: prev?.scoreB ?? 0,
-                  labelA: prev?.labelA ?? queue.slice(0, 2).join(' / '),
-                  labelB: prev?.labelB ?? queue.slice(2, 4).join(' / '),
+                  labelA: prev?.labelA ?? (isSinglesMode ? (queue[0] ?? 'Player 1') : queue.slice(0, 2).join(' / ')),
+                  labelB: prev?.labelB ?? (isSinglesMode ? (queue[1] ?? 'Player 2') : queue.slice(2, 4).join(' / ')),
                   limit: newLimit,
                   baseLimit: newLimit,
                   deuce: false,
@@ -2413,12 +2444,13 @@ function QueueSystemContent() {
               }}
               onResetScore={() => {
                 const prev = session.liveScore;
+                const isSinglesMode = (gameMode ?? 'doubles') === 'singles';
                 const baseLimit = prev?.baseLimit ?? prev?.limit ?? 11;
                 const nextLiveScore: LiveScoreState = {
                   scoreA: 0,
                   scoreB: 0,
-                  labelA: prev?.labelA ?? queue.slice(0, 2).join(' / '),
-                  labelB: prev?.labelB ?? queue.slice(2, 4).join(' / '),
+                  labelA: prev?.labelA ?? (isSinglesMode ? (queue[0] ?? 'Player 1') : queue.slice(0, 2).join(' / ')),
+                  labelB: prev?.labelB ?? (isSinglesMode ? (queue[1] ?? 'Player 2') : queue.slice(2, 4).join(' / ')),
                   limit: baseLimit,
                   baseLimit: baseLimit,
                   deuce: false,

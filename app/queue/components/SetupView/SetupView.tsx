@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import {
   Sun, Moon, ArrowLeft, Users, Swords, UserPlus,
   Trash2, Star, BookOpen, Play, Wifi,
@@ -70,7 +71,7 @@ export function SetupView({
   const SKILL_TITLE: Record<SkillBracket, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
 
   return (
-    <div className={`queue-system setup-page ${darkMode ? 'dark' : ''}`}>
+    <div className={`queue-system setup-page ${darkMode ? 'dark dark-mode' : ''}`}>
       <button className="dark-mode-toggle" onClick={onToggleDark}>
         {darkMode ? <Sun size={17} /> : <Moon size={17} />}
       </button>
@@ -79,9 +80,14 @@ export function SetupView({
       </button>
 
       <div className="setup-hero">
-        <div className="setup-hero-icon">
-          {gameMode === 'singles' ? <Swords size={26} /> : <Users size={26} />}
-        </div>
+        <Image
+          src="/padq-logo.png"
+          alt="PADQ"
+          width={130}
+          height={36}
+          priority
+          style={{ width: 'auto', height: '36px', marginBottom: '8px' }}
+        />
         <h1 className="app-name">{gameMode === 'singles' ? 'Singles' : 'Doubles'} Queue</h1>
         <p className="app-subtitle">Add players to get started</p>
       </div>

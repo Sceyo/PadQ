@@ -26,6 +26,7 @@ interface Props {
   onPlayerRemove: (name: string) => void;
   onReturnFromBreak: (name: string) => void;
   onMoveWaitingPlayer?: (name: string, direction: -1 | 1) => void;
+  gameMode?: 'singles' | 'doubles';
 }
 
 export function MultiCourtScreen({
@@ -41,6 +42,7 @@ export function MultiCourtScreen({
   onPlayerRemove,
   onReturnFromBreak,
   onMoveWaitingPlayer,
+  gameMode = 'doubles',
 }: Props) {
   // Overlays state
   const [editingCourtId, setEditingCourtId] = useState<string | null>(null);
@@ -55,14 +57,17 @@ export function MultiCourtScreen({
     side: 'A' | 'B';
     teamA: string[];
     teamB: string[];
+    mode?: 'singles' | 'doubles' | 'skilled';
   } | null>(null);
+
+  const isSingles = gameMode === 'singles';
 
   const handleWinClick = (courtId: string, side: 'A' | 'B') => {
     if (!isHost) return;
     const slot = courtSlots.find(s => s.id === courtId);
     if (!slot) return;
-    const teamA = slot.onCourt.slice(0, 2);
-    const teamB = slot.onCourt.slice(2, 4);
+    const teamA = slot.onCourt.slice(0, isSingles ? 1 : 2);
+    const teamB = slot.onCourt.slice(isSingles ? 1 : 2, isSingles ? 2 : 4);
 
     if (scorePromptEnabled) {
       setPendingScoreMatch({
@@ -71,6 +76,7 @@ export function MultiCourtScreen({
         side,
         teamA,
         teamB,
+        mode: gameMode ?? 'doubles',
       });
     } else {
       onWin(courtId, side, undefined);
@@ -136,8 +142,9 @@ export function MultiCourtScreen({
               statsMap={statsMap}
               isHost={isHost}
               onWin={handleWinClick}
-              onEdit={isHost ? (id) => setEditingCourtId(id) : undefined}
+              onEdit={isHost && !isSingles ? (id) => setEditingCourtId(id) : undefined}
               onSelectPlayer={isHost ? (p) => setSelectedPlayerForMenu({ name: p, zone: 'playing' }) : undefined}
+              gameMode={gameMode}
             />
           ))}
         </div>

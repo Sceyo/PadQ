@@ -104,7 +104,7 @@ export function LiveCourtStatus({
         {hasMatch ? (
           <div className="w-matchup-container">
             <div className="w-team-box w-team-box--a">
-              <span className="w-team-tag w-team-tag--a">Team 1</span>
+              <span className="w-team-tag w-team-tag--a">{gameMode === 'singles' ? 'Player 1' : 'Team 1'}</span>
               <div className="w-team-players">
                 {teamA.map((player, idx) => (
                   <React.Fragment key={`w-a-${idx}-${player}`}>
@@ -120,7 +120,7 @@ export function LiveCourtStatus({
             <div className="w-vs-badge" aria-label="Versus">VS</div>
 
             <div className="w-team-box w-team-box--b">
-              <span className="w-team-tag w-team-tag--b">Team 2</span>
+              <span className="w-team-tag w-team-tag--b">{gameMode === 'singles' ? 'Player 2' : 'Team 2'}</span>
               <div className="w-team-players">
                 {teamB.map((player, idx) => (
                   <React.Fragment key={`w-b-${idx}-${player}`}>

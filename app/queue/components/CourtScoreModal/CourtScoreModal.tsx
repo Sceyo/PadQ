@@ -20,7 +20,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const SCORE_PRESETS = [9, 8, 7, 6, 5, 3, 0];
+const PRESET_LIMITS = [11, 15, 21] as const;
 
 export const CourtScoreModal: React.FC<Props> = ({
   isOpen,
@@ -28,14 +28,18 @@ export const CourtScoreModal: React.FC<Props> = ({
   onConfirm,
   onCancel,
 }) => {
+  const [targetLimit, setTargetLimit] = useState<number>(11);
   const [winnerScore, setWinnerScore] = useState('11');
   const [loserScore, setLoserScore] = useState('');
+  const [isCustomTargetOpen, setIsCustomTargetOpen] = useState(false);
+  const [customTargetInput, setCustomTargetInput] = useState('');
   const loserInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setWinnerScore('11');
+      setWinnerScore(String(targetLimit));
       setLoserScore('');
+      setIsCustomTargetOpen(false);
       // Autofocus loser score so host can just type the opponent's score and press Enter
       const t = setTimeout(() => {
         loserInputRef.current?.focus();
@@ -43,7 +47,7 @@ export const CourtScoreModal: React.FC<Props> = ({
       }, 50);
       return () => clearTimeout(t);
     }
-  }, [isOpen, match]);
+  }, [isOpen, match, targetLimit]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -58,8 +62,38 @@ export const CourtScoreModal: React.FC<Props> = ({
 
   const winnerTeam = match.side === 'A' ? match.teamA : match.teamB;
   const loserTeam  = match.side === 'A' ? match.teamB : match.teamA;
-  const winnerLabel = winnerTeam.join(' & ');
-  const loserLabel  = loserTeam.join(' & ');
+  const winnerLabel = winnerTeam.length === 1 ? winnerTeam[0] : winnerTeam.join(' & ');
+  const loserLabel  = loserTeam.length === 1 ? loserTeam[0] : loserTeam.join(' & ');
+
+  const handleTargetChange = (newTarget: number) => {
+    setTargetLimit(newTarget);
+    setWinnerScore(String(newTarget));
+    setLoserScore('');
+    setIsCustomTargetOpen(false);
+  };
+
+  const getPresetsForTarget = (target: number) => {
+    if (target === 11) return [9, 8, 7, 6, 5, 3, 0];
+    if (target === 15) return [13, 12, 10, 8, 5, 0];
+    if (target === 21) return [19, 18, 15, 12, 8, 0];
+    const diffs = [2, 3, 5, Math.floor(target / 2), 0];
+    return diffs.map(d => Math.max(0, target - d)).filter((v, i, a) => a.indexOf(v) === i);
+  };
+
+  const scorePresets = getPresetsForTarget(targetLimit);
+
+  const handleLoserChange = (val: string) => {
+    setLoserScore(val);
+    const parsedLoser = parseInt(val.trim(), 10);
+    if (!isNaN(parsedLoser)) {
+      if (parsedLoser >= targetLimit - 1) {
+        // Deuce: must win by 2
+        setWinnerScore(String(parsedLoser + 2));
+      } else {
+        setWinnerScore(String(targetLimit));
+      }
+    }
+  };
 
   const handleSave = () => {
     const w = parseInt(winnerScore.trim(), 10);
@@ -83,7 +117,7 @@ export const CourtScoreModal: React.FC<Props> = ({
   };
 
   const handleApplyPreset = (presetOpponentScore: number) => {
-    setWinnerScore('11');
+    setWinnerScore(String(targetLimit));
     setLoserScore(String(presetOpponentScore));
   };
 
@@ -101,6 +135,114 @@ export const CourtScoreModal: React.FC<Props> = ({
             <X size={16} />
           </button>
         </div>
+
+        {/* Target limit presets */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap', marginBottom: '8px' }}>
+          <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #cbd5e1)', fontWeight: 600 }}>
+            Play to:
+          </span>
+          {PRESET_LIMITS.map(preset => {
+            const isActive = targetLimit === preset && !isCustomTargetOpen;
+            return (
+              <button
+                key={preset}
+                type="button"
+                onClick={() => handleTargetChange(preset)}
+                style={{
+                  fontSize: '0.8125rem',
+                  color: isActive ? '#ffffff' : 'var(--text-secondary, #cbd5e1)',
+                  background: isActive ? 'var(--accent-primary, #5457e0)' : 'var(--surface-elevated, #1a2035)',
+                  border: `1px solid ${isActive ? 'transparent' : 'var(--line-subtle, #252d47)'}`,
+                  borderRadius: '9999px',
+                  padding: '3px 10px',
+                  cursor: 'pointer',
+                  fontWeight: isActive ? 700 : 600,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {preset}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setIsCustomTargetOpen(prev => !prev)}
+            style={{
+              fontSize: '0.8125rem',
+              color: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit as any) ? '#ffffff' : 'var(--text-secondary, #cbd5e1)',
+              background: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit as any) ? 'var(--accent-primary, #5457e0)' : 'var(--surface-elevated, #1a2035)',
+              border: `1px solid ${isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit as any) ? 'transparent' : 'var(--line-subtle, #252d47)'}`,
+              borderRadius: '9999px',
+              padding: '3px 10px',
+              cursor: 'pointer',
+              fontWeight: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit as any) ? 700 : 600,
+              transition: 'all 0.15s ease',
+            }}
+          >
+            {!PRESET_LIMITS.includes(targetLimit as any) ? `Special (${targetLimit})` : 'Special'}
+          </button>
+        </div>
+
+        {isCustomTargetOpen && (
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              const val = parseInt(customTargetInput, 10);
+              if (!isNaN(val) && val >= 2 && val <= 99) {
+                handleTargetChange(val);
+              }
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '8px 12px',
+              background: 'var(--surface-elevated, #1a2035)',
+              border: '1px solid var(--line-subtle, #252d47)',
+              borderRadius: '12px',
+              marginBottom: '10px',
+            }}
+          >
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-secondary, #cbd5e1)', fontWeight: 600 }}>
+              Special limit:
+            </span>
+            <input
+              type="number"
+              min={2}
+              max={99}
+              value={customTargetInput}
+              onChange={e => setCustomTargetInput(e.target.value)}
+              placeholder="e.g. 7"
+              autoFocus
+              style={{
+                width: '64px',
+                padding: '4px 8px',
+                fontSize: '16px',
+                background: 'var(--surface-bg, #0b0d17)',
+                border: '1px solid var(--line-subtle, #252d47)',
+                borderRadius: '6px',
+                color: 'var(--text-primary, #f8fafc)',
+                textAlign: 'center',
+                fontWeight: 700,
+              }}
+            />
+            <button
+              type="submit"
+              style={{
+                padding: '5px 12px',
+                background: 'var(--accent-primary, #5457e0)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '0.8125rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Set
+            </button>
+          </form>
+        )}
 
         <div className={styles.scoreboard}>
           {/* Winner Side */}
@@ -132,10 +274,10 @@ export const CourtScoreModal: React.FC<Props> = ({
               type="number"
               min="0"
               max="99"
-              placeholder="e.g. 9"
+              placeholder={`e.g. ${targetLimit - 2}`}
               className={styles.scoreInput}
               value={loserScore}
-              onChange={e => setLoserScore(e.target.value)}
+              onChange={e => handleLoserChange(e.target.value)}
               onKeyDown={handleKeyDown}
               aria-label={`Score for ${loserLabel}`}
             />
@@ -145,8 +287,8 @@ export const CourtScoreModal: React.FC<Props> = ({
         <div className={styles.presetsSection}>
           <span className={styles.presetsLabel}>Quick Presets:</span>
           <div className={styles.presetsRow}>
-            {SCORE_PRESETS.map(pts => {
-              const isActive = winnerScore === '11' && loserScore === String(pts);
+            {scorePresets.map(pts => {
+              const isActive = winnerScore === String(targetLimit) && loserScore === String(pts);
               return (
                 <button
                   key={pts}
@@ -154,7 +296,7 @@ export const CourtScoreModal: React.FC<Props> = ({
                   className={`${styles.presetBtn} ${isActive ? styles.presetBtnActive : ''}`}
                   onClick={() => handleApplyPreset(pts)}
                 >
-                  11 – {pts}
+                  {targetLimit} – {pts}
                 </button>
               );
             })}

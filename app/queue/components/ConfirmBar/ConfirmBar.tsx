@@ -13,6 +13,8 @@ interface Props {
   onClearWinner: () => void;
   onConfirm: () => void;
   disabled?: boolean;
+  sideALabel?: string;
+  sideBLabel?: string;
 }
 
 export function ConfirmBar({
@@ -25,6 +27,8 @@ export function ConfirmBar({
   onClearWinner,
   onConfirm,
   disabled = false,
+  sideALabel,
+  sideBLabel,
 }: Props) {
   const isSaving = stage === 'saving' || stage === 'slow';
   const isFailed = stage === 'failed';
@@ -75,9 +79,13 @@ export function ConfirmBar({
                 fontWeight: 700,
                 cursor: disabled ? 'default' : 'pointer',
                 transition: 'border-color 0.15s ease',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                padding: '0 8px',
               }}
             >
-              Team A
+              {sideALabel ?? 'Team A'}
             </button>
             <button
               type="button"
@@ -94,9 +102,13 @@ export function ConfirmBar({
                 fontWeight: 700,
                 cursor: disabled ? 'default' : 'pointer',
                 transition: 'border-color 0.15s ease',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                padding: '0 8px',
               }}
             >
-              Team B
+              {sideBLabel ?? 'Team B'}
             </button>
           </div>
         </div>

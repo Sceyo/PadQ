@@ -241,14 +241,16 @@ function WatchPageContent() {
     // Multi-court match detection
     if (session.courtSlots && session.courtSlots.length > 0) {
       if (prevCourtSlotsRef.current) {
+        const minOnCourt = session.gameMode === 'singles' ? 2 : 4;
         const changedCourt = session.courtSlots.find(curr => {
           const prev = prevCourtSlotsRef.current?.find(p => p.id === curr.id);
-          return prev && curr.onCourt.length >= 4 && curr.onCourt.join(',') !== prev.onCourt.join(',');
+          return prev && curr.onCourt.length >= minOnCourt && curr.onCourt.join(',') !== prev.onCourt.join(',');
         });
 
         if (changedCourt) {
-          const tA = changedCourt.onCourt.slice(0, 2).join(' & ');
-          const tB = changedCourt.onCourt.slice(2, 4).join(' & ');
+          const isSingles = session.gameMode === 'singles';
+          const tA = isSingles ? changedCourt.onCourt[0] : changedCourt.onCourt.slice(0, 2).join(' & ');
+          const tB = isSingles ? changedCourt.onCourt[1] : changedCourt.onCourt.slice(2, 4).join(' & ');
           const payload = {
             label: `🎾 NOW PLAYING ON ${changedCourt.name.toUpperCase()}`,
             text: `${tA}  vs  ${tB}`,
@@ -520,8 +522,9 @@ function WatchPageContent() {
             ══════════════════════════════════════════════════ */}
         {!isMultiCourt && session.liveScore?.active && (() => {
           const ls = session.liveScore!;
-          const aWon = ls.scoreA >= ls.limit;
-          const bWon = ls.scoreB >= ls.limit;
+          const limit = ls.limit ?? 11;
+          const aWon = ls.scoreA >= limit && ls.scoreA - ls.scoreB >= 2;
+          const bWon = ls.scoreB >= limit && ls.scoreB - ls.scoreA >= 2;
           return (
             <div className="w-live-score-hero">
               <div className="w-live-score-badge">
