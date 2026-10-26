@@ -15,7 +15,7 @@
 }
 .liveForm input {
   padding: 7px 12px; border: 1.5px solid var(--border);
-  border-radius: var(--radius-sm); font-size: .83rem;
+  border-radius: var(--radius-sm); font-size: 1rem;
   background: var(--card); color: var(--txt-1); outline: none;
 }
 .liveFormSubmit {

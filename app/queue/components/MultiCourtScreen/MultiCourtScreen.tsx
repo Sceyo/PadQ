@@ -3,12 +3,12 @@
 import React, { useState } from 'react';
 import { CourtCard } from '../CourtCard/CourtCard';
 import { QueuePanel } from '../QueuePanel/QueuePanel';
-import { ConfirmBar } from '../ConfirmBar/ConfirmBar';
+
 import { EditTeamsDialog } from '../EditTeamsDialog/EditTeamsDialog';
 import { ReplaceDialog } from '../ReplaceDialog/ReplaceDialog';
 import { CourtScoreModal } from '../CourtScoreModal/CourtScoreModal';
 import { PlayerMenu } from '../PlayerMenu/PlayerMenu';
-import { useMatchFlow } from '../../hooks/useMatchFlow';
+
 import type { CourtSlot } from '@/lib/sessionService';
 import type { PlayerStat } from '../../lib/types';
 import type { QueueViewModel } from '../../lib/viewModels';
@@ -52,12 +52,6 @@ export function MultiCourtScreen({
     teamB: string[];
   } | null>(null);
 
-  const matchFlow = useMatchFlow({
-    onSave: async (winner, score) => {
-      if (!pendingScoreMatch) return false;
-      return onWin(pendingScoreMatch.courtId, winner, score);
-    },
-  });
 
   const handleWinClick = (courtId: string, side: 'A' | 'B') => {
     if (!isHost) return;

@@ -84,7 +84,7 @@ describe('CURRENT guards (pass today, must keep passing)', () => {
 });
 
 describe('TARGET guards (it.fails until the remodel; offenders are printed on failure)', () => {
-  it.fails('spectator scoreboard names also wrap (no nowrap + ellipsis on .scoreboard--viewer)', () => {
+  it('spectator scoreboard names also wrap (no nowrap + ellipsis on .scoreboard--viewer)', () => {
     const bad = rules.filter((r) => /score-player-name/.test(r.selector) && /viewer/.test(r.selector))
       .filter((r) => { const d = decls(r.body); return d.some(([k, v]) => k === 'white-space' && v.startsWith('nowrap')) && d.some(([k, v]) => k === 'text-overflow' && v.startsWith('ellipsis')); })
       .map((r) => r.selector);
@@ -98,7 +98,7 @@ describe('TARGET guards (it.fails until the remodel; offenders are printed on fa
     const bad = rules.filter((r) => /100vh/.test(r.body) && !/dvh/.test(r.body)).map((r) => r.selector);
     expect(bad).toEqual([]);
   });
-  it.fails('text inputs are at least 16px (stops iOS zoom)', () => {
+  it('text inputs are at least 16px (stops iOS zoom)', () => {
     const bad = rules.filter((r) => /(^|[\s,>])(input|textarea|select)\b|input/.test(r.selector))
       .filter((r) => { const f = decls(r.body).find(([k]) => k === 'font-size'); const v = f ? px(f[1]) : null; return v !== null && v < 16; })
       .map((r) => r.selector);
@@ -121,7 +121,7 @@ describe('TARGET guards (it.fails until the remodel; offenders are printed on fa
       });
     expect(bad).toEqual([]);
   });
-  it.fails('banned vocabulary does not appear in player-facing strings', () => {
+  it('banned vocabulary does not appear in player-facing strings', () => {
     const files = walk(join(ROOT, 'app'), ['.tsx']).filter((f) => !f.endsWith('.test.tsx'));
     const bad = files.flatMap((f) => readFileSync(f, 'utf-8').split('\n').map((l, i) => ({ l, i }))
       .filter(({ l }) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*(import|const|let|function|export)\b/.test(l)

@@ -28,6 +28,15 @@ import {
   type RosterEntry, type SkillBracket,
 } from '@/lib/sessionService';
 import './QueueSystem.css';
+import './styles/tokens.css';
+import { AppShell } from './components/AppShell/AppShell';
+import { SingleCourtScreen } from './components/SingleCourtScreen/SingleCourtScreen';
+import { MultiCourtScreen } from './components/MultiCourtScreen/MultiCourtScreen';
+import {
+  toSingleCourtViewModel,
+  toSingleCourtQueueViewModel,
+  toMultiCourtQueueViewModel,
+} from './lib/viewModels';
 
 // ── Lib ──────────────────────────────────────────────────────
 import type {
@@ -930,14 +939,12 @@ function QueueSystemContent() {
     setSubstituteFor(player);
   };
 
-  const handleConfirmSub = (replacement?: string) => {
-    if (!substituteFor) return;
+  const executePlayerReplacement = (absent: string, replacement?: string) => {
     if (isSingleCourtReplaceBlocked) {
       showToast('Cannot replace player after scoring has started');
       setSubstituteFor(null);
       return;
     }
-    const absent = substituteFor;
     const result = replaceCalledPlayerTransition(
       {
         gameMode: gameMode ?? 'singles',
@@ -1008,6 +1015,11 @@ function QueueSystemContent() {
       message: `Replaced ${absent}`,
       canUndo: true,
     });
+  };
+
+  const handleConfirmSub = (replacement?: string) => {
+    if (!substituteFor) return;
+    executePlayerReplacement(substituteFor, replacement);
   };
 
 
@@ -2163,6 +2175,152 @@ function QueueSystemContent() {
 
   // ── RENDER C — Default / Play-all / Skilled ──────────────
   const isSkilled = activeQueueMode === 'skilled';
+
+  if (V1_RELEASE.mobileFirstShell && !isSkilled && gameMode === 'doubles') {
+    const isMultiCourt = courtSlots.length > 0;
+    const singleCourtModel = toSingleCourtViewModel({
+      queue,
+      suggestedTeamA: playAllSuggestion?.suggestedTeamA,
+      suggestedTeamB: playAllSuggestion?.suggestedTeamB,
+      liveScore: session.liveScore,
+      canEdit: canControl,
+    });
+    const singleCourtQueueModel = toSingleCourtQueueViewModel({
+      queue,
+      priorityPlayers: activePriorityPlayers,
+      sittingOut: activeSittingOut,
+      formatEta: formatEtaLabel,
+    });
+    const multiCourtQueueModel = toMultiCourtQueueViewModel({
+      waitingPlayers,
+      priorityPlayers: activePriorityPlayers,
+      sittingOut: activeSittingOut,
+      formatEta: formatEtaLabel,
+    });
+
+    const handleSingleCourtSwapTeams = (newOnCourt: string[]) => {
+      const newQueue = [...newOnCourt, ...queue.slice(4)];
+      setQueue(newQueue);
+      queueRef.current = newQueue;
+      if (session.sessionId) {
+        session.syncField({ queue: newQueue });
+      }
+    };
+
+    const handleSingleCourtScoreAdjust = (side: 'A' | 'B', delta: number) => {
+      const firstFour = queue.slice(0, 4);
+      const teamA = playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2
+        ? playAllSuggestion.suggestedTeamA
+        : firstFour.slice(0, 2);
+      const teamB = playAllSuggestion?.suggestedTeamB && playAllSuggestion.suggestedTeamB.length === 2
+        ? playAllSuggestion.suggestedTeamB
+        : firstFour.slice(2, 4);
+
+      const prev = session.liveScore;
+      const currentScoreA = prev?.scoreA ?? 0;
+      const currentScoreB = prev?.scoreB ?? 0;
+      const nextScoreA = side === 'A' ? Math.max(0, currentScoreA + delta) : currentScoreA;
+      const nextScoreB = side === 'B' ? Math.max(0, currentScoreB + delta) : currentScoreB;
+
+      const nextLiveScore: LiveScoreState = {
+        scoreA: nextScoreA,
+        scoreB: nextScoreB,
+        labelA: prev?.labelA ?? teamA.join(' / '),
+        labelB: prev?.labelB ?? teamB.join(' / '),
+        limit: prev?.limit ?? 11,
+        baseLimit: prev?.baseLimit ?? 11,
+        deuce: prev?.deuce ?? false,
+        active: nextScoreA > 0 || nextScoreB > 0,
+      };
+      handleScoreChange(nextLiveScore);
+    };
+
+    const handleSingleCourtMatchComplete = async (winner: 'A' | 'B', scoreStr?: string): Promise<boolean> => {
+      const firstFour = queue.slice(0, 4);
+      const teamA = playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2
+        ? playAllSuggestion.suggestedTeamA
+        : firstFour.slice(0, 2);
+      const teamB = playAllSuggestion?.suggestedTeamB && playAllSuggestion.suggestedTeamB.length === 2
+        ? playAllSuggestion.suggestedTeamB
+        : firstFour.slice(2, 4);
+      return handleDoublesMatch(teamA, teamB, winner, scoreStr);
+    };
+
+    const handleMultiCourtWin = async (courtId: string, side: 'A' | 'B', scoreStr?: string): Promise<boolean> => {
+      handleCourtMatch(courtId, side, scoreStr);
+      return true;
+    };
+
+    const handleRemovePlayerFromQueue = (name: string) => {
+      if (activeSittingOut.includes(name)) {
+        const nextSittingOut = activeSittingOut.filter(p => p !== name);
+        setLocalSittingOut(nextSittingOut);
+        if (session.sessionId) session.syncField({ sittingOut: nextSittingOut });
+        return;
+      }
+      const qIdx = queue.indexOf(name);
+      if (qIdx >= 0) {
+        const res = removeFromQueueTransition(
+          { gameMode: gameMode ?? 'doubles', players, queue, courtSlots, sittingOut: activeSittingOut },
+          qIdx,
+        );
+        setQueue(res.queue);
+        queueRef.current = res.queue;
+        if (session.sessionId) session.syncField({ queue: res.queue });
+      }
+    };
+
+    return (
+      <AppShell
+        sessionId={session.sessionId}
+        isHost={session.isHost}
+        isConnected={session.isConnected}
+        onAddPlayerLive={handleAddPlayerLive}
+        scorePromptEnabled={scorePromptEnabled}
+        onToggleScorePrompt={() => setScorePromptEnabled(p => !p)}
+        onOpenGearMenu={() => setShowGuide(true)}
+        onBackHome={handleBackHome}
+        activeTab={activeTab === 'analytics' ? 'analytics' : 'queue'}
+        onTabChange={(t) => setActiveTab(t)}
+      >
+        {activeTab === 'analytics' ? (
+          <AnalyticsDashboard
+            stats={statsList}
+            history={activeHistory}
+            careerStats={careerStats}
+            roomCode={session.sessionId}
+          />
+        ) : isMultiCourt ? (
+          <MultiCourtScreen
+            courtSlots={courtSlots}
+            statsMap={statsMap}
+            queue={multiCourtQueueModel}
+            isHost={canControl}
+            scorePromptEnabled={scorePromptEnabled}
+            onWin={handleMultiCourtWin}
+            onReplacePlayer={executePlayerReplacement}
+            onSwapCourtPlayers={handleSwapPlayers}
+            onPlayerTakeBreak={handleToggleSitOut}
+            onPlayerRemove={handleRemovePlayerFromQueue}
+            onReturnFromBreak={handleToggleSitOut}
+          />
+        ) : (
+          <SingleCourtScreen
+            court={singleCourtModel}
+            queue={singleCourtQueueModel}
+            onMatchComplete={handleSingleCourtMatchComplete}
+            onScoreAdjust={handleSingleCourtScoreAdjust}
+            onReplacePlayer={executePlayerReplacement}
+            onSwapTeams={handleSingleCourtSwapTeams}
+            onPlayerTakeBreak={handleToggleSitOut}
+            onPlayerRemove={handleRemovePlayerFromQueue}
+            onReturnFromBreak={handleToggleSitOut}
+            isHost={canControl}
+          />
+        )}
+      </AppShell>
+    );
+  }
   return (
     <div className={`queue-system game-view ${darkMode ? 'dark' : ''}`}>
       <div className="topright-controls">

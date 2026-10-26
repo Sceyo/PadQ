@@ -134,7 +134,7 @@ export const DoublesMatch: React.FC<{
 
   return (
     <div className="match-section">
-      <h3 className="match-section-title"><Swords size={15} /> Form Teams</h3>
+      <h3 className="match-section-title"><Swords size={15} /> Current Match</h3>
       {suggestedTeamA && suggestedTeamB && (
         <div className="playall-badge">
           <Sparkles size={12} />Maximum-novelty suggestion
