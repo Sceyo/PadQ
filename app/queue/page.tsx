@@ -1087,13 +1087,6 @@ function QueueSystemContent() {
           }
           recordCareerResult(entry.players, entry.winner);
           setCareerStats(loadCareerStats());
-          if (score) {
-            showToast(`${slot.name}: ${winner} wins (${score})`);
-          } else {
-            setModalWinner(`${winner} wins!`);
-            setModalScore(undefined);
-            setModalOpen(true);
-          }
           showMatchToast({
             message: `${slot.name}: ${winner} won${score ? ` (${score})` : ''}`,
             canUndo: true,
@@ -1102,13 +1095,6 @@ function QueueSystemContent() {
       } else {
         recordCareerResult(entry.players, entry.winner);
         setCareerStats(loadCareerStats());
-        if (score) {
-          showToast(`${slot.name}: ${winner} wins (${score})`);
-        } else {
-          setModalWinner(`${winner} wins!`);
-          setModalScore(undefined);
-          setModalOpen(true);
-        }
         showMatchToast({
           message: `${slot.name}: ${winner} won${score ? ` (${score})` : ''}`,
           canUndo: true,
@@ -1191,9 +1177,6 @@ function QueueSystemContent() {
     const finishSuccess = () => {
       recordCareerResult(entry.players, entry.winner);
       setCareerStats(loadCareerStats());
-      setModalWinner(`${winner} wins!`);
-      setModalScore(score);
-      setModalOpen(true);
       showMatchToast({
         message: `${winner} won${score ? ` (${score})` : ''}`,
         canUndo: true,
@@ -1301,9 +1284,6 @@ function QueueSystemContent() {
     const finishSuccess = () => {
       recordCareerResult(entry.players, entry.winner);
       setCareerStats(loadCareerStats());
-      setModalWinner(`${winnerNames} win!`);
-      setModalScore(score);
-      setModalOpen(true);
       showMatchToast({
         message: `${winnerNames} won${score ? ` (${score})` : ''}`,
         canUndo: true,
@@ -1451,13 +1431,6 @@ function QueueSystemContent() {
         }
         recordCareerResult(entry.players, entry.winner);
         setCareerStats(loadCareerStats());
-        if (score) {
-          showToast(`${slot.name}: ${winnerNames} win (${score})`);
-        } else {
-          setModalWinner(`${winnerNames} win!`);
-          setModalScore(undefined);
-          setModalOpen(true);
-        }
         showMatchToast({
           message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
           canUndo: true,
@@ -1584,13 +1557,6 @@ function QueueSystemContent() {
       if (message) showToast(message);
     });
 
-    if (score) {
-      showToast(`${court.name}: ${winnerNames} win (${score})`);
-    } else {
-      setModalWinner(`${winnerNames} win!`);
-      setModalScore(undefined);
-      setModalOpen(true);
-    }
     showMatchToast({
       message: `${court.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
       canUndo: true,
@@ -2299,6 +2265,14 @@ function QueueSystemContent() {
                       }}
                     />
                   )}
+                  {!isSkilled && (
+                    <SitOutPanel
+                      players={players}
+                      sittingOut={activeSittingOut}
+                      onToggle={handleToggleSitOut}
+                      onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
+                    />
+                  )}
                   {!isSkilled && gameMode === 'doubles' && courtSlots.length > 0 && (
                     <PartnerPanel
                       players={players}
@@ -2329,15 +2303,6 @@ function QueueSystemContent() {
               </div>
             )}
 
-            {canControl && !isSkilled && (
-              <SitOutPanel
-                players={players}
-                sittingOut={activeSittingOut}
-                onToggle={handleToggleSitOut}
-                onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
-              />
-            )}
-
             {session.isHost && (
               <div className="diagnostics-bar">
                 <button
@@ -2352,7 +2317,7 @@ function QueueSystemContent() {
                 {showDiagnostics && (
                   <div className="diagnostics-panel" role="region" aria-label="Engine Diagnostics">
                     <div className="diagnostics-header">Engine State (Host Only)</div>
-                    {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && (
+                    {!isSkilled && activeQueueMode === 'default' && gameMode === 'doubles' && courtSlots.length === 0 && (
                       <PaddleStatusPanel paddleState={paddleStateUI} allPlayers={players} />
                     )}
                     {!isSkilled && activeQueueMode === 'default' && gameMode === 'singles' && courtSlots.length === 0 && (
@@ -2361,6 +2326,19 @@ function QueueSystemContent() {
                       ) : (
                         <SinglesStatusPanel singlesState={singlesStateUI} allPlayers={players} />
                       )
+                    )}
+                    {courtSlots.length > 0 && (
+                      <div className="diagnostics-multicourt" style={{ padding: '8px 12px', fontSize: '0.82rem' }}>
+                        <div style={{ fontWeight: 600, color: 'var(--text-primary, #e2e8f0)', marginBottom: '4px' }}>
+                          Multi-Court Queue Rotation ({courtSlots.length} {courtSlots.length === 1 ? 'court' : 'courts'})
+                        </div>
+                        <div style={{ color: 'var(--text-secondary, #94a3b8)', lineHeight: '1.5' }}>
+                          <div>Courts active: {courtSlots.map(c => `${c.name} (${c.onCourt.filter(Boolean).length}/${gameMode === 'singles' ? 2 : 4})`).join(' • ')}</div>
+                          <div>Waiting in queue: {waitingPlayers.length}</div>
+                          {activePriorityPlayers.length > 0 && <div>Priority players: {activePriorityPlayers.join(', ')}</div>}
+                          {activeSittingOut.length > 0 && <div>On break: {activeSittingOut.join(', ')}</div>}
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}

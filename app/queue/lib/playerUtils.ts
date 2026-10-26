@@ -190,9 +190,28 @@ export function generateSuggestions(stats: PlayerStat[], queue: string[]): Smart
   const hot = stats.filter(s => s.streak >= 3);
   if (hot.length) suggestions.push({ type: 'hot-streak', message: `${hot.map(s => s.name).join(', ')} ${hot.length === 1 ? 'is' : 'are'} on a hot streak 🔥`, players: hot.map(s => s.name) });
   if (queue.length >= 4) {
-    const rates = queue.slice(0, 4).map(n => stats.find(s => s.name === n)?.winRate ?? 50);
-    if (Math.abs((rates[0] + rates[1]) - (rates[2] + rates[3])) > 30)
-      suggestions.push({ type: 'team-balance', message: 'The next doubles match may be unbalanced. Try swapping players.', players: queue.slice(0, 4) });
+    const p = queue.slice(0, 4);
+    const rates = p.map(n => stats.find(s => s.name === n)?.winRate ?? 50);
+    const diff = Math.abs((rates[0] + rates[1]) - (rates[2] + rates[3]));
+    if (diff > 30) {
+      const avgA = Math.round((rates[0] + rates[1]) / 2);
+      const avgB = Math.round((rates[2] + rates[3]) / 2);
+
+      // Check which swap creates better balance:
+      const diff1 = Math.abs((rates[0] + rates[2]) - (rates[1] + rates[3]));
+      const diff2 = Math.abs((rates[0] + rates[3]) - (rates[2] + rates[1]));
+
+      let swapAdvice = `Try swapping ${p[1]} and ${p[2]}.`;
+      if (diff2 < diff1) {
+        swapAdvice = `Try swapping ${p[1]} and ${p[3]}.`;
+      }
+
+      suggestions.push({
+        type: 'team-balance',
+        message: `Next doubles match (${p[0]} & ${p[1]} vs ${p[2]} & ${p[3]}) may be unbalanced (${avgA}% vs ${avgB}% avg win rate). ${swapAdvice}`,
+        players: p,
+      });
+    }
   }
   return suggestions;
 }
