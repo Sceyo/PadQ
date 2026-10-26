@@ -12,6 +12,7 @@ import { PlayerMenu } from '../PlayerMenu/PlayerMenu';
 import { useMatchFlow } from '../../hooks/useMatchFlow';
 import type { CourtViewModel, QueueViewModel } from '../../lib/viewModels';
 import type { PlayerStat } from '../../lib/types';
+import styles from './SingleCourtScreen.module.css';
 
 const PRESET_LIMITS = [11, 15, 21] as const;
 
@@ -126,18 +127,10 @@ export function SingleCourtScreen({
   const canMoveDown = selectedIndex >= 0 && selectedIndex < waitingQueueNames.length - 1;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--sp-3_5, 14px)',
-        width: '100%',
-        maxWidth: '680px',
-        margin: '0 auto',
-      }}
-    >
-      {/* 1. Court Card */}
-      <CourtView
+    <div className={styles.container}>
+      <div className={styles.courtSection}>
+        {/* 1. Court Card */}
+        <CourtView
         court={court}
         onEditTeams={() => setIsEditTeamsOpen(true)}
         onSelectPlayer={(name) => handlePlayerTap(name, 'playing')}
@@ -437,14 +430,17 @@ export function SingleCourtScreen({
           </div>
         </section>
       )}
+      </div>
 
-      {/* 3. Queue Card */}
-      <QueuePanel
-        queue={queue}
-        onSelectPlayer={(name, zone) => handlePlayerTap(name, zone ?? 'waiting')}
-        onReturnFromBreak={onReturnFromBreak}
-        statsMap={statsMap}
-      />
+      <div className={styles.queueSection}>
+        {/* 3. Queue Card */}
+        <QueuePanel
+          queue={queue}
+          onSelectPlayer={(name, zone) => handlePlayerTap(name, zone ?? 'waiting')}
+          onReturnFromBreak={onReturnFromBreak}
+          statsMap={statsMap}
+        />
+      </div>
 
       {/* 4. Sticky Bottom Confirm Bar */}
       {isHost && (

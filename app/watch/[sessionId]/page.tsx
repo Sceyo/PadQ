@@ -20,6 +20,7 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
@@ -484,6 +485,16 @@ function WatchPageContent() {
         <button className="w-back-btn" onClick={() => router.push('/')}>
           <ArrowLeft size={14} /> Home
         </button>
+        <div style={{ display: 'flex', alignItems: 'center', margin: '0 8px' }}>
+          <Image
+            src="/padq-logo.png"
+            alt="PadQ"
+            width={78}
+            height={24}
+            priority
+            style={{ width: 'auto', height: '22px' }}
+          />
+        </div>
         <Link
           className="w-back-btn"
           href="/privacy"
@@ -534,7 +545,7 @@ function WatchPageContent() {
               </div>
               <div className="w-live-score-board">
                 <div className={`w-live-side ${aWon ? 'w-live-side--winner' : ''}`}>
-                  <div className="w-live-team-label">Team A</div>
+                  <div className="w-live-team-label">{gameMode === 'singles' ? 'Player 1' : 'Team A'}</div>
                   <div className="w-live-player-name">{ls.labelA}</div>
                   <div className="w-live-score-num">{ls.scoreA}</div>
                 </div>
@@ -543,7 +554,7 @@ function WatchPageContent() {
                   {(aWon || bWon) && <div className="w-live-gameover">Game Over!</div>}
                 </div>
                 <div className={`w-live-side ${bWon ? 'w-live-side--winner' : ''}`}>
-                  <div className="w-live-team-label">Team B</div>
+                  <div className="w-live-team-label">{gameMode === 'singles' ? 'Player 2' : 'Team B'}</div>
                   <div className="w-live-player-name">{ls.labelB}</div>
                   <div className="w-live-score-num">{ls.scoreB}</div>
                 </div>

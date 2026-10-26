@@ -3,7 +3,7 @@
  */
 import React from 'react';
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent } from '@testing-library/react';
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
 import { AppShell } from '@/app/queue/components/AppShell/AppShell';
 import { SingleCourtScreen } from '@/app/queue/components/SingleCourtScreen/SingleCourtScreen';
@@ -160,5 +160,50 @@ describe('Mobile-First Shell Integration & Release Config', () => {
 
     // Waiting queue
     expect(screen.getAllByText('Wait 1').length).toBeGreaterThan(0);
+  });
+
+  it('triggers onMoveWaitingPlayer when tapping a waiting player and choosing move up', () => {
+    const queue = ['Alice', 'Bob', 'Charlie', 'Dave', 'Eve', 'Frank'];
+    const courtModel = toSingleCourtViewModel({
+      queue,
+      liveScore: null,
+      canEdit: true,
+    });
+    const queueModel = toSingleCourtQueueViewModel({
+      queue,
+      priorityPlayers: [],
+      sittingOut: [],
+    });
+
+    const onMoveWaitingPlayer = vi.fn();
+
+    render(
+      <SingleCourtScreen
+        court={courtModel}
+        queue={queueModel}
+        onMatchComplete={vi.fn().mockResolvedValue(true)}
+        onScoreAdjust={vi.fn()}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+        onMoveWaitingPlayer={onMoveWaitingPlayer}
+        isHost={true}
+      />
+    );
+
+    // In single court, nextUp has Eve, Frank. Frank is at index 1 of waiting list.
+    // Tap on 'Frank' in QueuePanel to open PlayerMenu
+    const frankButtons = screen.getAllByText('Frank');
+    fireEvent.click(frankButtons[0]);
+
+    // In PlayerMenu, find 'Move up in line' button and tap it
+    const moveUpBtn = screen.getByRole('button', { name: /Move up in line/i });
+    expect(moveUpBtn).toBeDefined();
+    expect((moveUpBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(moveUpBtn);
+    expect(onMoveWaitingPlayer).toHaveBeenCalledWith('Frank', -1);
   });
 });

@@ -493,21 +493,20 @@ function QueueSystemContent() {
   const courtSlots = session.isConnected ? (session.courtSlots ?? []) : localCourtSlots;
   useEffect(() => { courtSlotsRef.current = courtSlots; }, [courtSlots]);
 
-  // Players not on any court (the shared waiting queue in multi-court mode)
+  // Players not on any court (the shared waiting queue in single and multi-court modes)
   const waitingPlayers = useMemo(() => {
-    if (courtSlots.length === 0) return [];
     const queued = accountPlayers({
       gameMode: gameMode ?? 'doubles',
       players,
       queue,
       courtSlots,
       sittingOut: activeSittingOut,
-    }).queued;
+    }).queued.filter(p => !activeSittingOut.includes(p));
     const prioritySet = new Set(activePriorityPlayers);
     const priorityQueued = activePriorityPlayers.filter(p => queued.includes(p));
     const restQueued = queued.filter(p => !prioritySet.has(p));
     return [...priorityQueued, ...restQueued];
-  }, [players, courtSlots, queue, activeSittingOut, activePriorityPlayers]);
+  }, [gameMode, players, courtSlots, queue, activeSittingOut, activePriorityPlayers]);
 
   const handleGoLive = (live: boolean) => {
     setIsLiveLocal(live);
@@ -1640,10 +1639,6 @@ function QueueSystemContent() {
     if (targetIdx < 0 || targetIdx >= waitingPlayers.length) return;
     const otherPlayer = waitingPlayers[targetIdx];
 
-    const isPlayerPriority = activePriorityPlayers.includes(playerName);
-    const isOtherPriority = activePriorityPlayers.includes(otherPlayer);
-    if (isPlayerPriority !== isOtherPriority) return;
-
     const qIdx1 = queue.indexOf(playerName);
     const qIdx2 = queue.indexOf(otherPlayer);
     if (qIdx1 === -1 || qIdx2 === -1) return;
@@ -1652,9 +1647,29 @@ function QueueSystemContent() {
     newQueue[qIdx1] = otherPlayer;
     newQueue[qIdx2] = playerName;
 
+    // Update priority list so manual host movement reflects accurately
+    let nextPriority = [...activePriorityPlayers];
+    const isPlayerPriority = nextPriority.includes(playerName);
+    const isOtherPriority = nextPriority.includes(otherPlayer);
+
+    if (isPlayerPriority && isOtherPriority) {
+      const pIdx1 = nextPriority.indexOf(playerName);
+      const pIdx2 = nextPriority.indexOf(otherPlayer);
+      nextPriority[pIdx1] = otherPlayer;
+      nextPriority[pIdx2] = playerName;
+    } else if (!isPlayerPriority && isOtherPriority && direction === -1) {
+      const pIdx = nextPriority.indexOf(otherPlayer);
+      nextPriority.splice(pIdx, 0, playerName);
+    } else if (isPlayerPriority && !isOtherPriority && direction === 1) {
+      nextPriority = nextPriority.filter(p => p !== playerName);
+    }
+
     setQueue(newQueue);
     queueRef.current = newQueue;
-    if (session.sessionId) session.syncField({ queue: newQueue });
+    setLocalPriorityPlayers(nextPriority);
+    if (session.sessionId) {
+      session.syncField({ queue: newQueue, priorityPlayers: nextPriority });
+    }
   };
 
   const handlePartnerPairsChange = (nextPairs: [string, string][]) => {

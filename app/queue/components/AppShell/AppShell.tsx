@@ -83,6 +83,7 @@ export function AppShell({
                 height={30}
                 priority
                 className={styles.brandLogo}
+                style={{ width: 'auto', height: '26px' }}
               />
               <span className={styles.srOnly}>PadQ</span>
             </div>

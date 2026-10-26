@@ -12,6 +12,7 @@ import { PlayerMenu } from '../PlayerMenu/PlayerMenu';
 import type { CourtSlot } from '@/lib/sessionService';
 import type { PlayerStat } from '../../lib/types';
 import type { QueueViewModel } from '../../lib/viewModels';
+import styles from './MultiCourtScreen.module.css';
 
 interface Props {
   courtSlots: CourtSlot[];
@@ -103,60 +104,55 @@ export function MultiCourtScreen({
   const canMoveDown = selectedIndex >= 0 && selectedIndex < waitingQueueNames.length - 1;
 
   return (
-    <div
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 'var(--sp-4, 16px)',
-        width: '100%',
-        maxWidth: '1080px',
-        margin: '0 auto',
-      }}
-    >
-      {/* 1. Live Court Status Cards Grid */}
-      <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3, 12px)' }}>
-        <h2
-          style={{
-            margin: 0,
-            fontSize: 'var(--fs-sm, 0.9375rem)',
-            fontWeight: 800,
-            letterSpacing: '0.06em',
-            textTransform: 'uppercase',
-            color: 'var(--text-secondary, #cbd5e1)',
-          }}
-        >
-          Live Court Status ({courtSlots.length} {courtSlots.length === 1 ? 'Court' : 'Courts'})
-        </h2>
+    <div className={styles.container}>
+      <div className={styles.courtsSection}>
+        {/* 1. Live Court Status Cards Grid */}
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-3, 12px)' }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: 'var(--fs-sm, 0.9375rem)',
+              fontWeight: 800,
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              color: 'var(--text-secondary, #cbd5e1)',
+            }}
+          >
+            Live Court Status ({courtSlots.length} {courtSlots.length === 1 ? 'Court' : 'Courts'})
+          </h2>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: courtSlots.length > 1 ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr',
-            gap: 'var(--sp-3_5, 14px)',
-          }}
-        >
-          {courtSlots.map((slot) => (
-            <CourtCard
-              key={slot.id}
-              slot={slot}
-              statsMap={statsMap}
-              isHost={isHost}
-              onWin={handleWinClick}
-              onEdit={isHost && !isSingles ? (id) => setEditingCourtId(id) : undefined}
-              onSelectPlayer={isHost ? (p) => setSelectedPlayerForMenu({ name: p, zone: 'playing' }) : undefined}
-              gameMode={gameMode}
-            />
-          ))}
-        </div>
-      </section>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: courtSlots.length > 1 ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr',
+              gap: 'var(--sp-3_5, 14px)',
+            }}
+          >
+            {courtSlots.map((slot) => (
+              <CourtCard
+                key={slot.id}
+                slot={slot}
+                statsMap={statsMap}
+                isHost={isHost}
+                onWin={handleWinClick}
+                onEdit={isHost && !isSingles ? (id) => setEditingCourtId(id) : undefined}
+                onSelectPlayer={isHost ? (p) => setSelectedPlayerForMenu({ name: p, zone: 'playing' }) : undefined}
+                gameMode={gameMode}
+              />
+            ))}
+          </div>
+        </section>
+      </div>
 
-      {/* 2. Unified Shared Queue Panel with ETAs */}
-      <QueuePanel
-        queue={queue}
-        onSelectPlayer={(name, zone) => isHost && setSelectedPlayerForMenu({ name, zone: zone ?? 'waiting' })}
-        onReturnFromBreak={onReturnFromBreak}
-        statsMap={statsMap}
-      />
+      <div className={styles.queueSection}>
+        {/* 2. Unified Shared Queue Panel with ETAs */}
+        <QueuePanel
+          queue={queue}
+          onSelectPlayer={(name, zone) => isHost && setSelectedPlayerForMenu({ name, zone: zone ?? 'waiting' })}
+          onReturnFromBreak={onReturnFromBreak}
+          statsMap={statsMap}
+        />
+      </div>
 
       {/* 3. Floating Score Modal when scorePromptEnabled */}
       {pendingScoreMatch && (
