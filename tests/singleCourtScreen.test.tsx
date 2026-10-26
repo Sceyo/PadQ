@@ -120,13 +120,20 @@ describe('SingleCourtScreen component suite', () => {
     expect(screen.getByText(/john & ben won 11–9/i)).toBeDefined();
     expect(screen.getByText('Confirm result')).toBeDefined();
 
-    // Tapping Change returns to WHO WON? where winner buttons are unlocked since limit was reached
+    // Tapping Change returns to WHO WON?
     fireEvent.click(screen.getByText('Change'));
     expect(screen.getByText('WHO WON?')).toBeDefined();
-    const teamBBtn = screen.getByRole('button', { name: 'Team B' }) as HTMLButtonElement;
-    expect(teamBBtn.disabled).toBe(false);
-    fireEvent.click(teamBBtn);
-    expect(screen.getByText(/jerome & tyson won/i)).toBeDefined();
+
+    const footer = document.querySelector('footer')!;
+    // The losing team (Team B, 9 pts) MUST NOT be pressable!
+    const teamBBtn = within(footer).getByRole('button', { name: /Team B/i }) as HTMLButtonElement;
+    expect(teamBBtn.disabled).toBe(true);
+
+    // Only the winning team (Team A, 11 pts) is pressable
+    const teamABtn = within(footer).getByRole('button', { name: /Team A/i }) as HTMLButtonElement;
+    expect(teamABtn.disabled).toBe(false);
+    fireEvent.click(teamABtn);
+    expect(screen.getByText(/john & ben won 11–9/i)).toBeDefined();
   });
 
   it('disables winner selection while match is in progress and unlocks upon tapping End match early', () => {

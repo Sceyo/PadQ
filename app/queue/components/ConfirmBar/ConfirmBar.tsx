@@ -18,6 +18,8 @@ interface Props {
   isScoreZeroAndEnabled?: boolean;
   scoreEnabled?: boolean;
   isGameWon?: boolean;
+  isWonA?: boolean;
+  isWonB?: boolean;
   targetLimit?: number;
   isEndEarly?: boolean;
   onToggleEndEarly?: (active: boolean) => void;
@@ -38,6 +40,8 @@ export function ConfirmBar({
   isScoreZeroAndEnabled = false,
   scoreEnabled = true,
   isGameWon = false,
+  isWonA = false,
+  isWonB = false,
   targetLimit = 11,
   isEndEarly = false,
   onToggleEndEarly,
@@ -47,10 +51,26 @@ export function ConfirmBar({
 
   const isScoringActive = Boolean(scoreEnabled);
   const isWinnerLocked = isScoringActive && !isGameWon && !isEndEarly;
-  const isButtonsDisabled = disabled || isScoreZeroAndEnabled || isWinnerLocked;
 
-  const buttonTooltip = isScoreZeroAndEnabled
+  // Option 1 rule: If game is won mathematically, the LOSING side cannot be pressed!
+  const isLosingSideA = isScoringActive && isGameWon && !isEndEarly && isWonB;
+  const isLosingSideB = isScoringActive && isGameWon && !isEndEarly && isWonA;
+
+  const isButtonADisabled = disabled || isScoreZeroAndEnabled || isWinnerLocked || isLosingSideA;
+  const isButtonBDisabled = disabled || isScoreZeroAndEnabled || isWinnerLocked || isLosingSideB;
+
+  const buttonATooltip = isScoreZeroAndEnabled
     ? 'Enter score above or switch Match Scores off in Host Tools (≡)'
+    : isLosingSideA
+    ? `Lost (${scoreLabel ?? ''}) · Winner is ${sideBLabel ?? 'Team B'}`
+    : isWinnerLocked
+    ? `Playing to ${targetLimit}. Winner selection unlocks at game point, or tap 'End match early'.`
+    : undefined;
+
+  const buttonBTooltip = isScoreZeroAndEnabled
+    ? 'Enter score above or switch Match Scores off in Host Tools (≡)'
+    : isLosingSideB
+    ? `Lost (${scoreLabel ?? ''}) · Winner is ${sideALabel ?? 'Team A'}`
     : isWinnerLocked
     ? `Playing to ${targetLimit}. Winner selection unlocks at game point, or tap 'End match early'.`
     : undefined;
@@ -164,21 +184,25 @@ export function ConfirmBar({
             <button
               type="button"
               onClick={() => onChooseWinner('A')}
-              disabled={isButtonsDisabled}
-              title={buttonTooltip}
+              disabled={isButtonADisabled}
+              title={buttonATooltip}
               style={{
                 height: 'var(--tap-min, 48px)',
                 minHeight: 'var(--tap-min, 44px)',
                 borderRadius: 'var(--r-md, 14px)',
-                border: isEndEarly
+                border: (isWonA && isGameWon && !isEndEarly)
+                  ? '2px solid var(--status-success, #22c55e)'
+                  : isEndEarly
                   ? '1.5px solid rgba(245, 158, 11, 0.4)'
                   : '1.5px solid var(--line-subtle, #252d47)',
                 background: 'var(--surface-bg-alt, #1a2035)',
-                color: 'var(--text-primary, #f8fafc)',
+                color: (isWonA && isGameWon && !isEndEarly)
+                  ? 'var(--status-success, #22c55e)'
+                  : 'var(--text-primary, #f8fafc)',
                 fontSize: 'var(--fs-sm, 0.9375rem)',
                 fontWeight: 700,
-                cursor: isButtonsDisabled ? 'not-allowed' : 'pointer',
-                opacity: isButtonsDisabled ? 0.35 : 1,
+                cursor: isButtonADisabled ? 'not-allowed' : 'pointer',
+                opacity: isButtonADisabled ? (isLosingSideA ? 0.2 : 0.35) : 1,
                 transition: 'border-color 0.15s ease, opacity 0.15s ease',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -187,25 +211,30 @@ export function ConfirmBar({
               }}
             >
               {sideALabel ?? 'Team A'}
+              {isWonA && isGameWon && !isEndEarly && ' 🏆'}
             </button>
             <button
               type="button"
               onClick={() => onChooseWinner('B')}
-              disabled={isButtonsDisabled}
-              title={buttonTooltip}
+              disabled={isButtonBDisabled}
+              title={buttonBTooltip}
               style={{
                 height: 'var(--tap-min, 48px)',
                 minHeight: 'var(--tap-min, 44px)',
                 borderRadius: 'var(--r-md, 14px)',
-                border: isEndEarly
+                border: (isWonB && isGameWon && !isEndEarly)
+                  ? '2px solid var(--status-success, #22c55e)'
+                  : isEndEarly
                   ? '1.5px solid rgba(245, 158, 11, 0.4)'
                   : '1.5px solid var(--line-subtle, #252d47)',
                 background: 'var(--surface-bg-alt, #1a2035)',
-                color: 'var(--text-primary, #f8fafc)',
+                color: (isWonB && isGameWon && !isEndEarly)
+                  ? 'var(--status-success, #22c55e)'
+                  : 'var(--text-primary, #f8fafc)',
                 fontSize: 'var(--fs-sm, 0.9375rem)',
                 fontWeight: 700,
-                cursor: isButtonsDisabled ? 'not-allowed' : 'pointer',
-                opacity: isButtonsDisabled ? 0.35 : 1,
+                cursor: isButtonBDisabled ? 'not-allowed' : 'pointer',
+                opacity: isButtonBDisabled ? (isLosingSideB ? 0.2 : 0.35) : 1,
                 transition: 'border-color 0.15s ease, opacity 0.15s ease',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -214,6 +243,7 @@ export function ConfirmBar({
               }}
             >
               {sideBLabel ?? 'Team B'}
+              {isWonB && isGameWon && !isEndEarly && ' 🏆'}
             </button>
           </div>
           {!isScoreZeroAndEnabled && isWinnerLocked && (
