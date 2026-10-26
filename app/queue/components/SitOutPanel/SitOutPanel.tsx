@@ -8,28 +8,32 @@ export function SitOutPanel({
   sittingOut,
   onToggle,
   onSelectPlayer,
+  hideToggle = false,
 }: {
   players:    string[];
   sittingOut: string[];
   onToggle:   (name: string) => void;
   onSelectPlayer?: (name: string) => void;
+  hideToggle?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(hideToggle);
 
   return (
     <div className="sitout-wrap live-panel">
-      <button
-        className={`live-panel-toggle sitout-toggle-btn${open ? ' sitout-toggle-btn--open' : ''}`}
-        onClick={() => setOpen(o => !o)}
-        type="button"
-        aria-expanded={open}
-        aria-label={`Sit Out${sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}`}
-      >
-        <UserMinus size={13} />
-        Sit Out{sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}
-      </button>
+      {!hideToggle && (
+        <button
+          className={`live-panel-toggle sitout-toggle-btn${open ? ' sitout-toggle-btn--open' : ''}`}
+          onClick={() => setOpen(o => !o)}
+          type="button"
+          aria-expanded={open}
+          aria-label={`Sit Out${sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}`}
+        >
+          <UserMinus size={13} />
+          Sit Out{sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}
+        </button>
+      )}
 
-      {open && (
+      {(open || hideToggle) && (
         <div className="sitout-panel">
           {players.map(name => {
             const out = sittingOut.includes(name);

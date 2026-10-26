@@ -79,13 +79,33 @@
   border-width: 0;
 }
 
+.liveBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 7px 2px 5px;
+  background: var(--status-success-bg, rgba(34, 197, 94, 0.12));
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  border-radius: var(--r-pill, 9999px);
+  margin-left: 2px;
+}
+
 .liveDot {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: var(--status-success, #22c55e);
   box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.35);
   display: inline-block;
+  flex-shrink: 0;
+}
+
+.liveText {
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--status-success, #22c55e);
+  line-height: 1;
 }
 
 .headerRight {

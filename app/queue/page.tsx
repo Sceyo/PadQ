@@ -223,9 +223,9 @@ function QueueSystemContent() {
   const [swapCourtId,  setSwapCourtId]  = useState<string | null>(null);
   const [autoClose,    setAutoClose]    = useState(false);
   const [scorePromptEnabled, setScorePromptEnabled] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined') return true;
     const saved = localStorage.getItem('padq_multicourt_scores');
-    return saved !== null ? saved === 'true' : false;
+    return saved !== null ? saved === 'true' : true;
   });
   const [pendingCourtScore, setPendingCourtScore] = useState<PendingCourtMatch | null>(null);
   const handleToggleScorePrompt = () => {
@@ -2309,6 +2309,7 @@ function QueueSystemContent() {
                 playerGroups={[queue, ...courtSlots.map(court => court.onCourt)]}
                 pairs={lockedPartners}
                 onChange={handlePartnerPairsChange}
+                hideToggle
               />
             ) : undefined
           }
@@ -2330,6 +2331,7 @@ function QueueSystemContent() {
                 setQueue(res.queue);
                 if (session.sessionId) session.syncField({ queue: res.queue });
               }}
+              hideToggle
             />
           }
           sitOutPanelNode={
@@ -2338,6 +2340,7 @@ function QueueSystemContent() {
               sittingOut={activeSittingOut}
               onToggle={handleToggleSitOut}
               onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
+              hideToggle
             />
           }
           diagnosticsNode={

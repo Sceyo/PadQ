@@ -36,7 +36,7 @@ interface Props {
 }
 
 export function AppShell({
-  sessionId: _sessionId,
+  sessionId,
   isHost,
   isConnected,
   children,
@@ -83,8 +83,11 @@ export function AppShell({
               />
               <span className={styles.srOnly}>PadQ</span>
             </div>
-            {isConnected && (
-              <span className={styles.liveDot} title="Live session connected" aria-label="Live session" />
+            {Boolean(sessionId && isConnected) && (
+              <span className={styles.liveBadge} title={`Live session connected (${sessionId})`} aria-label="Live session">
+                <span className={styles.liveDot} />
+                <span className={styles.liveText}>LIVE</span>
+              </span>
             )}
           </div>
 
