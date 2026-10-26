@@ -77,8 +77,9 @@ describe('Mobile-First Shell Integration & Release Config', () => {
       </AppShell>
     );
 
-    // Header brand and gear menu trigger
+    // Header brand logo and gear menu trigger
     expect(screen.getByText('PadQ')).toBeDefined();
+    expect(screen.getByAltText('PadQ')).toBeDefined();
     expect(screen.getByTitle('Settings')).toBeDefined();
 
     // Court View & Players

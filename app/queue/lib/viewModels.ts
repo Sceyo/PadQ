@@ -12,9 +12,13 @@ export interface CourtViewModel {
   score: {
     enabled: boolean;
     limit: number;
+    baseLimit?: number;
     scoreA: number;
     scoreB: number;
     hasStarted: boolean;
+    deuce?: boolean;
+    finished?: boolean;
+    winner?: 'A' | 'B' | null;
   };
   pendingWinner: 'A' | 'B' | null;
   canEdit: boolean;
@@ -30,7 +34,14 @@ export function toSingleCourtViewModel(params: {
   queue: string[];
   suggestedTeamA?: string[] | null;
   suggestedTeamB?: string[] | null;
-  liveScore?: { scoreA: number; scoreB: number; limit?: number; active?: boolean } | null;
+  liveScore?: {
+    scoreA: number;
+    scoreB: number;
+    limit?: number;
+    baseLimit?: number;
+    deuce?: boolean;
+    active?: boolean;
+  } | null;
   canEdit?: boolean;
 }): CourtViewModel {
   const { queue, suggestedTeamA, suggestedTeamB, liveScore, canEdit = true } = params;
@@ -41,7 +52,12 @@ export function toSingleCourtViewModel(params: {
   const scoreA = liveScore?.scoreA ?? 0;
   const scoreB = liveScore?.scoreB ?? 0;
   const hasStarted = scoreA > 0 || scoreB > 0;
-  const limit = liveScore?.limit ?? 11;
+  const baseLimit = liveScore?.baseLimit ?? liveScore?.limit ?? 11;
+  const isWonA = scoreA >= baseLimit && scoreA - scoreB >= 2;
+  const isWonB = scoreB >= baseLimit && scoreB - scoreA >= 2;
+  const finished = isWonA || isWonB;
+  const inDeuce = !finished && scoreA >= baseLimit - 1 && scoreB >= baseLimit - 1;
+  const effectiveLimit = inDeuce ? Math.max(baseLimit, Math.min(scoreA, scoreB) + 2) : baseLimit;
   const enabled = liveScore?.active ?? true;
 
   return {
@@ -54,10 +70,14 @@ export function toSingleCourtViewModel(params: {
     ],
     score: {
       enabled,
-      limit,
+      limit: effectiveLimit,
+      baseLimit,
       scoreA,
       scoreB,
       hasStarted,
+      deuce: inDeuce,
+      finished,
+      winner: finished ? (isWonA ? 'A' : 'B') : null,
     },
     pendingWinner: null,
     canEdit: canEdit && !hasStarted,

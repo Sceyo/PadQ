@@ -2218,18 +2218,32 @@ function QueueSystemContent() {
     const prev = session.liveScore;
     const currentScoreA = prev?.scoreA ?? 0;
     const currentScoreB = prev?.scoreB ?? 0;
+    const baseLimit = prev?.baseLimit ?? prev?.limit ?? 11;
+
+    // Check if game was already won: do not allow adding points beyond the winning limit
+    const alreadyWon = (currentScoreA >= baseLimit && currentScoreA - currentScoreB >= 2) ||
+                       (currentScoreB >= baseLimit && currentScoreB - currentScoreA >= 2);
+    if (delta > 0 && alreadyWon) {
+      return;
+    }
+
     const nextScoreA = side === 'A' ? Math.max(0, currentScoreA + delta) : currentScoreA;
     const nextScoreB = side === 'B' ? Math.max(0, currentScoreB + delta) : currentScoreB;
+
+    const inDeuce = nextScoreA >= baseLimit - 1 && nextScoreB >= baseLimit - 1;
+    const isGameWon = (nextScoreA >= baseLimit && nextScoreA - nextScoreB >= 2) ||
+                      (nextScoreB >= baseLimit && nextScoreB - nextScoreA >= 2);
+    const nextLimit = inDeuce ? Math.max(baseLimit, Math.min(nextScoreA, nextScoreB) + 2) : baseLimit;
 
     const nextLiveScore: LiveScoreState = {
       scoreA: nextScoreA,
       scoreB: nextScoreB,
       labelA: prev?.labelA ?? teamA.join(' / '),
       labelB: prev?.labelB ?? teamB.join(' / '),
-      limit: prev?.limit ?? 11,
-      baseLimit: prev?.baseLimit ?? 11,
-      deuce: prev?.deuce ?? false,
-      active: nextScoreA > 0 || nextScoreB > 0,
+      limit: nextLimit,
+      baseLimit,
+      deuce: inDeuce && !isGameWon,
+      active: true,
     };
     handleScoreChange(nextLiveScore);
   };
@@ -2392,15 +2406,16 @@ function QueueSystemContent() {
               }}
               onResetScore={() => {
                 const prev = session.liveScore;
+                const baseLimit = prev?.baseLimit ?? prev?.limit ?? 11;
                 const nextLiveScore: LiveScoreState = {
                   scoreA: 0,
                   scoreB: 0,
                   labelA: prev?.labelA ?? queue.slice(0, 2).join(' / '),
                   labelB: prev?.labelB ?? queue.slice(2, 4).join(' / '),
-                  limit: prev?.limit ?? 11,
-                  baseLimit: prev?.limit ?? 11,
+                  limit: baseLimit,
+                  baseLimit: baseLimit,
                   deuce: false,
-                  active: false,
+                  active: true,
                 };
                 handleScoreChange(nextLiveScore);
               }}
@@ -2409,7 +2424,7 @@ function QueueSystemContent() {
             />
           )}
 
-          {historyPanel}
+          {/* History is now in the dedicated Stats -> History tab */}
           <SmartSuggestions suggestions={!isSkilled ? suggestions : []} />
         </AppShell>
       ) : (

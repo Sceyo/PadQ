@@ -48,6 +48,53 @@ describe('viewModels pure mappers', () => {
       });
       expect(court.status).toBe('waiting');
     });
+
+    it('accurately calculates finished and deuce win-by-2 dynamics', () => {
+      // 1. Normal victory at 11-0
+      const court11 = toSingleCourtViewModel({
+        queue: ['A', 'B', 'C', 'D'],
+        liveScore: { scoreA: 11, scoreB: 0, limit: 11, baseLimit: 11 },
+      });
+      expect(court11.score.finished).toBe(true);
+      expect(court11.score.winner).toBe('A');
+      expect(court11.score.deuce).toBe(false);
+
+      // 2. Deuce at 10-10 -> limit slides to 12
+      const court10 = toSingleCourtViewModel({
+        queue: ['A', 'B', 'C', 'D'],
+        liveScore: { scoreA: 10, scoreB: 10, limit: 12, baseLimit: 11 },
+      });
+      expect(court10.score.finished).toBe(false);
+      expect(court10.score.deuce).toBe(true);
+      expect(court10.score.limit).toBe(12);
+
+      // 3. Deuce at 11-10 -> still deuce, limit 12, not finished
+      const court11_10 = toSingleCourtViewModel({
+        queue: ['A', 'B', 'C', 'D'],
+        liveScore: { scoreA: 11, scoreB: 10, limit: 12, baseLimit: 11 },
+      });
+      expect(court11_10.score.finished).toBe(false);
+      expect(court11_10.score.deuce).toBe(true);
+      expect(court11_10.score.limit).toBe(12);
+
+      // 4. Won by 2 at 12-10 -> finished!
+      const court12_10 = toSingleCourtViewModel({
+        queue: ['A', 'B', 'C', 'D'],
+        liveScore: { scoreA: 12, scoreB: 10, limit: 12, baseLimit: 11 },
+      });
+      expect(court12_10.score.finished).toBe(true);
+      expect(court12_10.score.winner).toBe('A');
+      expect(court12_10.score.deuce).toBe(false);
+
+      // 5. Deuce at 11-11 -> limit slides to 13
+      const court11_11 = toSingleCourtViewModel({
+        queue: ['A', 'B', 'C', 'D'],
+        liveScore: { scoreA: 11, scoreB: 11, limit: 13, baseLimit: 11 },
+      });
+      expect(court11_11.score.finished).toBe(false);
+      expect(court11_11.score.deuce).toBe(true);
+      expect(court11_11.score.limit).toBe(13);
+    });
   });
 
   describe('toSingleCourtQueueViewModel', () => {

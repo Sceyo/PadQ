@@ -4,7 +4,7 @@ import React, { useRef, useState } from 'react';
 import { Plus, Minus, Check, RotateCcw, Target, Settings } from 'lucide-react';
 import type { LiveScoreState } from '@/lib/sessionService';
 
-const SCORE_PRESETS = [11, 21] as const;
+const SCORE_PRESETS = [11, 15, 21] as const;
 
 export const SCORING_ENABLED_STORAGE_KEY = 'padq_scoring_enabled';
 

@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import {
   ArrowLeft,
   SlidersHorizontal,
-  History,
   Sun,
   Moon,
   Swords,
@@ -27,8 +27,6 @@ interface Props {
   onBackHome?: () => void;
   activeTab?: 'queue' | 'analytics';
   onTabChange?: (tab: 'queue' | 'analytics') => void;
-  showHistory?: boolean;
-  onToggleHistory?: () => void;
   darkMode?: boolean;
   onToggleDarkMode?: () => void;
   partnerPanelNode?: React.ReactNode;
@@ -49,8 +47,6 @@ export function AppShell({
   onBackHome,
   activeTab = 'queue',
   onTabChange,
-  showHistory = false,
-  onToggleHistory,
   darkMode = true,
   onToggleDarkMode,
   partnerPanelNode,
@@ -76,26 +72,23 @@ export function AppShell({
                 <ArrowLeft size={16} />
               </button>
             )}
-            <span className={styles.brandTitle}>PadQ</span>
+            <div className={styles.brandTitleWrap}>
+              <Image
+                src="/padq-logo.png"
+                alt="PadQ"
+                width={88}
+                height={30}
+                priority
+                className={styles.brandLogo}
+              />
+              <span className={styles.srOnly}>PadQ</span>
+            </div>
             {isConnected && (
               <span className={styles.liveDot} title="Live session connected" aria-label="Live session" />
             )}
           </div>
 
           <div className={styles.headerRight}>
-            {/* History Toggle Button */}
-            {onToggleHistory && (
-              <button
-                type="button"
-                className={`${styles.iconBtn} ${showHistory ? styles.iconBtnActive : ''}`}
-                onClick={onToggleHistory}
-                aria-label="Match history"
-                title="Match history"
-              >
-                <History size={17} />
-              </button>
-            )}
-
             {/* Host Tools Button */}
             {isHost && (
               <button

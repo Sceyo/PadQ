@@ -9,6 +9,8 @@ interface Props {
   isWinner: boolean;
   onAdjustScore: (side: 'A' | 'B', delta: number) => void;
   disabled?: boolean;
+  canAdd?: boolean;
+  canSubtract?: boolean;
 }
 
 export function ScoreRow({
@@ -18,6 +20,8 @@ export function ScoreRow({
   isWinner,
   onAdjustScore,
   disabled = false,
+  canAdd = true,
+  canSubtract = true,
 }: Props) {
   const isA = side === 'A';
   const color = isA ? 'var(--team-a-text, #4ade80)' : 'var(--team-b-text, #60a5fa)';
@@ -79,7 +83,7 @@ export function ScoreRow({
         <button
           type="button"
           onClick={() => onAdjustScore(side, -1)}
-          disabled={disabled || score <= 0}
+          disabled={disabled || score <= 0 || !canSubtract}
           aria-label={`Decrease Team ${side} score`}
           style={{
             width: 'var(--tap-min, 44px)',
@@ -93,8 +97,8 @@ export function ScoreRow({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: disabled || score <= 0 ? 'default' : 'pointer',
-            opacity: disabled || score <= 0 ? 0.4 : 1,
+            cursor: disabled || score <= 0 || !canSubtract ? 'default' : 'pointer',
+            opacity: disabled || score <= 0 || !canSubtract ? 0.35 : 1,
             transition: 'background 0.15s ease, transform 0.1s ease',
           }}
         >
@@ -118,7 +122,7 @@ export function ScoreRow({
         <button
           type="button"
           onClick={() => onAdjustScore(side, 1)}
-          disabled={disabled}
+          disabled={disabled || !canAdd}
           aria-label={`Increase Team ${side} score`}
           style={{
             width: 'var(--tap-min, 44px)',
@@ -132,8 +136,8 @@ export function ScoreRow({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            cursor: disabled ? 'default' : 'pointer',
-            opacity: disabled ? 0.4 : 1,
+            cursor: disabled || !canAdd ? 'default' : 'pointer',
+            opacity: disabled || !canAdd ? 0.35 : 1,
             transition: 'background 0.15s ease, transform 0.1s ease',
           }}
         >

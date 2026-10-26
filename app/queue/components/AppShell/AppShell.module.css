@@ -53,11 +53,30 @@
   background: var(--surface-card, #252d47);
 }
 
-.brandTitle {
-  font-weight: 800;
-  font-size: var(--fs-md, 1.0625rem);
-  letter-spacing: -0.02em;
-  color: #ffffff;
+.brandTitleWrap {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1_5, 6px);
+}
+
+.brandLogo {
+  height: 26px;
+  width: auto;
+  max-width: 90px;
+  object-fit: contain;
+  display: block;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
 }
 
 .liveDot {

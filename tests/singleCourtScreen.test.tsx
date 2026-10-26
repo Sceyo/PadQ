@@ -170,4 +170,117 @@ describe('SingleCourtScreen component suite', () => {
     expect(screen.getByText('Court 1 — Edit teams')).toBeDefined();
     expect(screen.getByText('Tap two players to swap their positions. Players on the same side are partners.')).toBeDefined();
   });
+
+  it('supports 11-15-21 presets and custom special limit input', () => {
+    const onScoreLimitChange = vi.fn();
+    render(
+      <SingleCourtScreen
+        court={mockCourt}
+        queue={mockQueue}
+        onMatchComplete={vi.fn()}
+        onScoreAdjust={vi.fn()}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+        onScoreLimitChange={onScoreLimitChange}
+      />
+    );
+
+    // 11, 15, 21 presets are rendered
+    expect(screen.getByRole('button', { name: '11' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '15' })).toBeDefined();
+    expect(screen.getByRole('button', { name: '21' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Special' })).toBeDefined();
+
+    // Click 15 preset
+    fireEvent.click(screen.getByRole('button', { name: '15' }));
+    expect(onScoreLimitChange).toHaveBeenCalledWith(15);
+
+    // Click Special button -> opens special limit form
+    fireEvent.click(screen.getByRole('button', { name: 'Special' }));
+    const input = screen.getByPlaceholderText('e.g. 7') as HTMLInputElement;
+    expect(input).toBeDefined();
+    fireEvent.change(input, { target: { value: '9' } });
+    fireEvent.click(screen.getByRole('button', { name: /set/i }));
+    expect(onScoreLimitChange).toHaveBeenCalledWith(9);
+  });
+
+  it('caps score and disables + button when target limit is reached without deuce', () => {
+    const onScoreAdjust = vi.fn();
+    const courtAtLimit: CourtViewModel = {
+      ...mockCourt,
+      score: {
+        enabled: true,
+        limit: 11,
+        baseLimit: 11,
+        scoreA: 0,
+        scoreB: 11,
+        hasStarted: true,
+      },
+    };
+
+    render(
+      <SingleCourtScreen
+        court={courtAtLimit}
+        queue={mockQueue}
+        onMatchComplete={vi.fn()}
+        onScoreAdjust={onScoreAdjust}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    // Banner indicates game over
+    expect(screen.getByText(/Game Over · jerome & tyson reached limit \(0–11\)/)).toBeDefined();
+
+    // The + buttons for both teams are disabled
+    const plusButtons = screen.getAllByLabelText(/Increase Team/i);
+    expect(plusButtons[0].hasAttribute('disabled')).toBe(true);
+    expect(plusButtons[1].hasAttribute('disabled')).toBe(true);
+
+    // Team B minus button is still enabled for correction
+    const minusB = screen.getByLabelText('Decrease Team B score');
+    expect(minusB.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('slides target to 2 at deuce (10-10) and only caps when winning by 2', () => {
+    const courtAtDeuce: CourtViewModel = {
+      ...mockCourt,
+      score: {
+        enabled: true,
+        limit: 12,
+        baseLimit: 11,
+        scoreA: 10,
+        scoreB: 10,
+        hasStarted: true,
+      },
+    };
+
+    render(
+      <SingleCourtScreen
+        court={courtAtDeuce}
+        queue={mockQueue}
+        onMatchComplete={vi.fn()}
+        onScoreAdjust={vi.fn()}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    // Shows Deuce banner
+    expect(screen.getByText(/Deuce! Must win by 2 points \(playing to 12\)/)).toBeDefined();
+
+    // Both + buttons remain enabled
+    const plusButtons = screen.getAllByLabelText(/Increase Team/i);
+    expect(plusButtons[0].hasAttribute('disabled')).toBe(false);
+    expect(plusButtons[1].hasAttribute('disabled')).toBe(false);
+  });
 });
