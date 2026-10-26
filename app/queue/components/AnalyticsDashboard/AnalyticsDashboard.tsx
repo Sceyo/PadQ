@@ -55,23 +55,29 @@ export const AnalyticsDashboard: React.FC<{
         <div className="analytics-tab-row">
           {hasSkilled && (
             <button
+              type="button"
               className={`analytics-tab-btn ${tab === 'skilled' ? 'active' : ''}`}
               onClick={() => setTab('skilled')}
             >
-              <Layers size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />Skilled
+              <Layers size={14} />
+              <span>Skilled</span>
             </button>
           )}
           <button
+            type="button"
             className={`analytics-tab-btn ${tab === 'session' ? 'active' : ''}`}
             onClick={() => setTab('session')}
           >
-            <Trophy size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />Session
+            <Trophy size={14} />
+            <span>Session</span>
           </button>
           <button
+            type="button"
             className={`analytics-tab-btn ${tab === 'history' ? 'active' : ''}`}
             onClick={() => setTab('history')}
           >
-            <Clock size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />History
+            <Clock size={14} />
+            <span>History</span>
           </button>
         </div>
 

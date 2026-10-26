@@ -89,7 +89,7 @@ test('owner permanently deletes the live event and its history', async ({ browse
 
     await host.getByTitle('Settings').click();
     await host.getByRole('menuitem', { name: 'End & Delete Event' }).click();
-    await expect(host.getByRole('dialog')).toContainText('Delete this event and all match history');
+    await expect(host.getByRole('dialog')).toContainText('Nothing will be saved after the session has ended');
     await host.getByRole('button', { name: 'Confirm', exact: true }).click();
     await expect(host).toHaveURL('/', { timeout: 20_000 });
 
