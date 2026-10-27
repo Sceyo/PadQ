@@ -86,6 +86,8 @@ export function ConfirmBar({
         backdropFilter: 'blur(8px)',
         WebkitBackdropFilter: 'blur(8px)',
         borderTop: '1px solid var(--line-subtle, #252d47)',
+        borderRadius: 'var(--r-lg, 18px) var(--r-lg, 18px) 0 0',
+        boxShadow: '0 -4px 16px rgba(15, 23, 42, 0.06)',
         padding: 'var(--sp-3, 12px) var(--sp-4, 16px) calc(var(--safe-bottom, 0px) + var(--sp-3, 12px))',
         zIndex: 'var(--z-action-bar, 200)',
         boxSizing: 'border-box',

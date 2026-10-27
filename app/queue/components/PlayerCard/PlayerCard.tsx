@@ -25,7 +25,7 @@ export function PlayerCard({ name, side, onTap, disabled = false, statsMap }: Pr
         height: 'var(--player-card-h, 48px)',
         minHeight: 'var(--tap-min, 44px)',
         width: '100%',
-        background: 'var(--surface-bg, #0b0d17)',
+        background: isA ? 'var(--team-a-bg, var(--surface-bg, #0b0d17))' : 'var(--team-b-bg, var(--surface-bg, #0b0d17))',
         border: `1.5px solid ${isA ? 'var(--team-a-border)' : 'var(--team-b-border)'}`,
         borderRadius: 'var(--r-md, 14px)',
         padding: '0 var(--sp-3, 12px)',

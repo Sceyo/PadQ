@@ -16,7 +16,7 @@
   padding-top: var(--safe-top, 0px);
   padding-left: max(var(--sp-3_5, 14px), var(--safe-left, 0px));
   padding-right: max(var(--sp-3_5, 14px), var(--safe-right, 0px));
-  background: var(--surface-bg, #0b0d17);
+  background: var(--surface-card, #0b0d17);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line-subtle, #252d47);
@@ -149,7 +149,8 @@
 .tabNav {
   display: flex;
   border-bottom: 1px solid var(--line-subtle, #252d47);
-  background: var(--surface-bg, #0b0d17);
+  background: var(--surface-card, #0b0d17);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.03);
   padding: 0 var(--sp-3_5, 14px);
 }
 

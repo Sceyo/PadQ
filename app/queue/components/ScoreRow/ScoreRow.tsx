@@ -32,7 +32,7 @@ export function ScoreRow({
   return (
     <div
       style={{
-        background: 'var(--surface-bg, #0b0d17)',
+        background: 'var(--surface-bg-alt, #0b0d17)',
         border: `1.5px solid ${activeBorder}`,
         boxShadow: isWinner ? `0 0 0 1px ${activeBorder}` : 'none',
         borderRadius: 'var(--r-md, 14px)',
@@ -49,7 +49,7 @@ export function ScoreRow({
           display: 'flex',
           flexDirection: 'column',
           fontSize: 'var(--fs-sm, 0.9375rem)',
-          fontWeight: 600,
+          fontWeight: 700,
           lineHeight: 'var(--lh-snug, 1.25)',
           color,
           minWidth: 0,
@@ -89,8 +89,8 @@ export function ScoreRow({
             width: 'var(--tap-min, 44px)',
             height: 'var(--tap-min, 44px)',
             borderRadius: 'var(--r-sm, 10px)',
-            border: '1px solid var(--line-subtle, #252d47)',
-            background: 'var(--surface-elevated, #1a2035)',
+            border: '1.5px solid var(--line-strong, #252d47)',
+            background: 'var(--surface-card, #1a2035)',
             color: 'var(--text-primary, #f8fafc)',
             fontSize: '1.25rem',
             fontWeight: 700,
@@ -98,7 +98,8 @@ export function ScoreRow({
             alignItems: 'center',
             justifyContent: 'center',
             cursor: disabled || score <= 0 || !canSubtract ? 'default' : 'pointer',
-            opacity: disabled || score <= 0 || !canSubtract ? 0.35 : 1,
+            opacity: disabled || score <= 0 || !canSubtract ? 0.45 : 1,
+            boxShadow: 'var(--shadow-sm)',
             transition: 'background 0.15s ease, transform 0.1s ease',
           }}
         >
