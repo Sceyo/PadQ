@@ -109,7 +109,8 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent,
               <button
                 className={`${styles.winBtn} ${styles.winBtnA}`}
                 onClick={() => onWin(slot.id, 'A')}
-                title={`${isSingles ? labelA : teamA.join(' & ')} win`}
+                aria-label={`${isSingles ? labelA : 'Team 1'} wins`}
+                title={`${isSingles ? labelA : teamA.join(' & ')} wins`}
               >
                 <Trophy size={12} />
                 {isSingles ? `${labelA} Wins` : 'Team 1 Wins'}
@@ -117,7 +118,8 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent,
               <button
                 className={`${styles.winBtn} ${styles.winBtnB}`}
                 onClick={() => onWin(slot.id, 'B')}
-                title={`${isSingles ? labelB : teamB.join(' & ')} win`}
+                aria-label={`${isSingles ? labelB : 'Team 2'} wins`}
+                title={`${isSingles ? labelB : teamB.join(' & ')} wins`}
               >
                 <Trophy size={12} />
                 {isSingles ? `${labelB} Wins` : 'Team 2 Wins'}

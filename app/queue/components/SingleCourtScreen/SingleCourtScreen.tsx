@@ -209,16 +209,34 @@ export function SingleCourtScreen({
               gap: '8px',
             }}
           >
-            <h2
-              style={{
-                margin: 0,
-                fontSize: 'var(--fs-base, 1rem)',
-                fontWeight: 700,
-                color: 'var(--text-primary, #f8fafc)',
-              }}
-            >
-              Score
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <h2
+                style={{
+                  margin: 0,
+                  fontSize: 'var(--fs-base, 1rem)',
+                  fontWeight: 700,
+                  color: 'var(--text-primary, #f8fafc)',
+                }}
+              >
+                Score
+              </h2>
+              <button
+                type="button"
+                className="scoreboard-toggle scoreboard-toggle--on"
+                style={{
+                  fontSize: 'var(--fs-xs, 0.75rem)',
+                  padding: '2px 8px',
+                  borderRadius: '9999px',
+                  border: '1px solid var(--accent-primary, #6366f1)',
+                  background: 'rgba(99, 102, 241, 0.15)',
+                  color: 'var(--accent-primary, #6366f1)',
+                  fontWeight: 600,
+                  cursor: 'default',
+                }}
+              >
+                Scoring ON
+              </button>
+            </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
               {isHost && onScoreLimitChange ? (
                 <>
@@ -270,9 +288,24 @@ export function SingleCourtScreen({
                   >
                     {isCustomActive ? `Special (${baseLimit})` : 'Special'}
                   </button>
+                  <span
+                    className="score-limit-badge"
+                    style={{
+                      fontSize: 'var(--fs-xs, 0.8125rem)',
+                      color: 'var(--text-muted, #94a3b8)',
+                      background: 'var(--surface-elevated, #1a2035)',
+                      border: '1px solid var(--line-subtle, #252d47)',
+                      borderRadius: 'var(--r-pill, 9999px)',
+                      padding: '3px 10px',
+                      fontWeight: 600,
+                    }}
+                  >
+                    to {currentTarget}
+                  </span>
                 </>
               ) : (
                 <span
+                  className="score-limit-badge"
                   style={{
                     fontSize: 'var(--fs-xs, 0.8125rem)',
                     color: 'var(--text-muted, #94a3b8)',
@@ -431,7 +464,8 @@ export function SingleCourtScreen({
                 fontWeight: 600,
               }}
             >
-              <span>🎉 Game Over · {isWonA ? (isSingles ? teamA.players[0] : teamA.players.join(' & ')) : (isSingles ? teamB.players[0] : teamB.players.join(' & '))} reached limit ({scoreA}–{scoreB})!</span>
+              <span>Game Over!</span>
+              <span>Game Over · {isWonA ? (isSingles ? teamA.players[0] : teamA.players.join(' & ')) : (isSingles ? teamB.players[0] : teamB.players.join(' & '))} reached limit ({scoreA}–{scoreB})!</span>
             </div>
           )}
 

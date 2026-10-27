@@ -29,8 +29,11 @@ export function ScoreRow({
     ? (isA ? 'var(--team-a-text, #4ade80)' : 'var(--team-b-text, #60a5fa)')
     : 'var(--line-subtle, #252d47)';
 
+  const playerLabel = players.join(' & ');
+
   return (
     <div
+      className={`score-side score-side--${side.toLowerCase()}`}
       style={{
         background: 'var(--surface-bg-alt, #0b0d17)',
         border: `1.5px solid ${activeBorder}`,
@@ -85,6 +88,8 @@ export function ScoreRow({
           onClick={() => onAdjustScore(side, -1)}
           disabled={disabled || score <= 0 || !canSubtract}
           aria-label={`Decrease Team ${side} score`}
+          title={`Remove point from ${players[0] ?? side}`}
+          className="score-btn score-btn--minus"
           style={{
             width: 'var(--tap-min, 44px)',
             height: 'var(--tap-min, 44px)',
@@ -107,7 +112,7 @@ export function ScoreRow({
         </button>
 
         <span
-          className="tabular-nums"
+          className="tabular-nums score-display"
           style={{
             fontSize: 'var(--fs-xl, 2.125rem)',
             fontWeight: 800,
@@ -125,6 +130,8 @@ export function ScoreRow({
           onClick={() => onAdjustScore(side, 1)}
           disabled={disabled || !canAdd}
           aria-label={`Increase Team ${side} score`}
+          title={`Add point for ${players[0] ?? side}`}
+          className="score-btn score-btn--plus"
           style={{
             width: 'var(--tap-min, 44px)',
             height: 'var(--tap-min, 44px)',

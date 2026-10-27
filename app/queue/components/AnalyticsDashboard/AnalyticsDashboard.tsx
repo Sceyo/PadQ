@@ -230,7 +230,7 @@ export const AnalyticsDashboard: React.FC<{
             ? <p className="muted-hint">No stats yet — play some matches!</p>
             : (
               <>
-                <div className="analytics-section-label"><BarChart2 size={13} /> Leaderboard</div>
+                <div className="analytics-section-label"><BarChart2 size={13} /><span>Leaderboard</span></div>
                 <div className="analytics-table-scroll analytics-desktop-only">
                   <table className="analytics-table">
                     <thead>

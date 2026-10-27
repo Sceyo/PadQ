@@ -23,6 +23,7 @@ interface Props {
   manualQueuePanelNode?: React.ReactNode;
   sitOutPanelNode?: React.ReactNode;
   diagnosticsNode?: React.ReactNode;
+  initialSection?: 'partners' | 'queue' | 'sitout';
 }
 
 export function HostToolsSheet({
@@ -35,12 +36,21 @@ export function HostToolsSheet({
   manualQueuePanelNode,
   sitOutPanelNode,
   diagnosticsNode,
+  initialSection,
 }: Props) {
   const [playerName, setPlayerName] = useState('');
-  const [openPartners, setOpenPartners] = useState(false);
-  const [openManualQueue, setOpenManualQueue] = useState(false);
-  const [openSitOut, setOpenSitOut] = useState(false);
+  const [openPartners, setOpenPartners] = useState(initialSection === 'partners');
+  const [openManualQueue, setOpenManualQueue] = useState(initialSection === 'queue');
+  const [openSitOut, setOpenSitOut] = useState(initialSection === 'sitout');
   const [openDiagnostics, setOpenDiagnostics] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      if (initialSection === 'queue') setOpenManualQueue(true);
+      if (initialSection === 'partners') setOpenPartners(true);
+      if (initialSection === 'sitout') setOpenSitOut(true);
+    }
+  }, [isOpen, initialSection]);
 
   if (!isOpen) return null;
 
@@ -229,7 +239,7 @@ export function HostToolsSheet({
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Users size={16} style={{ color: 'var(--team-b-text, #60a5fa)' }} />
-                <span>Lock Doubles Partners</span>
+                <span>Set Partners</span>
               </div>
               {openPartners ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
@@ -265,7 +275,7 @@ export function HostToolsSheet({
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <ListOrdered size={16} style={{ color: 'var(--accent-primary, #5457e0)' }} />
-                <span>Manage / Reorder Queue</span>
+                <span>Manage Queue</span>
               </div>
               {openManualQueue ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>

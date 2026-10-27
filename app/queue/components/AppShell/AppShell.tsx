@@ -9,9 +9,14 @@ import {
   Moon,
   Swords,
   BarChart2,
+  UserPlus,
+  Link2,
+  ListOrdered,
+  Coffee,
 } from 'lucide-react';
 import { GearMenu, type GearMenuProps } from '../GearMenu/GearMenu';
 import { HostToolsSheet } from '../HostToolsSheet/HostToolsSheet';
+import { SessionBar } from '../SessionBar/SessionBar';
 import { OverlayHost } from '../OverlayHost/OverlayHost';
 import styles from './AppShell.module.css';
 
@@ -19,6 +24,7 @@ interface Props {
   sessionId?: string | null;
   isHost: boolean;
   isConnected: boolean;
+  isSaving?: boolean;
   isLive?: boolean;
   children: React.ReactNode;
   onAddPlayerLive: (name: string) => void;
@@ -33,6 +39,7 @@ interface Props {
   partnerPanelNode?: React.ReactNode;
   manualQueuePanelNode?: React.ReactNode;
   sitOutPanelNode?: React.ReactNode;
+  activeSittingOutCount?: number;
   diagnosticsNode?: React.ReactNode;
 }
 
@@ -40,6 +47,7 @@ export function AppShell({
   sessionId,
   isHost,
   isConnected,
+  isSaving = false,
   isLive,
   children,
   onAddPlayerLive,
@@ -54,9 +62,11 @@ export function AppShell({
   partnerPanelNode,
   manualQueuePanelNode,
   sitOutPanelNode,
+  activeSittingOutCount = 0,
   diagnosticsNode,
 }: Props) {
   const [isHostToolsOpen, setIsHostToolsOpen] = useState(false);
+  const [hostToolsInitialSection, setHostToolsInitialSection] = useState<'partners' | 'queue' | 'sitout' | undefined>();
   const isBroadcastingLive = (isLive ?? gearMenuProps?.isLive ?? false) && Boolean(sessionId && isConnected);
 
   return (
@@ -135,7 +145,6 @@ export function AppShell({
               className={`${styles.tabBtn} ${activeTab === 'queue' ? styles.tabBtnActive : ''}`}
               onClick={() => onTabChange('queue')}
               aria-selected={activeTab === 'queue'}
-              role="tab"
             >
               <Swords size={15} />
               <span>Queue</span>
@@ -145,7 +154,6 @@ export function AppShell({
               className={`${styles.tabBtn} ${activeTab === 'analytics' ? styles.tabBtnActive : ''}`}
               onClick={() => onTabChange('analytics')}
               aria-selected={activeTab === 'analytics'}
-              role="tab"
             >
               <BarChart2 size={15} />
               <span>Stats</span>
@@ -155,6 +163,126 @@ export function AppShell({
 
         {/* 3. Main Workspace */}
         <main className={styles.workspace}>
+          {sessionId && (
+            <SessionBar
+              sessionId={sessionId}
+              isHost={isHost}
+              isConnected={isConnected}
+              isSaving={isSaving}
+            />
+          )}
+
+          {isHost && (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap',
+                marginBottom: '12px',
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => { setHostToolsInitialSection(undefined); setIsHostToolsOpen(true); }}
+                style={{
+                  minHeight: '36px',
+                  padding: '6px 14px',
+                  borderRadius: 'var(--r-pill, 9999px)',
+                  border: '1px solid var(--line-strong, #333d5e)',
+                  background: 'var(--surface-card, #131726)',
+                  color: 'var(--text-primary, #f8fafc)',
+                  fontSize: '0.8125rem',
+                  fontWeight: 600,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: 'pointer',
+                  boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+                }}
+              >
+                <UserPlus size={13} style={{ color: 'var(--status-success, #22c55e)' }} />
+                <span>Add Player</span>
+              </button>
+
+              {partnerPanelNode && (
+                <button
+                  type="button"
+                  onClick={() => { setHostToolsInitialSection('partners'); setIsHostToolsOpen(true); }}
+                  style={{
+                    minHeight: '36px',
+                    padding: '6px 14px',
+                    borderRadius: 'var(--r-pill, 9999px)',
+                    border: '1px solid var(--line-strong, #333d5e)',
+                    background: 'var(--surface-card, #131726)',
+                    color: 'var(--text-primary, #f8fafc)',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+                  }}
+                >
+                  <Link2 size={13} style={{ color: 'var(--team-b-text, #60a5fa)' }} />
+                  <span>Set Partners</span>
+                </button>
+              )}
+
+              {manualQueuePanelNode && (
+                <button
+                  type="button"
+                  onClick={() => { setHostToolsInitialSection('queue'); setIsHostToolsOpen(true); }}
+                  style={{
+                    minHeight: '36px',
+                    padding: '6px 14px',
+                    borderRadius: 'var(--r-pill, 9999px)',
+                    border: '1px solid var(--line-strong, #333d5e)',
+                    background: 'var(--surface-card, #131726)',
+                    color: 'var(--text-primary, #f8fafc)',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+                  }}
+                >
+                  <ListOrdered size={13} style={{ color: 'var(--accent-primary, #5457e0)' }} />
+                  <span>Manage Queue</span>
+                </button>
+              )}
+
+              {sitOutPanelNode && (
+                <button
+                  type="button"
+                  className="sitout-toggle-btn"
+                  onClick={() => { setHostToolsInitialSection('sitout'); setIsHostToolsOpen(true); }}
+                  style={{
+                    minHeight: '36px',
+                    padding: '6px 14px',
+                    borderRadius: 'var(--r-pill, 9999px)',
+                    border: '1px solid var(--line-strong, #333d5e)',
+                    background: 'var(--surface-card, #131726)',
+                    color: 'var(--text-primary, #f8fafc)',
+                    fontSize: '0.8125rem',
+                    fontWeight: 600,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
+                  }}
+                >
+                  <Coffee size={13} style={{ color: 'var(--status-warn, #f59e0b)' }} />
+                  <span>Breaks{activeSittingOutCount > 0 ? ` (${activeSittingOutCount})` : ''}</span>
+                </button>
+              )}
+            </div>
+          )}
+
           {children}
         </main>
 
@@ -169,6 +297,7 @@ export function AppShell({
           manualQueuePanelNode={manualQueuePanelNode}
           sitOutPanelNode={sitOutPanelNode}
           diagnosticsNode={diagnosticsNode}
+          initialSection={hostToolsInitialSection}
         />
       </div>
     </OverlayHost>

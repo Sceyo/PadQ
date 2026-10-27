@@ -1191,6 +1191,9 @@ function QueueSystemContent() {
     const finishSuccess = () => {
       recordCareerResult(entry.players, entry.winner);
       setCareerStats(loadCareerStats());
+      setModalWinner(`${winner} wins!`);
+      setModalScore(score);
+      setModalOpen(true);
       showMatchToast({
         message: `${winner} won${score ? ` (${score})` : ''}`,
         canUndo: true,
@@ -1298,6 +1301,9 @@ function QueueSystemContent() {
     const finishSuccess = () => {
       recordCareerResult(entry.players, entry.winner);
       setCareerStats(loadCareerStats());
+      setModalWinner(`${winnerNames} win!`);
+      setModalScore(score);
+      setModalOpen(true);
       showMatchToast({
         message: `${winnerNames} won${score ? ` (${score})` : ''}`,
         canUndo: true,
@@ -1445,6 +1451,13 @@ function QueueSystemContent() {
         }
         recordCareerResult(entry.players, entry.winner);
         setCareerStats(loadCareerStats());
+        if (score) {
+          showToast(`${slot.name}: ${winnerNames} win (${score})`);
+        } else {
+          setModalWinner(`${winnerNames} win!`);
+          setModalScore(undefined);
+          setModalOpen(true);
+        }
         showMatchToast({
           message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
           canUndo: true,
@@ -2331,6 +2344,7 @@ function QueueSystemContent() {
           sessionId={session.sessionId}
           isHost={session.isHost}
           isConnected={session.isConnected}
+          isSaving={session.isSaving}
           isLive={isLiveLocal}
           onAddPlayerLive={handleAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}
@@ -2382,6 +2396,7 @@ function QueueSystemContent() {
               hideToggle
             />
           }
+          activeSittingOutCount={activeSittingOut.length}
           diagnosticsNode={
             courtSlots.length > 0 ? (
               <div className="diagnostics-multicourt" style={{ padding: '8px 12px', fontSize: '0.82rem' }}>

@@ -58,6 +58,10 @@ test('30 viewer tabs receive a three-court queue rotation in real time', async (
       (button as HTMLButtonElement).click();
       (button as HTMLButtonElement).click();
     });
+    const skipBtn = host.getByRole('button', { name: /Skip Score/i });
+    if (await skipBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await skipBtn.click();
+    }
 
     await Promise.all(viewers.map(page => expect.poll(
       async () => page.locator('.w-next-up').innerText(),

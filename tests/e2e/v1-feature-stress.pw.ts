@@ -62,6 +62,10 @@ test('30-player three-court singles rotates safely for host and viewer', async (
 
     const courtTwoCard = host.locator('.courts-grid > div').filter({ hasText: 'Court 2' });
     await courtTwoCard.getByRole('button', { name: /wins$/ }).first().click();
+    const skipScore = host.getByRole('button', { name: 'Skip Score' });
+    if (await skipScore.isVisible({ timeout: 1500 }).catch(() => false)) {
+      await skipScore.click();
+    }
     await expect.poll(
       async () => viewer.getByRole('tabpanel').innerText(),
       { timeout: 20_000 },
@@ -97,8 +101,8 @@ test('single-court live scoring, management, stats, history, and undo stay consi
       .toBeVisible({ timeout: 30_000 });
 
     await expect(host.getByRole('button', { name: 'Scoring ON' })).toBeVisible();
-    await host.getByRole('button', { name: 'Custom' }).click();
-    const customLimit = host.getByPlaceholder('e.g. 15');
+    await host.getByRole('button', { name: /Custom|Special/ }).click();
+    const customLimit = host.getByPlaceholder(/e\.g\. (15|7)/);
     await customLimit.fill('3');
     await customLimit.press('Enter');
     await expect(viewer.locator('.w-live-limit-badge')).toHaveText('to 3', { timeout: 20_000 });
@@ -108,9 +112,9 @@ test('single-court live scoring, management, stats, history, and undo stay consi
     await scoreAPlus.click();
     await scoreAPlus.click();
     await scoreBPlus.click();
-    await expect(viewer.locator('.w-live-side').filter({ hasText: 'Team A' }).locator('.w-live-score-num'))
+    await expect(viewer.locator('.w-live-side').filter({ hasText: /Team A|Player 1/ }).locator('.w-live-score-num'))
       .toHaveText('2');
-    await expect(viewer.locator('.w-live-side').filter({ hasText: 'Team B' }).locator('.w-live-score-num'))
+    await expect(viewer.locator('.w-live-side').filter({ hasText: /Team B|Player 2/ }).locator('.w-live-score-num'))
       .toHaveText('1');
 
     // A host refresh must restore the last Firebase score instead of replacing
@@ -131,7 +135,7 @@ test('single-court live scoring, management, stats, history, and undo stay consi
     await restoredScoreAMinus.click();
     await expect(host.locator('.score-side--a .score-display')).toHaveText('2');
     await expect(host.getByText('Game Over!', { exact: true })).not.toBeVisible();
-    await expect(viewer.locator('.w-live-side').filter({ hasText: 'Team A' }).locator('.w-live-score-num'))
+    await expect(viewer.locator('.w-live-side').filter({ hasText: /Team A|Player 1/ }).locator('.w-live-score-num'))
       .toHaveText('2');
 
     await restoredScoreAPlus.click();
@@ -152,19 +156,24 @@ test('single-court live scoring, management, stats, history, and undo stay consi
     await expect(host.getByText('Leaderboard', { exact: true })).toBeVisible();
     await expect(host.getByRole('row', { name: /Score Player 01 Bronze 1 0 1 100% \+2 50% 1/ }))
       .toBeVisible();
-    await host.getByRole('button', { name: 'Queue' }).click();
+    await host.getByRole('button', { name: 'Queue', exact: true }).click();
 
     await host.getByRole('button', { name: 'Add Player' }).click();
     await host.getByPlaceholder('Player name').fill('Late Arrival');
     await host.getByPlaceholder('Player name').press('Enter');
 
-    await host.getByRole('button', { name: 'Sit Out' }).click();
+    await host.getByRole('button', { name: /Sit Out|Breaks/i }).click();
     const lateArrivalRow = host.locator('.sitout-row').filter({ hasText: 'Late Arrival' });
     await expect(lateArrivalRow).toBeVisible();
-    await lateArrivalRow.getByRole('button', { name: 'Sit Out' }).click();
-    await expect(host.getByRole('button', { name: 'Sit Out (1)' })).toBeVisible();
-    await lateArrivalRow.getByRole('button', { name: 'Return' }).click();
+    await lateArrivalRow.getByRole('button', { name: /sit out|take a break/i }).click();
+    await expect(host.getByRole('button', { name: /breaks \(1\)|sit out \(1\)/i })).toBeVisible();
+    await lateArrivalRow.getByRole('button', { name: /return|back in/i }).click();
     await expect(host.locator('.sitout-toggle-btn')).not.toContainText('(1)');
+
+    const closeSheet = host.getByRole('button', { name: 'Close sheet' });
+    if (await closeSheet.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await closeSheet.click();
+    }
 
     await host.getByTitle('Settings').click();
     await host.getByRole('menuitem', { name: 'Undo Last Match' }).click();

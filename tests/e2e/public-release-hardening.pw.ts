@@ -80,7 +80,8 @@ test('owner permanently deletes the live event and its history', async ({ browse
     await expect(viewer.getByText('You are watching live. Only the host can make changes.'))
       .toBeVisible({ timeout: 20_000 });
 
-    await host.getByRole('button', { name: 'Team A', exact: true }).click();
+    const plusA = host.locator('.score-side--a .score-btn--plus');
+    for (let point = 0; point < 11; point += 1) await plusA.click();
     await host.getByRole('button', { name: 'Confirm Match' }).click();
     await expect(host.getByRole('button', { name: 'Close' })).toBeVisible({ timeout: 20_000 });
     await host.getByRole('button', { name: 'Close' }).click();
@@ -109,8 +110,9 @@ test('an offline match save restores the prior queue and can be retried', async 
     await startLiveDoublesRoom(host);
     const beforeQueue = await host.locator('.pairing-table').innerText();
 
+    const plusA2 = host.locator('.score-side--a .score-btn--plus');
+    for (let point = 0; point < 11; point += 1) await plusA2.click();
     await context.setOffline(true);
-    await host.getByRole('button', { name: 'Team A', exact: true }).click();
     await host.getByRole('button', { name: 'Confirm Match' }).click();
 
     await expect(host.locator('.toast-notification')).toContainText(/could not reach Firebase|could not be saved/, { timeout: 20_000 });

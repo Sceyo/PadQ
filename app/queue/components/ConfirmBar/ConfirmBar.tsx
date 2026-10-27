@@ -372,6 +372,7 @@ export function ConfirmBar({
           <button
             type="button"
             onClick={onConfirm}
+            aria-label={winner ? `Confirm Match - Confirm ${winnerLabel} won${scoreLabel ? `, ${scoreLabel}` : ''}` : 'Confirm Match'}
             disabled={isSaving || isScoreZeroAndEnabled}
             style={{
               width: '100%',

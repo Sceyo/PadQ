@@ -122,6 +122,7 @@ export function MultiCourtScreen({
           </h2>
 
           <div
+            className="courts-grid"
             style={{
               display: 'grid',
               gridTemplateColumns: courtSlots.length > 1 ? 'repeat(auto-fit, minmax(320px, 1fr))' : '1fr',

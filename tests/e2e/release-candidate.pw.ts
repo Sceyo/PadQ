@@ -77,6 +77,10 @@ test('release candidate supports responsive viewers and offline reconnection', a
     const courtThreeCard = host.locator('.courts-grid > div').filter({ hasText: 'Court 3' });
     const beforeHostResult = await courtThreeCard.innerText();
     await courtThreeCard.getByRole('button', { name: /wins?$/i }).first().click();
+    const skipBtn = host.getByRole('button', { name: /Skip Score/i });
+    if (await skipBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await skipBtn.click();
+    }
     await expect.poll(
       async () => courtThreeCard.innerText(),
       { timeout: 20_000 },

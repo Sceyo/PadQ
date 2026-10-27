@@ -27,6 +27,11 @@ test('25-player rush preserves registration order and a middle departure', async
     await host.getByRole('button', { name: /Start Queue/ }).click();
     await expect(host.locator('.session-bar--host')).toContainText('Connected', { timeout: 30_000 });
 
+    const expandWaiting = host.getByRole('button', { name: /Expand waiting queue/i });
+    if (await expandWaiting.isVisible().catch(() => false)) {
+      await expandWaiting.click();
+    }
+
     const initialWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
     expect(initialWaiting.map(text => text.trim())).toEqual(RUSH_PLAYERS.slice(12));
 

@@ -26,6 +26,7 @@ export function QueuePanel({
 
   return (
     <section
+      className="pairing-table"
       style={{
         background: 'var(--surface-card, #131726)',
         border: '1px solid var(--line-subtle, #252d47)',
@@ -72,7 +73,7 @@ export function QueuePanel({
           )}
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2, 8px)' }}>
+        <div className="waiting-players-list" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2, 8px)' }}>
           {queue.nextUp.length === 0 ? (
             <span style={{ fontSize: 'var(--fs-xs, 0.8125rem)', color: 'var(--text-muted, #94a3b8)', padding: '4px 0' }}>
               No players next up.
@@ -81,6 +82,7 @@ export function QueuePanel({
             queue.nextUp.map((p) => (
               <button
                 key={`next-${p.name}`}
+                className="waiting-player-row"
                 type="button"
                 onClick={() => onSelectPlayer(p.name, 'waiting')}
                 style={{
@@ -179,7 +181,7 @@ export function QueuePanel({
         </button>
 
         {isWaitingExpanded && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2, 8px)', paddingTop: '4px' }}>
+          <div className="waiting-players-list" style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--sp-2, 8px)', paddingTop: '4px' }}>
             {queue.waiting.length === 0 ? (
               <span style={{ fontSize: 'var(--fs-xs, 0.8125rem)', color: 'var(--text-muted, #94a3b8)' }}>
                 No additional players waiting.
@@ -188,6 +190,7 @@ export function QueuePanel({
               queue.waiting.map((p) => (
                 <button
                   key={`waiting-${p.name}`}
+                  className="waiting-player-row"
                   type="button"
                   onClick={() => onSelectPlayer(p.name, 'waiting')}
                   style={{
