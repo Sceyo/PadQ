@@ -71,11 +71,11 @@ export function SetupView({
   const SKILL_TITLE: Record<SkillBracket, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
 
   return (
-    <div className={`queue-system setup-page ${darkMode ? 'dark dark-mode' : ''}`}>
-      <button className="dark-mode-toggle" onClick={onToggleDark}>
+    <div className={`queue-system setup-page ${darkMode ? 'dark dark-mode' : ''}`} suppressHydrationWarning>
+      <button type="button" className="dark-mode-toggle" onClick={onToggleDark} suppressHydrationWarning>
         {darkMode ? <Sun size={17} /> : <Moon size={17} />}
       </button>
-      <button className="back-home" onClick={onBack}>
+      <button type="button" className="back-home" onClick={onBack} suppressHydrationWarning>
         <ArrowLeft size={14} /> Back
       </button>
 
@@ -103,6 +103,7 @@ export function SetupView({
                 onClick={() => onCourtCountChange(Math.max(1, courtCount - 1))}
                 type="button"
                 disabled={courtCount <= 1}
+                suppressHydrationWarning
               >−</button>
               <span className="court-count-value">{courtCount}</span>
               <button
@@ -110,6 +111,7 @@ export function SetupView({
                 onClick={() => onCourtCountChange(Math.min(maxCourts, courtCount + 1))}
                 type="button"
                 disabled={courtCount >= maxCourts}
+                suppressHydrationWarning
               >+</button>
             </div>
             {courtCount > 1 && gameMode === 'doubles' && (
@@ -136,14 +138,14 @@ export function SetupView({
             <div className="singles-format-selector">
               <button
                 type="button"
-                className={`format-option-btn ${singlesFormat === 'pool' ? 'format-option-btn--active' : ''}`}
+                className={`format-option-btn ${singlesFormat === 'pool' ? 'format-option-btn--active' : ''}`} suppressHydrationWarning
                 onClick={() => onSinglesFormatChange?.('pool')}
               >
                 Pool Rotation <span className="format-default-badge">(Default)</span>
               </button>
               <button
                 type="button"
-                className={`format-option-btn ${singlesFormat === 'king' ? 'format-option-btn--active' : ''}`}
+                className={`format-option-btn ${singlesFormat === 'king' ? 'format-option-btn--active' : ''}`} suppressHydrationWarning
                 onClick={() => onSinglesFormatChange?.('king')}
               >
                 King of the Court
@@ -170,6 +172,9 @@ export function SetupView({
             placeholder="Leave blank for open access"
             maxLength={4}
             autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            suppressHydrationWarning
           />
         </div>}
 
@@ -179,11 +184,12 @@ export function SetupView({
             type="button"
             className={`roster-toggle-btn${showRoster ? ' roster-toggle-btn--active' : ''}`}
             onClick={onToggleRoster}
+            suppressHydrationWarning
           >
             <BookOpen size={13} /> From Roster ({roster.length})
           </button>
           {tempPlayers.length > 0 && (
-            <button type="button" className="roster-save-btn" onClick={onSaveToRoster}>
+            <button type="button" className="roster-save-btn" onClick={onSaveToRoster} suppressHydrationWarning>
               <Star size={13} /> Save to Roster
             </button>
           )}
@@ -225,6 +231,7 @@ export function SetupView({
                           className="roster-remove-btn"
                           onClick={e => { e.preventDefault(); onRemoveFromRoster(entry.name); }}
                           title="Remove from roster"
+                          suppressHydrationWarning
                         >×</button>
                       </div>
                       {showSkillTagging && pickerOpen && (
@@ -254,6 +261,7 @@ export function SetupView({
                   type="button"
                   className="roster-action-btn"
                   onClick={onSelectAllRoster}
+                  suppressHydrationWarning
                 >
                   Select All
                 </button>
@@ -261,6 +269,7 @@ export function SetupView({
                   type="button"
                   className={`roster-action-btn${rosterSelected.size > 0 ? ' roster-action-btn--primary' : ''}`}
                   onClick={onAddFromRoster}
+                  suppressHydrationWarning
                   disabled={rosterSelected.size === 0}
                 >
                   Add Selected ({rosterSelected.size})
@@ -277,8 +286,12 @@ export function SetupView({
             onChange={e => { onCurrentNameChange(e.target.value); }}
             placeholder="Enter player name"
             onKeyDown={e => e.key === 'Enter' && onAddPlayer()}
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            suppressHydrationWarning
           />
-          <button onClick={onAddPlayer} className="add-btn"><UserPlus size={15} /></button>
+          <button type="button" onClick={onAddPlayer} className="add-btn" suppressHydrationWarning><UserPlus size={15} /></button>
         </div>
         {errorMsg && <p className="setup-error-msg">{errorMsg}</p>}
         <div className="input-group">
@@ -288,10 +301,16 @@ export function SetupView({
             onChange={e => onPasteInputChange(e.target.value)}
             placeholder="Paste names separated by commas…"
             onKeyDown={e => e.key === 'Enter' && onAddFromPaste()}
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            suppressHydrationWarning
           />
           <button
+            type="button"
             onClick={onAddFromPaste}
             className="add-btn add-btn--paste"
+            suppressHydrationWarning
             title="Add all"
           >
             <Users size={15} />
@@ -306,7 +325,7 @@ export function SetupView({
                 <li key={i}>
                   <span className="setup-player-num">#{i + 1}</span>
                   <span>{p}</span>
-                  <button onClick={() => onRemoveTempPlayer(i)} className="remove-btn">
+                  <button type="button" onClick={() => onRemoveTempPlayer(i)} className="remove-btn" suppressHydrationWarning>
                     <Trash2 size={12} />
                   </button>
                 </li>
@@ -317,8 +336,10 @@ export function SetupView({
 
         {/* ── Lock Partners (doubles multi-court only) ── */}
         <button
+          type="button"
           onClick={onStartQueue}
           className="start-btn"
+          suppressHydrationWarning
           disabled={tempPlayers.length < minPlayers || isSaving}
         >
           {isSaving
