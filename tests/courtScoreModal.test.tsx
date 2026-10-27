@@ -227,4 +227,38 @@ describe('CourtScoreModal component', () => {
     fireEvent.click(getByRole('button', { name: 'Save Score & Continue' }));
     expect(onConfirm).toHaveBeenCalledWith('12 – 10');
   });
+
+  it('defaults blank opponent score to 0 when Save Score & Continue is clicked', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { getByRole } = render(
+      <CourtScoreModal
+        isOpen={true}
+        match={mockDoublesMatchA}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    );
+
+    // Loser score is left blank -> defaults to 0 (11 - 0 victory for Team A)
+    fireEvent.click(getByRole('button', { name: 'Save Score & Continue' }));
+    expect(onConfirm).toHaveBeenCalledWith('11 – 0');
+  });
+
+  it('defaults blank opponent score to 0 when Side B wins', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { getByRole } = render(
+      <CourtScoreModal
+        isOpen={true}
+        match={mockDoublesMatchB}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    );
+
+    // Loser score is left blank -> defaults to 0 (0 - 11 victory for Team B)
+    fireEvent.click(getByRole('button', { name: 'Save Score & Continue' }));
+    expect(onConfirm).toHaveBeenCalledWith('0 – 11');
+  });
 });

@@ -123,10 +123,8 @@ test('multi-court mode reveals Undo Last Match in settings and restores court an
       await skipBtn2.click();
     }
 
-    // WinnerModal opens after a win; autoClose is false by default, so dismiss it.
-    await expect(host.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
-    await host.keyboard.press('Escape');
-    await expect(host.locator('.modal-overlay')).not.toBeVisible({ timeout: 3_000 });
+    // MatchCompletionToast confirms win with undo capability
+    await expect(host.locator('text=/won/i')).toBeVisible({ timeout: 5_000 });
 
     // Now Court 1 rotated: Player 09 and Player 10 were pulled onto Court 1
     await expect(courtOneCard).not.toContainText('Player 01 & Player 02');

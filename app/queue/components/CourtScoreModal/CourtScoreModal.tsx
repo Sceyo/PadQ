@@ -96,13 +96,14 @@ export const CourtScoreModal: React.FC<Props> = ({
   };
 
   const handleSave = () => {
-    const w = parseInt(winnerScore.trim(), 10);
-    const l = parseInt(loserScore.trim(), 10);
-    if (isNaN(w) || isNaN(l)) {
-      // If host left score empty, complete without score
-      onConfirm(undefined);
-      return;
-    }
+    const rawLoser = loserScore.trim();
+    const parsedLoser = rawLoser === '' ? 0 : parseInt(rawLoser, 10);
+    const rawWinner = winnerScore.trim();
+    const parsedWinner = rawWinner === '' ? targetLimit : parseInt(rawWinner, 10);
+
+    const w = isNaN(parsedWinner) ? targetLimit : parsedWinner;
+    const l = isNaN(parsedLoser) ? 0 : parsedLoser;
+
     // Format score in Team A vs Team B order
     const scoreA = match.side === 'A' ? w : l;
     const scoreB = match.side === 'A' ? l : w;
@@ -274,7 +275,7 @@ export const CourtScoreModal: React.FC<Props> = ({
               type="number"
               min="0"
               max="99"
-              placeholder={`e.g. ${targetLimit - 2}`}
+              placeholder="0"
               className={styles.scoreInput}
               value={loserScore}
               onChange={e => handleLoserChange(e.target.value)}

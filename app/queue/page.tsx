@@ -1191,9 +1191,6 @@ function QueueSystemContent() {
     const finishSuccess = () => {
       recordCareerResult(entry.players, entry.winner);
       setCareerStats(loadCareerStats());
-      setModalWinner(`${winner} wins!`);
-      setModalScore(score);
-      setModalOpen(true);
       showMatchToast({
         message: `${winner} won${score ? ` (${score})` : ''}`,
         canUndo: true,
@@ -1301,9 +1298,6 @@ function QueueSystemContent() {
     const finishSuccess = () => {
       recordCareerResult(entry.players, entry.winner);
       setCareerStats(loadCareerStats());
-      setModalWinner(`${winnerNames} win!`);
-      setModalScore(score);
-      setModalOpen(true);
       showMatchToast({
         message: `${winnerNames} won${score ? ` (${score})` : ''}`,
         canUndo: true,
@@ -1451,13 +1445,6 @@ function QueueSystemContent() {
         }
         recordCareerResult(entry.players, entry.winner);
         setCareerStats(loadCareerStats());
-        if (score) {
-          showToast(`${slot.name}: ${winnerNames} win (${score})`);
-        } else {
-          setModalWinner(`${winnerNames} win!`);
-          setModalScore(undefined);
-          setModalOpen(true);
-        }
         showMatchToast({
           message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
           canUndo: true,
@@ -1466,13 +1453,6 @@ function QueueSystemContent() {
     } else {
       recordCareerResult(entry.players, entry.winner);
       setCareerStats(loadCareerStats());
-      if (score) {
-        showToast(`${slot.name}: ${winnerNames} win (${score})`);
-      } else {
-        setModalWinner(`${winnerNames} win!`);
-        setModalScore(undefined);
-        setModalOpen(true);
-      }
       showMatchToast({
         message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
         canUndo: true,

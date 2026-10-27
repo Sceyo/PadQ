@@ -143,10 +143,8 @@ test('Human Chaos 2: Multi-court partner locking, match rotation, undo, and live
       await skipScore.click();
     }
 
-    // Dismiss WinnerModal
-    await expect(host.locator('.modal-overlay')).toBeVisible({ timeout: 5000 });
-    await host.keyboard.press('Escape');
-    await expect(host.locator('.modal-overlay')).not.toBeVisible({ timeout: 3000 });
+    // MatchCompletionToast confirms win
+    await expect(host.locator('text=/won/i')).toBeVisible({ timeout: 5000 });
 
     // Court 1 rotated: waiting duo (09 & 10) was pulled onto court
     await expect.poll(async () => courtOneCard.innerText()).not.toBe(courtOneBefore);
@@ -165,9 +163,7 @@ test('Human Chaos 2: Multi-court partner locking, match rotation, undo, and live
     if (await skipScore.isVisible({ timeout: 2000 }).catch(() => false)) {
       await skipScore.click();
     }
-    await expect(host.locator('.modal-overlay')).toBeVisible({ timeout: 5000 });
-    await host.keyboard.press('Escape');
-    await expect(host.locator('.modal-overlay')).not.toBeVisible({ timeout: 3000 });
+    await expect(host.locator('text=/won/i')).toBeVisible({ timeout: 5000 });
 
     // 6. Spectator checks Standings and opens Recap Modal
     const historyToggle = viewer.locator('.w-history-toggle');
