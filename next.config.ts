@@ -1,8 +1,11 @@
 import type { NextConfig } from "next";
 
-const isDevelopment = process.env.NODE_ENV === "development";
+const isDevelopment = process.env.NODE_ENV === "development" || process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
 const developmentFirebaseConnections = isDevelopment
-  ? " http://127.0.0.1:8080 http://127.0.0.1:9099 ws://127.0.0.1:8080 http://127.0.0.1:8180 http://127.0.0.1:9199 ws://127.0.0.1:8180"
+  ? " http://127.0.0.1:8080 http://127.0.0.1:9099 ws://127.0.0.1:8080 http://127.0.0.1:8180 http://127.0.0.1:9199 ws://127.0.0.1:8180 http://localhost:8080 http://localhost:9099 ws://localhost:8080 http://localhost:8180 http://localhost:9199 ws://localhost:8180"
+  : "";
+const developmentFirebaseFrames = isDevelopment
+  ? " http://127.0.0.1:9099 http://localhost:9099 http://127.0.0.1:9199 http://localhost:9199"
   : "";
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -12,7 +15,7 @@ const contentSecurityPolicy = [
   "font-src 'self' data:",
   "media-src 'self' blob:",
   `connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://www.google.com https://www.gstatic.com https://www.recaptcha.net${developmentFirebaseConnections}`,
-  "frame-src 'self' https://www.google.com https://recaptcha.google.com https://www.recaptcha.net https://*.firebaseapp.com https://apis.google.com",
+  `frame-src 'self' https://www.google.com https://recaptcha.google.com https://www.recaptcha.net https://*.firebaseapp.com https://apis.google.com${developmentFirebaseFrames}`,
   "worker-src 'self' blob:",
   "object-src 'none'",
   "base-uri 'self'",
