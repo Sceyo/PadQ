@@ -25,7 +25,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
-  Wifi, Check,
+  Wifi, Check, Sun, Moon,
   BarChart2, TrendingUp, Activity, AlertCircle,
   Loader2, Share2, Coffee,
 } from 'lucide-react';
@@ -128,6 +128,27 @@ function WatchPageContent() {
 
   // ── Access control: PIN gate ─────────────────────────────
   const { access, submitPin } = useSessionAccess(sessionId);
+
+  // ── Theme State ──────────────────────────────────────────
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem('padq_dark_mode');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    document.body.classList.toggle('dark-mode', darkMode);
+    document.documentElement.classList.toggle('dark-mode', darkMode);
+    try {
+      localStorage.setItem('padq_dark_mode', String(darkMode));
+    } catch {
+      // storage unavailable
+    }
+  }, [darkMode]);
 
   // ── Firebase state ──────────────────────────────────────
   const [session,         setSession]         = useState<SessionDoc | null>(null);
@@ -475,54 +496,70 @@ function WatchPageContent() {
           <div className="w-announcement-inner">
             <div className="w-announcement-label">{announcement.label}</div>
             <div className="w-announcement-match">{announcement.text}</div>
-            <button className="w-announcement-close" onClick={() => setAnnouncement(null)}>✕</button>
+            <button className="w-announcement-close" aria-label="Close match announcement" onClick={() => setAnnouncement(null)}>✕</button>
           </div>
         </div>
       )}
 
       {/* ── Top bar ── */}
-      <div className="w-topbar">
-        <button className="w-back-btn" onClick={() => router.push('/')}>
-          <ArrowLeft size={14} /> Home
-        </button>
-        <div style={{ display: 'flex', alignItems: 'center', margin: '0 8px' }}>
-          <Image
-            src="/padq-logo.png"
-            alt="PadQ"
-            width={78}
-            height={24}
-            priority
-            style={{ width: 'auto', height: '22px' }}
-          />
-        </div>
-        <Link
-          className="w-back-btn"
-          href="/privacy"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              sessionStorage.setItem('padq_privacy_from', window.location.pathname + window.location.search);
-            }
-          }}
-        >
-          Privacy
-        </Link>
-
-        <div className="w-session-info">
-          <span className={`w-dot ${status === 'live' ? 'w-dot--live' : 'w-dot--off'}`} />
-          <span className="w-live-label">LIVE</span>
-          <span className="w-room-code">{sessionId}</span>
+      <header className="w-topbar">
+        <div className="w-topbar-left">
+          <button className="w-back-btn" onClick={() => router.push('/')} aria-label="Back to home">
+            <ArrowLeft size={14} /> Home
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', margin: '0 4px' }}>
+            <Image
+              src="/padq-logo.png"
+              alt="PadQ"
+              width={78}
+              height={24}
+              priority
+              style={{ width: 'auto', height: '22px' }}
+            />
+          </div>
         </div>
 
-        <div className="w-topbar-mode">
-          {gameMode === 'singles' ? <Swords size={14} /> : <Users size={14} />}
-          {gameMode === 'singles' ? 'Singles' : 'Doubles'} ·{' '}
-          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : 'Default'}
+        <div className="w-topbar-right">
+          <div className="w-session-info">
+            <span className={`w-dot ${status === 'live' ? 'w-dot--live' : 'w-dot--off'}`} />
+            <span className="w-live-label">LIVE</span>
+            <span className="w-room-code">{sessionId}</span>
+          </div>
+
+          <Link
+            className="w-back-btn"
+            href="/privacy"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('padq_privacy_from', window.location.pathname + window.location.search);
+              }
+            }}
+          >
+            Privacy
+          </Link>
+
+          <button
+            type="button"
+            className="w-theme-toggle"
+            onClick={() => setDarkMode(d => !d)}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
         </div>
-      </div>
+      </header>
 
       {/* ── Viewer read-only banner ── */}
       <div className="w-viewer-banner">
-        <Wifi size={13} /> You are watching live. Only the host can make changes.
+        <div className="w-viewer-banner-text">
+          <Wifi size={13} /> You are watching live. Only the host can make changes.
+        </div>
+        <div className="w-topbar-mode">
+          {gameMode === 'singles' ? <Swords size={12} /> : <Users size={12} />}
+          {gameMode === 'singles' ? 'Singles' : 'Doubles'} ·{' '}
+          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : 'Default'}
+        </div>
       </div>
 
       <div className="w-body">
@@ -694,6 +731,7 @@ function WatchPageContent() {
               sittingOut={session?.sittingOut ?? []}
               players={session?.players ?? []}
               priorityPlayers={session?.priorityPlayers ?? []}
+              lockedPartners={session?.lockedPartners ?? []}
             />
           </div>
         )}
@@ -744,8 +782,8 @@ function WatchPageContent() {
             ══════════════════════════════════════════════════ */}
         {!isTournament && !isSkilled && !isMultiCourt && (
           <>
-            {/* Current match */}
-            {currentSinglesMatch && (
+            {/* Current match — only show standalone On Court card if Live Score hero is not already active */}
+            {!session.liveScore?.active && currentSinglesMatch && (
               <div className="w-section">
                 <h2 className="w-section-title"><Swords size={16} /> On Court Now</h2>
                 <div className="w-vs-row">
@@ -762,7 +800,7 @@ function WatchPageContent() {
               </div>
             )}
 
-            {currentDoublesNext && (
+            {!session.liveScore?.active && currentDoublesNext && (
               <div className="w-section">
                 <h2 className="w-section-title"><Users size={16} /> On Court Now</h2>
                 <div className="w-vs-row">

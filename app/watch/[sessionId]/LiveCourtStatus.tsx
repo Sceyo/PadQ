@@ -13,6 +13,7 @@ interface Props {
   sittingOut?: string[];
   players?: string[];
   priorityPlayers?: string[];
+  lockedPartners?: Array<{ a: string; b: string }>;
 }
 
 export function resolveSelectedCourt(courtSlots: CourtSlot[], selectedCourtId: string) {
@@ -32,6 +33,7 @@ export function LiveCourtStatus({
   sittingOut = [],
   players,
   priorityPlayers = [],
+  lockedPartners = [],
 }: Props) {
   const selectedCourt = resolveSelectedCourt(courtSlots, selectedCourtId);
   const playersNeeded = gameMode === 'doubles' ? 4 : 2;
@@ -53,6 +55,19 @@ export function LiveCourtStatus({
   const waitingQueue = [...priorityWaiting, ...otherWaiting];
   const onBreak = Array.from(accounting.onBreak);
   const nextPlayers = getNextPlayers(waitingQueue, gameMode);
+
+  // Partner pairing map for fast lookup
+  const partnerMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!lockedPartners) return map;
+    for (const pair of lockedPartners) {
+      if (pair.a && pair.b) {
+        map[pair.a] = pair.b;
+        map[pair.b] = pair.a;
+      }
+    }
+    return map;
+  }, [lockedPartners]);
 
   if (!selectedCourt) {
     return <p className="w-muted">Courts are not assigned yet.</p>;
@@ -111,6 +126,11 @@ export function LiveCourtStatus({
                     {idx > 0 && <span className="w-partner-and">{' & '}</span>}
                     <div className="w-player-chip w-player-chip--individual">
                       <span className="w-player-name">{player}</span>
+                      {partnerMap[player] && (
+                        <span className="w-partner-badge" title={`Paired with ${partnerMap[player]}`} aria-label={`Paired with ${partnerMap[player]}`}>
+                          🔗
+                        </span>
+                      )}
                     </div>
                   </React.Fragment>
                 ))}
@@ -127,6 +147,11 @@ export function LiveCourtStatus({
                     {idx > 0 && <span className="w-partner-and">{' & '}</span>}
                     <div className="w-player-chip w-player-chip--individual">
                       <span className="w-player-name">{player}</span>
+                      {partnerMap[player] && (
+                        <span className="w-partner-badge" title={`Paired with ${partnerMap[player]}`} aria-label={`Paired with ${partnerMap[player]}`}>
+                          🔗
+                        </span>
+                      )}
                     </div>
                   </React.Fragment>
                 ))}
@@ -148,6 +173,11 @@ export function LiveCourtStatus({
             {nextPlayers.map((player, index) => (
               <span key={`${index}-${player}`} className="w-queue-chip">
                 <span className="w-queue-num">#{index + 1}</span> {player}
+                {partnerMap[player] && (
+                  <span className="w-partner-pill" title={`Paired with ${partnerMap[player]}`}>
+                    🔗
+                  </span>
+                )}
                 {prioritySet.has(player) && (
                   <span className="w-status-pill w-status-pill--priority">Next up</span>
                 )}
