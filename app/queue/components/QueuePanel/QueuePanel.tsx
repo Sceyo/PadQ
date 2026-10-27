@@ -87,8 +87,8 @@ export function QueuePanel({
                   minHeight: 'var(--tap-min, 44px)',
                   padding: 'var(--sp-1_5, 6px) var(--sp-3_5, 14px)',
                   borderRadius: 'var(--r-pill, 9999px)',
-                  border: '1.5px solid var(--line-subtle, #252d47)',
-                  background: 'var(--surface-bg, #0b0d17)',
+                  border: '1.5px solid var(--line-strong, #333d5e)',
+                  background: 'var(--surface-bg-alt, #101424)',
                   color: 'var(--text-primary, #f8fafc)',
                   fontSize: 'var(--fs-sm, 0.9375rem)',
                   fontWeight: 600,
@@ -96,7 +96,8 @@ export function QueuePanel({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '6px',
-                  transition: 'border-color 0.15s ease',
+                  boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05))',
+                  transition: 'border-color 0.15s ease, background 0.15s ease',
                 }}
               >
                 <PlayerLabel name={p.name} statsMap={statsMap} showRank={false} />
@@ -191,8 +192,8 @@ export function QueuePanel({
                     minHeight: 'var(--tap-min, 44px)',
                     padding: 'var(--sp-1_5, 6px) var(--sp-3_5, 14px)',
                     borderRadius: 'var(--r-pill, 9999px)',
-                    border: '1.5px solid var(--line-subtle, #252d47)',
-                    background: 'var(--surface-bg, #0b0d17)',
+                    border: '1.5px solid var(--line-strong, #333d5e)',
+                    background: 'var(--surface-bg-alt, #101424)',
                     color: 'var(--text-primary, #f8fafc)',
                     fontSize: 'var(--fs-sm, 0.9375rem)',
                     fontWeight: 600,
@@ -200,7 +201,8 @@ export function QueuePanel({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 'var(--sp-1_5, 6px)',
-                    transition: 'border-color 0.15s ease',
+                    boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05))',
+                    transition: 'border-color 0.15s ease, background 0.15s ease',
                   }}
                 >
                   <PlayerLabel name={p.name} statsMap={statsMap} showRank={false} />
@@ -297,8 +299,8 @@ export function QueuePanel({
                     minHeight: 'var(--tap-min, 44px)',
                     padding: 'var(--sp-1_5, 6px) var(--sp-3_5, 14px)',
                     borderRadius: 'var(--r-pill, 9999px)',
-                    border: '1.5px solid var(--line-subtle, #252d47)',
-                    background: 'var(--surface-bg, #0b0d17)',
+                    border: '1.5px solid var(--line-strong, #333d5e)',
+                    background: 'var(--surface-bg-alt, #101424)',
                     color: 'var(--text-primary, #f8fafc)',
                     fontSize: 'var(--fs-sm, 0.9375rem)',
                     fontWeight: 600,
@@ -306,7 +308,8 @@ export function QueuePanel({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 'var(--sp-1_5, 6px)',
-                    transition: 'border-color 0.15s ease',
+                    boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0, 0, 0, 0.05))',
+                    transition: 'border-color 0.15s ease, background 0.15s ease',
                   }}
                 >
                   <PlayerLabel name={p.name} statsMap={statsMap} showRank={false} />

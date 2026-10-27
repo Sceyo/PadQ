@@ -234,7 +234,7 @@ export function HostToolsSheet({
               {openPartners ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             {openPartners && (
-              <div style={{ marginTop: '8px', padding: '10px', background: 'var(--surface-elevated, #1a2035)', borderRadius: '12px' }}>
+              <div style={{ marginTop: '8px', padding: '10px', background: 'var(--surface-bg, #0b0d17)', border: '1px solid var(--line-subtle, #252d47)', borderRadius: '12px' }}>
                 {partnerPanelNode}
               </div>
             )}
@@ -270,7 +270,7 @@ export function HostToolsSheet({
               {openManualQueue ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             {openManualQueue && (
-              <div style={{ marginTop: '8px', padding: '10px', background: 'var(--surface-elevated, #1a2035)', borderRadius: '12px' }}>
+              <div style={{ marginTop: '8px', padding: '10px', background: 'var(--surface-bg, #0b0d17)', border: '1px solid var(--line-subtle, #252d47)', borderRadius: '12px' }}>
                 {manualQueuePanelNode}
               </div>
             )}
@@ -306,7 +306,7 @@ export function HostToolsSheet({
               {openSitOut ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             {openSitOut && (
-              <div style={{ marginTop: '8px', padding: '10px', background: 'var(--surface-elevated, #1a2035)', borderRadius: '12px' }}>
+              <div style={{ marginTop: '8px', padding: '10px', background: 'var(--surface-bg, #0b0d17)', border: '1px solid var(--line-subtle, #252d47)', borderRadius: '12px' }}>
                 {sitOutPanelNode}
               </div>
             )}
@@ -342,7 +342,7 @@ export function HostToolsSheet({
               {openDiagnostics ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
             </button>
             {openDiagnostics && (
-              <div style={{ marginTop: '8px', padding: '10px', background: 'var(--surface-elevated, #1a2035)', borderRadius: '12px' }}>
+              <div style={{ marginTop: '8px', padding: '10px', background: 'var(--surface-bg, #0b0d17)', border: '1px solid var(--line-subtle, #252d47)', borderRadius: '12px' }}>
                 {diagnosticsNode}
               </div>
             )}

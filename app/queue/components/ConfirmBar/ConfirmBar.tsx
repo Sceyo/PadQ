@@ -194,15 +194,19 @@ export function ConfirmBar({
                   ? '2px solid var(--status-success, #22c55e)'
                   : isEndEarly
                   ? '1.5px solid rgba(245, 158, 11, 0.4)'
-                  : '1.5px solid var(--line-subtle, #252d47)',
+                  : isButtonADisabled
+                  ? '1.5px solid var(--line-subtle, #252d47)'
+                  : '1.5px solid var(--line-strong, #333d5e)',
                 background: 'var(--surface-bg-alt, #1a2035)',
                 color: (isWonA && isGameWon && !isEndEarly)
                   ? 'var(--status-success, #22c55e)'
+                  : isButtonADisabled
+                  ? 'var(--text-muted, #94a3b8)'
                   : 'var(--text-primary, #f8fafc)',
                 fontSize: 'var(--fs-sm, 0.9375rem)',
                 fontWeight: 700,
                 cursor: isButtonADisabled ? 'not-allowed' : 'pointer',
-                opacity: isButtonADisabled ? (isLosingSideA ? 0.2 : 0.35) : 1,
+                opacity: isButtonADisabled ? (isLosingSideA ? 0.2 : 0.6) : 1,
                 transition: 'border-color 0.15s ease, opacity 0.15s ease',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -226,15 +230,19 @@ export function ConfirmBar({
                   ? '2px solid var(--status-success, #22c55e)'
                   : isEndEarly
                   ? '1.5px solid rgba(245, 158, 11, 0.4)'
-                  : '1.5px solid var(--line-subtle, #252d47)',
+                  : isButtonBDisabled
+                  ? '1.5px solid var(--line-subtle, #252d47)'
+                  : '1.5px solid var(--line-strong, #333d5e)',
                 background: 'var(--surface-bg-alt, #1a2035)',
                 color: (isWonB && isGameWon && !isEndEarly)
                   ? 'var(--status-success, #22c55e)'
+                  : isButtonBDisabled
+                  ? 'var(--text-muted, #94a3b8)'
                   : 'var(--text-primary, #f8fafc)',
                 fontSize: 'var(--fs-sm, 0.9375rem)',
                 fontWeight: 700,
                 cursor: isButtonBDisabled ? 'not-allowed' : 'pointer',
-                opacity: isButtonBDisabled ? (isLosingSideB ? 0.2 : 0.35) : 1,
+                opacity: isButtonBDisabled ? (isLosingSideB ? 0.2 : 0.6) : 1,
                 transition: 'border-color 0.15s ease, opacity 0.15s ease',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',

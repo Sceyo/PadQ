@@ -136,6 +136,15 @@ body:not(.dark-mode) {
   --accent-hover: #4346c6;
   --accent-surface: rgba(84, 87, 224, 0.08);
 
+  --status-success: #16a34a;
+  --status-success-bg: rgba(22, 163, 74, 0.10);
+
+  --status-warn: #b45309;
+  --status-warn-bg: rgba(180, 83, 9, 0.12);
+
+  --status-danger: #dc2626;
+  --status-danger-bg: rgba(220, 38, 38, 0.10);
+
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.12);
