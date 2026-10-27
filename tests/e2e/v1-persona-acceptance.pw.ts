@@ -46,9 +46,12 @@ test('25-player rush preserves registration order and a middle departure', async
     await expect(viewer.locator('.w-next-up')).toContainText(RUSH_PLAYERS[15]);
     await expect(viewer.locator('.w-next-up')).toContainText('+9 waiting');
 
-    await host.getByRole('button', { name: 'Manage Queue' }).click();
+    await host.getByRole('button', { name: 'Host Tools' }).click();
+    const sheet = host.getByRole('dialog', { name: 'Host Tools' });
+    await sheet.getByRole('button', { name: 'Manage Queue' }).click();
     const departingPlayer = RUSH_PLAYERS[18];
-    await host.locator('.mqp-btn--remove').filter({ hasText: departingPlayer }).click();
+    await sheet.locator('.mqp-btn--remove').filter({ hasText: departingPlayer }).click();
+    await sheet.getByRole('button', { name: 'Close sheet' }).click();
 
     const remainingWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
     expect(remainingWaiting.map(text => text.trim())).toEqual([

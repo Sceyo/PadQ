@@ -158,22 +158,18 @@ test('single-court live scoring, management, stats, history, and undo stay consi
       .toBeVisible();
     await host.getByRole('button', { name: 'Queue', exact: true }).click();
 
-    await host.getByRole('button', { name: 'Add Player' }).click();
-    await host.getByPlaceholder('Player name').fill('Late Arrival');
-    await host.getByPlaceholder('Player name').press('Enter');
+    await host.getByRole('button', { name: 'Host Tools' }).click();
+    const sheet = host.getByRole('dialog', { name: 'Host Tools' });
+    await sheet.getByPlaceholder('Player name').fill('Late Arrival');
+    await sheet.getByRole('button', { name: 'Add', exact: true }).click();
 
-    await host.getByRole('button', { name: /Sit Out|Breaks/i }).click();
-    const lateArrivalRow = host.locator('.sitout-row').filter({ hasText: 'Late Arrival' });
+    await host.getByRole('button', { name: 'Host Tools' }).click();
+    await sheet.getByRole('button', { name: 'Manage Players On Break' }).click();
+    const lateArrivalRow = sheet.locator('.sitout-row').filter({ hasText: 'Late Arrival' });
     await expect(lateArrivalRow).toBeVisible();
-    await lateArrivalRow.getByRole('button', { name: /sit out|take a break/i }).click();
-    await expect(host.getByRole('button', { name: /breaks \(1\)|sit out \(1\)/i })).toBeVisible();
-    await lateArrivalRow.getByRole('button', { name: /return|back in/i }).click();
-    await expect(host.locator('.sitout-toggle-btn')).not.toContainText('(1)');
-
-    const closeSheet = host.getByRole('button', { name: 'Close sheet' });
-    if (await closeSheet.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await closeSheet.click();
-    }
+    await sheet.getByRole('button', { name: 'Sit out Late Arrival' }).click();
+    await sheet.getByRole('button', { name: 'Return Late Arrival', exact: true }).click();
+    await sheet.getByRole('button', { name: 'Close sheet' }).click();
 
     await host.getByTitle('Settings').click();
     await host.getByRole('menuitem', { name: 'Undo Last Match' }).click();

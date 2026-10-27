@@ -29,10 +29,11 @@ test('Human Chaos 1: Mid-match break, late arrival, queue reorder, and departure
       .toBeVisible({ timeout: 30_000 });
 
     // 1. Host opens Host Tools sheet and marks Player 05 for a break
-    await host.getByRole('button', { name: /Breaks/i }).first().click();
+    await host.getByRole('button', { name: 'Host Tools' }).click();
     const sheet = host.getByRole('dialog', { name: 'Host Tools' });
     await expect(sheet).toBeVisible();
 
+    await sheet.getByRole('button', { name: 'Manage Players On Break' }).click();
     await sheet.getByRole('button', { name: 'Sit out Chaos Player 05' }).click();
     await expect(sheet.locator('.sitout-row').filter({ hasText: 'Chaos Player 05' })).toContainText('On break');
 
@@ -41,12 +42,6 @@ test('Human Chaos 1: Mid-match break, late arrival, queue reorder, and departure
     await expect(viewer.getByText('Chaos Player 05')).toBeVisible();
 
     // 2. Late walk-in arrival: Add "Late Arrival Zoe"
-    await sheet.getByRole('button', { name: 'Close sheet' }).click();
-    await expect(sheet).not.toBeVisible();
-
-    await host.getByRole('button', { name: 'Add Player' }).first().click();
-    await expect(sheet).toBeVisible();
-
     const addInput = sheet.getByPlaceholder(/Player name/);
     await addInput.fill('Late Arrival Zoe');
     await sheet.getByRole('button', { name: 'Add', exact: true }).click();
@@ -54,20 +49,18 @@ test('Human Chaos 1: Mid-match break, late arrival, queue reorder, and departure
     await expect(host.locator('.waiting-players-list')).toContainText('Late Arrival Zoe');
 
     // 3. Early departure: remove Player 08 from queue
-    await host.getByRole('button', { name: 'Manage Queue' }).first().click();
+    await host.getByRole('button', { name: 'Host Tools' }).click();
     await expect(sheet).toBeVisible();
+    await sheet.getByRole('button', { name: 'Manage Queue' }).click();
 
     const removeBtn = sheet.locator('.mqp-btn--remove').filter({ hasText: 'Chaos Player 08' });
     await removeBtn.click();
     await expect(sheet.locator('.mqp-btn--remove').filter({ hasText: 'Chaos Player 08' })).toHaveCount(0);
 
     // 4. Return Player 05 from break
-    await sheet.getByRole('button', { name: 'Close sheet' }).click();
-    await expect(sheet).not.toBeVisible();
-
-    await host.getByRole('button', { name: /Breaks/i }).first().click();
-    await expect(sheet).toBeVisible();
-
+    if (!await sheet.locator('.sitout-row').first().isVisible()) {
+      await sheet.getByRole('button', { name: 'Manage Players On Break' }).click();
+    }
     await sheet.getByRole('button', { name: 'Return Chaos Player 05', exact: true }).click();
     await expect(sheet.locator('.sitout-row').filter({ hasText: 'Chaos Player 05' })).not.toContainText('On break');
     await sheet.getByRole('button', { name: 'Close sheet' }).click();

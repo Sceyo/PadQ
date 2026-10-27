@@ -9,10 +9,6 @@ import {
   Moon,
   Swords,
   BarChart2,
-  UserPlus,
-  Link2,
-  ListOrdered,
-  Coffee,
 } from 'lucide-react';
 import { GearMenu, type GearMenuProps } from '../GearMenu/GearMenu';
 import { HostToolsSheet } from '../HostToolsSheet/HostToolsSheet';
@@ -110,12 +106,36 @@ export function AppShell({
             {isHost && (
               <button
                 type="button"
-                className={styles.iconBtn}
+                className={`${styles.iconBtn} ${isHostToolsOpen ? styles.iconBtnActive : ''}`}
                 onClick={() => setIsHostToolsOpen(true)}
                 aria-label="Host Tools"
                 title="Host Tools"
+                style={{ position: 'relative' }}
               >
                 <SlidersHorizontal size={17} />
+                {activeSittingOutCount > 0 && (
+                  <span
+                    style={{
+                      position: 'absolute',
+                      top: '-4px',
+                      right: '-4px',
+                      minWidth: '16px',
+                      height: '16px',
+                      padding: '0 4px',
+                      borderRadius: '8px',
+                      background: 'var(--status-warn, #f59e0b)',
+                      color: '#000000',
+                      fontSize: '0.625rem',
+                      fontWeight: 800,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: 1,
+                    }}
+                  >
+                    {activeSittingOutCount}
+                  </span>
+                )}
               </button>
             )}
 
@@ -170,117 +190,6 @@ export function AppShell({
               isConnected={isConnected}
               isSaving={isSaving}
             />
-          )}
-
-          {isHost && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                flexWrap: 'wrap',
-                marginBottom: '12px',
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => { setHostToolsInitialSection(undefined); setIsHostToolsOpen(true); }}
-                style={{
-                  minHeight: '36px',
-                  padding: '6px 14px',
-                  borderRadius: 'var(--r-pill, 9999px)',
-                  border: '1px solid var(--line-strong, #333d5e)',
-                  background: 'var(--surface-card, #131726)',
-                  color: 'var(--text-primary, #f8fafc)',
-                  fontSize: '0.8125rem',
-                  fontWeight: 600,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  cursor: 'pointer',
-                  boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
-                }}
-              >
-                <UserPlus size={13} style={{ color: 'var(--status-success, #22c55e)' }} />
-                <span>Add Player</span>
-              </button>
-
-              {partnerPanelNode && (
-                <button
-                  type="button"
-                  onClick={() => { setHostToolsInitialSection('partners'); setIsHostToolsOpen(true); }}
-                  style={{
-                    minHeight: '36px',
-                    padding: '6px 14px',
-                    borderRadius: 'var(--r-pill, 9999px)',
-                    border: '1px solid var(--line-strong, #333d5e)',
-                    background: 'var(--surface-card, #131726)',
-                    color: 'var(--text-primary, #f8fafc)',
-                    fontSize: '0.8125rem',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer',
-                    boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
-                  }}
-                >
-                  <Link2 size={13} style={{ color: 'var(--team-b-text, #60a5fa)' }} />
-                  <span>Set Partners</span>
-                </button>
-              )}
-
-              {manualQueuePanelNode && (
-                <button
-                  type="button"
-                  onClick={() => { setHostToolsInitialSection('queue'); setIsHostToolsOpen(true); }}
-                  style={{
-                    minHeight: '36px',
-                    padding: '6px 14px',
-                    borderRadius: 'var(--r-pill, 9999px)',
-                    border: '1px solid var(--line-strong, #333d5e)',
-                    background: 'var(--surface-card, #131726)',
-                    color: 'var(--text-primary, #f8fafc)',
-                    fontSize: '0.8125rem',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer',
-                    boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
-                  }}
-                >
-                  <ListOrdered size={13} style={{ color: 'var(--accent-primary, #5457e0)' }} />
-                  <span>Manage Queue</span>
-                </button>
-              )}
-
-              {sitOutPanelNode && (
-                <button
-                  type="button"
-                  className="sitout-toggle-btn"
-                  onClick={() => { setHostToolsInitialSection('sitout'); setIsHostToolsOpen(true); }}
-                  style={{
-                    minHeight: '36px',
-                    padding: '6px 14px',
-                    borderRadius: 'var(--r-pill, 9999px)',
-                    border: '1px solid var(--line-strong, #333d5e)',
-                    background: 'var(--surface-card, #131726)',
-                    color: 'var(--text-primary, #f8fafc)',
-                    fontSize: '0.8125rem',
-                    fontWeight: 600,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    cursor: 'pointer',
-                    boxShadow: 'var(--shadow-sm, 0 1px 2px rgba(0,0,0,0.05))',
-                  }}
-                >
-                  <Coffee size={13} style={{ color: 'var(--status-warn, #f59e0b)' }} />
-                  <span>Breaks{activeSittingOutCount > 0 ? ` (${activeSittingOutCount})` : ''}</span>
-                </button>
-              )}
-            </div>
           )}
 
           {children}
