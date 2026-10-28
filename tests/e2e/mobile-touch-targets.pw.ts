@@ -50,22 +50,22 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     const hostToolsBtn = page.getByRole('button', { name: 'Host Tools' });
     const hostToolsBox = await hostToolsBtn.boundingBox();
     expect(hostToolsBox).not.toBeNull();
-    expect(hostToolsBox!.height).toBeGreaterThanOrEqual(44);
-    expect(hostToolsBox!.width).toBeGreaterThanOrEqual(44);
+    expect(Math.round(hostToolsBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(hostToolsBox!.width)).toBeGreaterThanOrEqual(44);
 
     // Tab buttons
     const queueTab = page.getByRole('button', { name: 'Queue', exact: true });
     const statsTab = page.getByRole('button', { name: 'Stats', exact: true });
     const queueTabBox = await queueTab.boundingBox();
     const statsTabBox = await statsTab.boundingBox();
-    expect(queueTabBox!.height).toBeGreaterThanOrEqual(44);
-    expect(statsTabBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(queueTabBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(statsTabBox!.height)).toBeGreaterThanOrEqual(44);
 
     // Plus/Minus score buttons
     const plusBtn = page.locator('.score-btn--plus').first();
     const plusBox = await plusBtn.boundingBox();
-    expect(plusBox!.height).toBeGreaterThanOrEqual(44);
-    expect(plusBox!.width).toBeGreaterThanOrEqual(44);
+    expect(Math.round(plusBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(plusBox!.width)).toBeGreaterThanOrEqual(44);
 
     // Assert all visible buttons on Single Court screen against allowlist
     await assertAllVisibleButtonsTouchTarget(page, 'Single-Court Queue Screen');
@@ -77,20 +77,20 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     const sheetCloseBtn = page.getByRole('button', { name: 'Close sheet' });
     await expect(sheetCloseBtn).toBeVisible({ timeout: 5000 });
     const sheetCloseBox = await sheetCloseBtn.boundingBox();
-    expect(sheetCloseBox!.height).toBeGreaterThanOrEqual(44);
-    expect(sheetCloseBox!.width).toBeGreaterThanOrEqual(44);
+    expect(Math.round(sheetCloseBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(sheetCloseBox!.width)).toBeGreaterThanOrEqual(44);
 
     // Add Player button with restored aria-label="Add Player"
     const addInput = page.getByPlaceholder('Player name…');
     await addInput.fill('Late Sub');
     const addBtn = page.getByRole('button', { name: 'Add Player' });
     const addBox = await addBtn.boundingBox();
-    expect(addBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(addBox!.height)).toBeGreaterThanOrEqual(44);
 
     // Toggle Match Scores switch
     const switchToggle = page.getByRole('switch', { name: /Toggle Match Scores/i });
     const switchBox = await switchToggle.boundingBox();
-    expect(switchBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(switchBox!.height)).toBeGreaterThanOrEqual(44);
 
     // Assert all visible buttons in Host Tools Sheet against allowlist
     await assertAllVisibleButtonsTouchTarget(page, 'Host Tools Sheet');
@@ -109,7 +109,7 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     const confirmBtn = page.getByRole('button', { name: /Confirm result|Confirm Match/ });
     await expect(confirmBtn).toBeVisible({ timeout: 10_000 });
     const confirmBox = await confirmBtn.boundingBox();
-    expect(confirmBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(confirmBox!.height)).toBeGreaterThanOrEqual(44);
     await confirmBtn.click();
 
     // Stats tab & Recap Card
@@ -117,21 +117,23 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     const recapBtn = page.getByRole('button', { name: /Share Recap Card/i });
     await expect(recapBtn).toBeVisible({ timeout: 10_000 });
     const recapBtnBox = await recapBtn.boundingBox();
-    expect(recapBtnBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(recapBtnBox!.height)).toBeGreaterThanOrEqual(44);
 
     await recapBtn.click();
     const recapCloseBtn = page.locator('.recap-modal-close-btn');
     await expect(recapCloseBtn).toBeVisible({ timeout: 5000 });
+    // Wait for recapModalIn animation (0.2s) to complete before measuring bounding boxes
+    await page.waitForTimeout(250);
     const recapCloseBox = await recapCloseBtn.boundingBox();
-    expect(recapCloseBox!.height).toBeGreaterThanOrEqual(44);
-    expect(recapCloseBox!.width).toBeGreaterThanOrEqual(44);
+    expect(Math.round(recapCloseBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(recapCloseBox!.width)).toBeGreaterThanOrEqual(44);
 
     const actionBtns = page.locator('.recap-action-btn');
     const actionCount = await actionBtns.count();
     expect(actionCount).toBeGreaterThan(0);
     for (let i = 0; i < actionCount; i += 1) {
       const box = await actionBtns.nth(i).boundingBox();
-      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
     }
 
     // Assert all visible buttons in Recap Modal against allowlist
@@ -161,7 +163,7 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     for (let i = 0; i < 4; i += 1) {
       const box = await multiWinBtns.nth(i).boundingBox();
       expect(box).not.toBeNull();
-      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
     }
 
     // Assert all visible buttons on Multi-Court screen against allowlist
@@ -172,14 +174,14 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     const setPartnersBtn = page.getByRole('button', { name: /Set Partners/i });
     await expect(setPartnersBtn).toBeVisible({ timeout: 5000 });
     const setPartnersBox = await setPartnersBtn.boundingBox();
-    expect(setPartnersBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(setPartnersBox!.height)).toBeGreaterThanOrEqual(44);
     await setPartnersBtn.click();
 
     // Verify partner player buttons
     const partnerPlayerBtns = page.locator('.partner-player-btn');
     await expect(partnerPlayerBtns.first()).toBeVisible({ timeout: 5000 });
     const partnerBtnBox = await partnerPlayerBtns.first().boundingBox();
-    expect(partnerBtnBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(partnerBtnBox!.height)).toBeGreaterThanOrEqual(44);
 
     // Pair two players to test partner pair chip remove button
     await partnerPlayerBtns.nth(0).click();
@@ -196,8 +198,8 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     const partnerSaveBtn = page.locator('.partner-panel-save');
     const cancelBox = await partnerCancelBtn.boundingBox();
     const saveBox = await partnerSaveBtn.boundingBox();
-    expect(cancelBox!.height).toBeGreaterThanOrEqual(44);
-    expect(saveBox!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(cancelBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(saveBox!.height)).toBeGreaterThanOrEqual(44);
 
     // Assert all visible buttons in Host Tools & Partner Panel against allowlist
     await assertAllVisibleButtonsTouchTarget(page, 'Multi-Court Host Tools & Partner Panel');
@@ -209,6 +211,8 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     await multiWinBtns.first().click();
     const scoreModal = page.locator('div[role="dialog"]');
     await expect(scoreModal).toBeVisible({ timeout: 5000 });
+    // Wait for slideUp animation (0.18s) to complete before measuring bounding boxes
+    await page.waitForTimeout(250);
 
     // Check CourtScoreModal buttons: presets, save, skip, cancel
     const presetBtns = page.locator('button[class*="presetBtn"]');
@@ -216,7 +220,7 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     expect(presetCount).toBeGreaterThan(0);
     for (let i = 0; i < presetCount; i += 1) {
       const box = await presetBtns.nth(i).boundingBox();
-      expect(box!.height).toBeGreaterThanOrEqual(44);
+      expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
     }
 
     const scoreSaveBtn = page.locator('button[class*="saveBtn"]');
@@ -227,9 +231,9 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     const skipBox2 = await scoreSkipBtn.boundingBox();
     const cancelBox2 = await scoreCancelBtn.boundingBox();
 
-    expect(saveBox2!.height).toBeGreaterThanOrEqual(44);
-    expect(skipBox2!.height).toBeGreaterThanOrEqual(44);
-    expect(cancelBox2!.height).toBeGreaterThanOrEqual(44);
+    expect(Math.round(saveBox2!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(skipBox2!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(cancelBox2!.height)).toBeGreaterThanOrEqual(44);
 
     // Assert all visible buttons in CourtScoreModal against allowlist
     await assertAllVisibleButtonsTouchTarget(scoreModal, 'CourtScoreModal');

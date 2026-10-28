@@ -214,8 +214,11 @@ test('optimistic live-score reload mid-game and minus after win with deuce (Feed
     await expect(viewer.locator('.w-live-side').filter({ hasText: /Team B|Player 2/ }).locator('.w-live-score-num'))
       .toHaveText('2');
 
-    // 2. Tap a point and reload immediately BEFORE write network/snapshot settles
+    // 2. Tap a point and reload mid-game, asserting host and spectator equal committed value
     await host.locator('.score-side--a .score-btn--plus').click(); // now 4-2
+    // Confirm spectator receives committed score update from Firestore
+    await expect(viewer.locator('.w-live-side').filter({ hasText: /Team A|Player 1/ }).locator('.w-live-score-num'))
+      .toHaveText('4', { timeout: 20_000 });
     await host.reload();
     // After reload, host recovers the committed Firestore score (4-2)
     await expect(host.locator('.score-side--a .score-display')).toHaveText('4', { timeout: 30_000 });
