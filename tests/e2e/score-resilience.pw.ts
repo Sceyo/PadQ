@@ -164,3 +164,22 @@ test('doubles score correction requires review and commits only once', async ({ 
     await hostContext.close();
   }
 });
+
+test('rapid point taps throttled at 100-150ms accumulate increments accurately from latest value', async ({ browser }) => {
+  const hostContext = await browser.newContext();
+  const host = await hostContext.newPage();
+  try {
+    await startRoom(host, 'singles', SINGLES);
+    const plusA = host.locator('.score-side--a .score-btn--plus');
+    const displayA = host.locator('.score-side--a .score-display');
+
+    for (let i = 0; i < 5; i += 1) {
+      await plusA.click();
+      await host.waitForTimeout(120);
+    }
+
+    await expect(displayA).toHaveText('5', { timeout: 10_000 });
+  } finally {
+    await hostContext.close();
+  }
+});

@@ -40,8 +40,10 @@
   border: 1px solid var(--line-subtle, #252d47);
   border-radius: var(--r-sm, 10px);
   color: var(--text-primary, #f8fafc);
-  width: 38px;
-  height: 38px;
+  width: var(--tap-min, 44px);
+  height: var(--tap-min, 44px);
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -115,10 +117,10 @@
 }
 
 .iconBtn {
-  width: 38px;
-  height: 38px;
-  min-width: 38px;
-  min-height: 38px;
+  width: var(--tap-min, 44px);
+  height: var(--tap-min, 44px);
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
   border-radius: var(--r-sm, 10px);
   border: 1px solid var(--line-subtle, #252d47);
   background: var(--surface-elevated, #1a2035);

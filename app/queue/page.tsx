@@ -36,6 +36,7 @@ import {
   toSingleCourtViewModel,
   toSingleCourtQueueViewModel,
   toMultiCourtQueueViewModel,
+  getSingleCourtLiveScoreLabels as getSingleCourtLiveScoreLabelsVM,
 } from './lib/viewModels';
 
 // ── Lib ──────────────────────────────────────────────────────
@@ -354,6 +355,17 @@ function QueueSystemContent() {
   const undoSnapshotRef = useRef<UndoSnapshot | null>(null);
   const [hasUndo, setHasUndo] = useState(false);
 
+  // Compute live score adjustments from the latest optimistic value to support rapid tapping
+  const [optimisticLiveScore, setOptimisticLiveScore] = useState<LiveScoreState | null>(null);
+  const latestLiveScoreRef = useRef<LiveScoreState | null>(null);
+  const pendingScoreWritesRef = useRef(0);
+  useEffect(() => {
+    if (pendingScoreWritesRef.current === 0) {
+      latestLiveScoreRef.current = session.liveScore ?? null;
+      setOptimisticLiveScore(session.liveScore ?? null);
+    }
+  }, [session.liveScore]);
+
   // ── Substitute / absent player ─────────────────────────────
   const [substituteFor, setSubstituteFor] = useState<string | null>(null);
   const [multiCourtSubConfirmed, setMultiCourtSubConfirmed] = useState(false);
@@ -517,8 +529,13 @@ function QueueSystemContent() {
   // point vulnerable if the host refreshed before its timer fired.
   const handleScoreChange = (score: LiveScoreState | null) => {
     setLocalHasScoredPoints(Boolean(score && (score.scoreA > 0 || score.scoreB > 0)));
+    latestLiveScoreRef.current = score;
+    setOptimisticLiveScore(score);
     if (!session.sessionId) return;
-    void session.syncField({ liveScore: score });
+    pendingScoreWritesRef.current += 1;
+    void session.syncField({ liveScore: score }).finally(() => {
+      pendingScoreWritesRef.current = Math.max(0, pendingScoreWritesRef.current - 1);
+    });
   };
   const isSingleCourtReplaceBlocked = courtSlots.length === 0 && (
     localHasScoredPoints ||
@@ -942,24 +959,16 @@ function QueueSystemContent() {
   };
 
   const getSingleCourtLiveScoreLabels = (currentQueue: string[]) => {
-    const isSinglesMode = (gameMode ?? 'doubles') === 'singles';
-    if (isSinglesMode) {
-      return {
-        labelA: currentQueue[0] ?? 'Player 1',
-        labelB: currentQueue[1] ?? 'Player 2',
-      };
-    }
-    const teamA = (playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2)
-      ? playAllSuggestion.suggestedTeamA
-      : currentQueue.slice(0, 2);
-    const teamB = (playAllSuggestion?.suggestedTeamB && playAllSuggestion.suggestedTeamB.length === 2)
-      ? playAllSuggestion.suggestedTeamB
-      : currentQueue.slice(2, 4);
-    return {
-      labelA: teamA.join(' / ') || 'Team A',
-      labelB: teamB.join(' / ') || 'Team B',
-    };
+    return getSingleCourtLiveScoreLabelsVM({
+      queue: currentQueue,
+      gameMode,
+      suggestedTeamA: playAllSuggestion?.suggestedTeamA,
+      suggestedTeamB: playAllSuggestion?.suggestedTeamB,
+    });
   };
+
+
+
 
   const executePlayerReplacement = (absent: string, replacement?: string) => {
     if (isSingleCourtReplaceBlocked) {
@@ -1038,7 +1047,8 @@ function QueueSystemContent() {
         labelA: labels.labelA,
         labelB: labels.labelB,
       };
-      handleScoreChange(nextLiveScore);
+      latestLiveScoreRef.current = nextLiveScore;
+    handleScoreChange(nextLiveScore);
     }
     setSubstituteFor(null);
     setMultiCourtSubConfirmed(false);
@@ -2271,7 +2281,7 @@ function QueueSystemContent() {
     queue,
     suggestedTeamA: playAllSuggestion?.suggestedTeamA,
     suggestedTeamB: playAllSuggestion?.suggestedTeamB,
-    liveScore: session.liveScore,
+    liveScore: optimisticLiveScore ?? session.liveScore,
     canEdit: canControl,
     gameMode: gameMode ?? 'doubles',
     scoreEnabled: scorePromptEnabled,
@@ -2308,7 +2318,8 @@ function QueueSystemContent() {
         labelA: labels.labelA,
         labelB: labels.labelB,
       };
-      handleScoreChange(nextLiveScore);
+      latestLiveScoreRef.current = nextLiveScore;
+    handleScoreChange(nextLiveScore);
     }
     if (session.sessionId) {
       session.syncField({ queue: newQueue });
@@ -2318,7 +2329,7 @@ function QueueSystemContent() {
   const handleSingleCourtScoreAdjust = (side: 'A' | 'B', delta: number) => {
     const labels = getSingleCourtLiveScoreLabels(queue);
 
-    const prev = session.liveScore;
+    const prev = latestLiveScoreRef.current ?? session.liveScore;
     const currentScoreA = prev?.scoreA ?? 0;
     const currentScoreB = prev?.scoreB ?? 0;
     const baseLimit = prev?.baseLimit ?? prev?.limit ?? 11;
@@ -2348,6 +2359,7 @@ function QueueSystemContent() {
       deuce: inDeuce && !isGameWon,
       active: true,
     };
+    latestLiveScoreRef.current = nextLiveScore;
     handleScoreChange(nextLiveScore);
   };
 
@@ -2518,7 +2530,7 @@ function QueueSystemContent() {
               onReturnFromBreak={handleToggleSitOut}
               onMoveWaitingPlayer={handleMoveWaitingPlayer}
               onScoreLimitChange={(newLimit) => {
-                const prev = session.liveScore;
+                const prev = latestLiveScoreRef.current ?? session.liveScore;
                 const labels = getSingleCourtLiveScoreLabels(queue);
                 const nextLiveScore: LiveScoreState = {
                   scoreA: prev?.scoreA ?? 0,
@@ -2530,10 +2542,11 @@ function QueueSystemContent() {
                   deuce: false,
                   active: true,
                 };
-                handleScoreChange(nextLiveScore);
+                latestLiveScoreRef.current = nextLiveScore;
+    handleScoreChange(nextLiveScore);
               }}
               onResetScore={() => {
-                const prev = session.liveScore;
+                const prev = latestLiveScoreRef.current ?? session.liveScore;
                 const baseLimit = prev?.baseLimit ?? prev?.limit ?? 11;
                 const labels = getSingleCourtLiveScoreLabels(queue);
                 const nextLiveScore: LiveScoreState = {
@@ -2546,7 +2559,8 @@ function QueueSystemContent() {
                   deuce: false,
                   active: true,
                 };
-                handleScoreChange(nextLiveScore);
+                latestLiveScoreRef.current = nextLiveScore;
+    handleScoreChange(nextLiveScore);
               }}
               isHost={canControl}
               statsMap={statsMap}

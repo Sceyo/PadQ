@@ -281,7 +281,7 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       const sheet = host.getByRole('dialog', { name: 'Host Tools' });
       const addInput = sheet.getByPlaceholder(/Player name/);
       await addInput.fill('Late Arrival Zoe');
-      await sheet.getByRole('button', { name: 'Add', exact: true }).click();
+      await sheet.getByRole('button', { name: /Add/ }).click();
       await expect(sheet).not.toBeVisible();
 
       // Zoe appears in waiting queue

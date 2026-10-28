@@ -163,7 +163,7 @@ test('single-court live scoring, management, stats, history, and undo stay consi
     await host.getByRole('button', { name: 'Host Tools' }).click();
     const sheet = host.getByRole('dialog', { name: 'Host Tools' });
     await sheet.getByPlaceholder('Player name').fill('Late Arrival');
-    await sheet.getByRole('button', { name: 'Add', exact: true }).click();
+    await sheet.getByRole('button', { name: /Add/ }).click();
 
     await host.getByRole('button', { name: 'Host Tools' }).click();
     await sheet.getByRole('button', { name: 'Manage Players On Break' }).click();

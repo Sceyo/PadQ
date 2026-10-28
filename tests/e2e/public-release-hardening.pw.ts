@@ -144,3 +144,42 @@ test('responses include the public-release security headers', async ({ request }
   expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
   expect(headers['permissions-policy']).toContain('camera=(self)');
 });
+
+test('player substitution at 0-0 updates live spectator view in real-time', async ({ browser }) => {
+  const hostContext = await browser.newContext();
+  const viewerContext = await browser.newContext();
+  const host = await hostContext.newPage();
+  const viewer = await viewerContext.newPage();
+
+  try {
+    const roomCode = await startLiveDoublesRoom(host);
+
+    await viewer.goto(`/watch/${roomCode}`);
+    await expect(viewer.getByText('You are watching live. Only the host can make changes.')).toBeVisible({ timeout: 20_000 });
+
+    // Initial on-court players: Delete Player 1 & Delete Player 2 vs Delete Player 3 & Delete Player 4
+    await expect(viewer.locator('.w-body')).toContainText('Delete Player 2', { timeout: 10_000 });
+
+    // Host replaces Delete Player 2 with Delete Player 5 at 0-0
+    await host.getByRole('button', { name: 'Delete Player 2' }).click();
+    await host.getByRole('button', { name: /Replace player/i }).click();
+
+    // Select Delete Player 5 in Replace dialog and confirm
+    const replaceDialog = host.getByRole('dialog', { name: /Replace/i });
+    await expect(replaceDialog).toBeVisible({ timeout: 5000 });
+    await replaceDialog.getByRole('button', { name: 'Delete Player 5' }).click();
+    await replaceDialog.getByRole('button', { name: 'Replace', exact: true }).click();
+    await expect(replaceDialog).toHaveCount(0);
+
+    // Host court now shows Delete Player 5 on court
+    await expect(host.locator('.score-side--a')).toContainText('Delete Player 5');
+
+    // Viewer observes Delete Player 5 on court without reloading, and Delete Player 2 removed from court
+    const onCourtSection = viewer.locator('.w-vs-row, .w-live-score-board').first();
+    await expect(onCourtSection).toContainText('Delete Player 5', { timeout: 15_000 });
+    await expect(onCourtSection).not.toContainText('Delete Player 2');
+  } finally {
+    await viewerContext.close();
+    await hostContext.close();
+  }
+});

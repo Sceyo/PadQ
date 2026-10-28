@@ -180,6 +180,7 @@
 }
 
 .winBtn {
+  min-height: var(--tap-min, 44px);
   display: flex;
   align-items: center;
   justify-content: center;

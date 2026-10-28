@@ -68,7 +68,7 @@ describe('HostToolsSheet — Match Scores slider toggle', () => {
     expect(input.maxLength).toBe(60);
 
     fireEvent.change(input, { target: { value: 'New Player' } });
-    const addBtn = screen.getByRole('button', { name: 'Add' });
+    const addBtn = screen.getByRole('button', { name: 'Add Player' });
     fireEvent.click(addBtn);
 
     expect(onAdd).toHaveBeenCalledWith('New Player');
@@ -90,7 +90,7 @@ describe('HostToolsSheet — Match Scores slider toggle', () => {
 
     const input = screen.getByPlaceholderText('Player name…') as HTMLInputElement;
     fireEvent.change(input, { target: { value: 'Duplicate Player' } });
-    const addBtn = screen.getByRole('button', { name: 'Add' });
+    const addBtn = screen.getByRole('button', { name: 'Add Player' });
     fireEvent.click(addBtn);
 
     expect(onAdd).toHaveBeenCalledWith('Duplicate Player');

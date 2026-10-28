@@ -511,10 +511,10 @@ function WatchPageContent() {
             <Image
               src="/padq-logo.png"
               alt="PadQ"
-              width={78}
-              height={24}
+              width={74}
+              height={26}
               priority
-              style={{ width: 'auto', height: '22px' }}
+
             />
           </div>
         </div>

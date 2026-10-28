@@ -122,6 +122,7 @@ export function HostToolsSheet({
             <button
               type="submit"
               disabled={!playerName.trim()}
+              aria-label="Add Player"
               style={{
                 height: 'var(--tap-min, 44px)',
                 padding: '0 var(--sp-4, 16px)',

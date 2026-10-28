@@ -43,7 +43,7 @@ export function toSingleCourtViewModel(params: {
     active?: boolean;
   } | null;
   canEdit?: boolean;
-  gameMode?: 'singles' | 'doubles';
+  gameMode?: 'singles' | 'doubles' | null;
   scoreEnabled?: boolean;
 }): CourtViewModel {
   const { queue, suggestedTeamA, suggestedTeamB, liveScore, canEdit = true, gameMode = 'doubles', scoreEnabled } = params;
@@ -97,7 +97,7 @@ export function toSingleCourtQueueViewModel(params: {
   priorityPlayers?: string[];
   sittingOut?: string[];
   formatEta?: (position: number, onCourtCount: number, isMultiCourt: boolean) => string | null;
-  gameMode?: 'singles' | 'doubles';
+  gameMode?: 'singles' | 'doubles' | null;
 }): QueueViewModel {
   const { queue, priorityPlayers = [], sittingOut = [], formatEta, gameMode = 'doubles' } = params;
   const groupSize = gameMode === 'singles' ? 2 : 4;
@@ -128,7 +128,7 @@ export function toMultiCourtQueueViewModel(params: {
   priorityPlayers?: string[];
   sittingOut?: string[];
   formatEta?: (position: number, onCourtCount: number, isMultiCourt: boolean) => string | null;
-  gameMode?: 'singles' | 'doubles';
+  gameMode?: 'singles' | 'doubles' | null;
 }): QueueViewModel {
   const { waitingPlayers, priorityPlayers = [], sittingOut = [], formatEta, gameMode = 'doubles' } = params;
   const groupSize = gameMode === 'singles' ? 2 : 4;
@@ -156,7 +156,7 @@ export function toMultiCourtQueueViewModel(params: {
 
 export function getSingleCourtLiveScoreLabels(params: {
   queue: string[];
-  gameMode?: 'singles' | 'doubles';
+  gameMode?: 'singles' | 'doubles' | null;
   suggestedTeamA?: string[] | null;
   suggestedTeamB?: string[] | null;
 }): { labelA: string; labelB: string } {

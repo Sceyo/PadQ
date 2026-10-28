@@ -44,7 +44,7 @@ test('Human Chaos 1: Mid-match break, late arrival, queue reorder, and departure
     // 2. Late walk-in arrival: Add "Late Arrival Zoe"
     const addInput = sheet.getByPlaceholder(/Player name/);
     await addInput.fill('Late Arrival Zoe');
-    await sheet.getByRole('button', { name: 'Add', exact: true }).click();
+    await sheet.getByRole('button', { name: /Add/ }).click();
     await expect(sheet).not.toBeVisible();
     await expect(host.locator('.pairing-table')).toContainText('Late Arrival Zoe');
 
