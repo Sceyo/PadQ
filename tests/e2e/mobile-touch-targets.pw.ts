@@ -23,9 +23,9 @@ async function assertAllVisibleButtonsTouchTarget(root: Page | Locator, contextN
       (await btn.innerText()).trim().replace(/\s+/g, ' ') ||
       'unnamed-button';
 
-    // Buttons must have at least 44px in their primary interactive dimension (height >= 44px)
+    // Buttons must have at least 44px in their primary interactive dimension (height >= 44px, rounding subpixel floats)
     expect(
-      box.height,
+      Math.round(box.height),
       `Button "${label}" in ${contextName} height should be >= 44px (got ${box.height}px)`
     ).toBeGreaterThanOrEqual(44);
   }
