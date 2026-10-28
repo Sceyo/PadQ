@@ -941,6 +941,26 @@ function QueueSystemContent() {
     setSubstituteFor(player);
   };
 
+  const getSingleCourtLiveScoreLabels = (currentQueue: string[]) => {
+    const isSinglesMode = (gameMode ?? 'doubles') === 'singles';
+    if (isSinglesMode) {
+      return {
+        labelA: currentQueue[0] ?? 'Player 1',
+        labelB: currentQueue[1] ?? 'Player 2',
+      };
+    }
+    const teamA = (playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2)
+      ? playAllSuggestion.suggestedTeamA
+      : currentQueue.slice(0, 2);
+    const teamB = (playAllSuggestion?.suggestedTeamB && playAllSuggestion.suggestedTeamB.length === 2)
+      ? playAllSuggestion.suggestedTeamB
+      : currentQueue.slice(2, 4);
+    return {
+      labelA: teamA.join(' / ') || 'Team A',
+      labelB: teamB.join(' / ') || 'Team B',
+    };
+  };
+
   const executePlayerReplacement = (absent: string, replacement?: string) => {
     if (isSingleCourtReplaceBlocked) {
       showToast('Cannot replace player after scoring has started');
@@ -1011,6 +1031,15 @@ function QueueSystemContent() {
         ...(result.courtSlots ? { courtSlots: result.courtSlots } : {}),
       });
     }
+    if (session.liveScore && (!localHasScoredPoints || (session.liveScore.scoreA === 0 && session.liveScore.scoreB === 0))) {
+      const labels = getSingleCourtLiveScoreLabels(result.queue);
+      const nextLiveScore: LiveScoreState = {
+        ...session.liveScore,
+        labelA: labels.labelA,
+        labelB: labels.labelB,
+      };
+      handleScoreChange(nextLiveScore);
+    }
     setSubstituteFor(null);
     setMultiCourtSubConfirmed(false);
     showMatchToast({
@@ -1025,59 +1054,58 @@ function QueueSystemContent() {
   };
 
 
-  const handleSinglesMatch = (winner: string, score?: string, courtId?: string) => {
+  const handleSinglesMatch = async (winner: string, score?: string, courtId?: string): Promise<boolean> => {
     const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
     if (gameMode === 'singles' && courtId && currentSlots.length > 0) {
-      if (processingCourtIdsRef.current.has(courtId)) return;
+      if (processingCourtIdsRef.current.has(courtId)) return false;
       processingCourtIdsRef.current.add(courtId);
-      const slot = currentSlots.find(court => court.id === courtId);
-      if (!slot || slot.onCourt.length !== 2 || !slot.onCourt.includes(winner)) {
-        processingCourtIdsRef.current.delete(courtId);
-        return;
-      }
+      try {
+        const slot = currentSlots.find(court => court.id === courtId);
+        if (!slot || slot.onCourt.length !== 2 || !slot.onCourt.includes(winner)) {
+          return false;
+        }
 
-      const winningSide: 'A' | 'B' = winner === slot.onCourt[0] ? 'A' : 'B';
-      const entry: MatchHistoryEntry = {
-        id: Date.now(),
-        mode: `Singles (${slot.name})`,
-        players: `${slot.onCourt[0]} vs ${slot.onCourt[1]}`,
-        winner,
-        score,
-        timestamp: new Date().toLocaleTimeString(),
-      };
-      const planned = planMultiCourtResult(
-        { queue: queueRef.current, courtSlots: currentSlots, sittingOut: activeSittingOut, priorityPlayers: activePriorityPlayers },
-        courtId,
-        [...slot.onCourt],
-        winningSide,
-        'singles',
-      );
-      if (!planned) {
-        processingCourtIdsRef.current.delete(courtId);
-        return;
-      }
-      const previousQueue = [...queueRef.current];
-      const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
-
-      setQueue(planned.queue);
-      queueRef.current = planned.queue;
-      setLocalCourtSlots(planned.courtSlots);
-      courtSlotsRef.current = planned.courtSlots;
-      if (planned.priorityPlayers !== undefined) {
-        setLocalPriorityPlayers(planned.priorityPlayers);
-      }
-      setLocalHistory(previous => [entry, ...previous]);
-
-      if (session.sessionId) {
-        void session.commitCourtResult({
-          courtId,
-          expectedPlayers: [...slot.onCourt],
-          winningSide,
-          gameMode: 'singles',
-          id: entry.id,
-          timestamp: entry.timestamp,
+        const winningSide: 'A' | 'B' = winner === slot.onCourt[0] ? 'A' : 'B';
+        const entry: MatchHistoryEntry = {
+          id: Date.now(),
+          mode: `Singles (${slot.name})`,
+          players: `${slot.onCourt[0]} vs ${slot.onCourt[1]}`,
+          winner,
           score,
-        }).then(result => {
+          timestamp: new Date().toLocaleTimeString(),
+        };
+        const planned = planMultiCourtResult(
+          { queue: queueRef.current, courtSlots: currentSlots, sittingOut: activeSittingOut, priorityPlayers: activePriorityPlayers },
+          courtId,
+          [...slot.onCourt],
+          winningSide,
+          'singles',
+        );
+        if (!planned) {
+          return false;
+        }
+        const previousQueue = [...queueRef.current];
+        const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
+
+        setQueue(planned.queue);
+        queueRef.current = planned.queue;
+        setLocalCourtSlots(planned.courtSlots);
+        courtSlotsRef.current = planned.courtSlots;
+        if (planned.priorityPlayers !== undefined) {
+          setLocalPriorityPlayers(planned.priorityPlayers);
+        }
+        setLocalHistory(previous => [entry, ...previous]);
+
+        if (session.sessionId) {
+          const result = await session.commitCourtResult({
+            courtId,
+            expectedPlayers: [...slot.onCourt],
+            winningSide,
+            gameMode: 'singles',
+            id: entry.id,
+            timestamp: entry.timestamp,
+            score,
+          });
           if (!result || result.status === 'failed') {
             setLocalHistory(previous => previous.filter(item => item.id !== entry.id));
             setQueue(previousQueue);
@@ -1088,7 +1116,7 @@ function QueueSystemContent() {
               ? 'Firebase rejected the result. Host access may have expired; the previous match was restored.'
               : 'The result could not be saved. Check the connection and try again; the previous match was restored.';
             showToast(message);
-            return;
+            return false;
           }
           setQueue(result.queue);
           queueRef.current = result.queue;
@@ -1097,7 +1125,7 @@ function QueueSystemContent() {
           if (result.status === 'stale') {
             setLocalHistory(previous => previous.filter(item => item.id !== entry.id));
             showToast('This court already changed. Its latest assignment has been restored.');
-            return;
+            return false;
           }
           recordCareerResult(entry.players, entry.winner);
           setCareerStats(loadCareerStats());
@@ -1105,119 +1133,121 @@ function QueueSystemContent() {
             message: `${slot.name}: ${winner} won${score ? ` (${score})` : ''}`,
             canUndo: true,
           });
-        }).finally(() => processingCourtIdsRef.current.delete(courtId));
+          return true;
+        } else {
+          recordCareerResult(entry.players, entry.winner);
+          setCareerStats(loadCareerStats());
+          showMatchToast({
+            message: `${slot.name}: ${winner} won${score ? ` (${score})` : ''}`,
+            canUndo: true,
+          });
+          return true;
+        }
+      } finally {
+        processingCourtIdsRef.current.delete(courtId);
+      }
+    }
+
+    if (isProcessingMatchRef.current) return false;
+    isProcessingMatchRef.current = true;
+    try {
+      const [p1, p2] = [queue[0], queue[1]];
+      const previousQueue = [...queue];
+      const previousPriorityPlayers = [...activePriorityPlayers];
+      const previousPaddleState = clonePaddleState(paddleStateRef.current);
+      const previousSinglesState = cloneSinglesState(singlesStateRef.current);
+      const previousPoolSinglesState = clonePoolSinglesState(poolSinglesStateRef.current);
+      undoSnapshotRef.current = {
+        queue: previousQueue,
+        paddleState: previousPaddleState,
+        singlesState: previousSinglesState,
+        poolSinglesState: previousPoolSinglesState,
+        singlesFormat,
+        priorityPlayers: previousPriorityPlayers,
+      };
+      setHasUndo(true);
+      if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
+      let newQueue: string[];
+
+      if (activeQueueMode === 'default' && gameMode === 'singles') {
+        const activePlayers = players.filter(p => !activeSittingOut.includes(p));
+        if (singlesFormat === 'pool') {
+          const loser = winner === p1 ? p2 : p1;
+          const skillMap = Object.fromEntries(
+            Object.entries(statsMap).map(([name, stat]) => [
+              name,
+              (stat as PlayerStat).gamesPlayed >= 3
+                ? (stat as PlayerStat).winRate
+                : bracketSkillValue(rosterSkillMap[name]),
+            ])
+          );
+          const { nextState, newQueue: poolQueue } = advancePoolSinglesState(
+            poolSinglesStateRef.current,
+            winner,
+            loser,
+            activePlayers,
+            skillMap,
+            activePriorityPlayers,
+          );
+          poolSinglesStateRef.current = nextState;
+          setPoolSinglesStateUI(nextState);
+          newQueue = poolQueue;
+        } else {
+          const { nextState, newQueue: singlesQueue } = advanceSinglesState(
+            singlesStateRef.current,
+            winner,
+            activePlayers,
+            activePriorityPlayers,
+          );
+          singlesStateRef.current = nextState;
+          setSinglesStateUI(nextState);
+          newQueue = singlesQueue;
+        }
       } else {
+        const rest = queue.slice(2);
+        const loser = winner === p1 ? p2 : p1;
+        newQueue = [loser, ...rest, winner];
+      }
+      const nextPriority = consumePriority(activePriorityPlayers, [p1, p2, ...newQueue.slice(0, 2)]);
+      setLocalPriorityPlayers(nextPriority);
+      setLocalHasScoredPoints(false);
+      setQueue(newQueue);
+      queueRef.current = newQueue;
+      const entry: MatchHistoryEntry = {
+        id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`,
+        winner, score, timestamp: new Date().toLocaleTimeString(),
+      };
+      setLocalHistory(current => [entry, ...current]);
+
+      const finishSuccess = () => {
         recordCareerResult(entry.players, entry.winner);
         setCareerStats(loadCareerStats());
         showMatchToast({
-          message: `${slot.name}: ${winner} won${score ? ` (${score})` : ''}`,
+          message: `${winner} won${score ? ` (${score})` : ''}`,
           canUndo: true,
         });
-        processingCourtIdsRef.current.delete(courtId);
+      };
+
+      if (!session.sessionId) {
+        finishSuccess();
+        return true;
       }
-      return;
-    }
 
-    if (isProcessingMatchRef.current) return;
-    isProcessingMatchRef.current = true;
-    const [p1, p2] = [queue[0], queue[1]];
-    const previousQueue = [...queue];
-    const previousPriorityPlayers = [...activePriorityPlayers];
-    const previousPaddleState = clonePaddleState(paddleStateRef.current);
-    const previousSinglesState = cloneSinglesState(singlesStateRef.current);
-    const previousPoolSinglesState = clonePoolSinglesState(poolSinglesStateRef.current);
-    undoSnapshotRef.current = {
-      queue: previousQueue,
-      paddleState: previousPaddleState,
-      singlesState: previousSinglesState,
-      poolSinglesState: previousPoolSinglesState,
-      singlesFormat,
-      priorityPlayers: previousPriorityPlayers,
-    };
-    setHasUndo(true);
-    if (activeQueueMode === 'playall') recordPlayAllSingles(p1, p2);
-    let newQueue: string[];
-
-    if (activeQueueMode === 'default' && gameMode === 'singles') {
-      const activePlayers = players.filter(p => !activeSittingOut.includes(p));
-      if (singlesFormat === 'pool') {
-        const loser = winner === p1 ? p2 : p1;
-        const skillMap = Object.fromEntries(
-          Object.entries(statsMap).map(([name, stat]) => [
-            name,
-            (stat as PlayerStat).gamesPlayed >= 3
-              ? (stat as PlayerStat).winRate
-              : bracketSkillValue(rosterSkillMap[name]),
-          ])
-        );
-        const { nextState, newQueue: poolQueue } = advancePoolSinglesState(
-          poolSinglesStateRef.current,
-          winner,
-          loser,
-          activePlayers,
-          skillMap,
-          activePriorityPlayers,
-        );
-        poolSinglesStateRef.current = nextState;
-        setPoolSinglesStateUI(nextState);
-        newQueue = poolQueue;
-      } else {
-        const { nextState, newQueue: singlesQueue } = advanceSinglesState(
-          singlesStateRef.current,
-          winner,
-          activePlayers,
-          activePriorityPlayers,
-        );
-        singlesStateRef.current = nextState;
-        setSinglesStateUI(nextState);
-        newQueue = singlesQueue;
-      }
-    } else {
-      const rest = queue.slice(2);
-      const loser = winner === p1 ? p2 : p1;
-      newQueue = [loser, ...rest, winner];
-    }
-    const nextPriority = consumePriority(activePriorityPlayers, [p1, p2, ...newQueue.slice(0, 2)]);
-    setLocalPriorityPlayers(nextPriority);
-    setLocalHasScoredPoints(false);
-    setQueue(newQueue);
-    queueRef.current = newQueue;
-    const entry: MatchHistoryEntry = {
-      id: Date.now(), mode: 'Singles', players: `${p1} vs ${p2}`,
-      winner, score, timestamp: new Date().toLocaleTimeString(),
-    };
-    setLocalHistory(current => [entry, ...current]);
-
-    const finishSuccess = () => {
-      recordCareerResult(entry.players, entry.winner);
-      setCareerStats(loadCareerStats());
-      showMatchToast({
-        message: `${winner} won${score ? ` (${score})` : ''}`,
-        canUndo: true,
-      });
-    };
-
-    if (!session.sessionId) {
-      finishSuccess();
-      isProcessingMatchRef.current = false;
-      return;
-    }
-
-    const enginePatch = activeQueueMode === 'default'
-      ? {
-          singlesEngineState: singlesFormat === 'pool'
-            ? (serializePoolSinglesState(poolSinglesStateRef.current) as unknown as Record<string, unknown>)
-            : (serializeSinglesState(singlesStateRef.current) as unknown as Record<string, unknown>),
-        }
-      : {};
-    void session.commitMatchResult(
-      { queue: newQueue, priorityPlayers: nextPriority, liveScore: null, ...enginePatch },
-      entry,
-    ).then(result => {
+      const enginePatch = activeQueueMode === 'default'
+        ? {
+            singlesEngineState: singlesFormat === 'pool'
+              ? (serializePoolSinglesState(poolSinglesStateRef.current) as unknown as Record<string, unknown>)
+              : (serializeSinglesState(singlesStateRef.current) as unknown as Record<string, unknown>),
+          }
+        : {};
+      const result = await session.commitMatchResult(
+        { queue: newQueue, priorityPlayers: nextPriority, liveScore: null, ...enginePatch },
+        entry,
+      );
       const message = matchResultFailureMessage(result);
       if (!message) {
         finishSuccess();
-        return;
+        return true;
       }
       setLocalHistory(current => current.filter(item => item.id !== entry.id));
       setLocalPriorityPlayers(previousPriorityPlayers);
@@ -1231,9 +1261,10 @@ function QueueSystemContent() {
       setPoolSinglesStateUI(previousPoolSinglesState);
       setHasUndo(false);
       showToast(message);
-    }).finally(() => {
+      return false;
+    } finally {
       isProcessingMatchRef.current = false;
-    });
+    }
   };
 
   const handleDoublesMatch = async (a: string[], b: string[], w: 'A' | 'B', score?: string): Promise<boolean> => {
@@ -1343,85 +1374,85 @@ function QueueSystemContent() {
     }
   };
 
-  const handleCourtMatch = (courtId: string, side: 'A' | 'B', score?: string) => {
-    if (processingCourtIdsRef.current.has(courtId)) return;
+  const handleCourtMatch = async (courtId: string, side: 'A' | 'B', score?: string): Promise<boolean> => {
+    if (processingCourtIdsRef.current.has(courtId)) return false;
     processingCourtIdsRef.current.add(courtId);
-    const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
-    const slot = currentSlots.find(c => c.id === courtId);
-    if (!slot || slot.onCourt.length < 4) { processingCourtIdsRef.current.delete(courtId); return; }
+    try {
+      const currentSlots = courtSlotsRef.current.length > 0 ? courtSlotsRef.current : courtSlots;
+      const slot = currentSlots.find(c => c.id === courtId);
+      if (!slot || slot.onCourt.length < 4) return false;
 
-    // Save undo snapshot (includes courtSlots so multi-court undo works correctly)
-    undoSnapshotRef.current = {
-      queue:        [...queue],
-      paddleState:  clonePaddleState(paddleStateRef.current),
-      singlesState: cloneSinglesState(singlesStateRef.current),
-      courtSlots:   currentSlots.map(c => ({ ...c, onCourt: [...c.onCourt] })),
-      priorityPlayers: [...activePriorityPlayers],
-    };
-    setHasUndo(true);
+      // Save undo snapshot (includes courtSlots so multi-court undo works correctly)
+      undoSnapshotRef.current = {
+        queue:        [...queue],
+        paddleState:  clonePaddleState(paddleStateRef.current),
+        singlesState: cloneSinglesState(singlesStateRef.current),
+        courtSlots:   currentSlots.map(c => ({ ...c, onCourt: [...c.onCourt] })),
+        priorityPlayers: [...activePriorityPlayers],
+      };
+      setHasUndo(true);
 
-    const teamA = slot.onCourt.slice(0, 2) as [string, string];
-    const teamB = slot.onCourt.slice(2, 4) as [string, string];
-    const winnerTeam = side === 'A' ? teamA : teamB;
-    const loserTeam  = side === 'A' ? teamB : teamA;
+      const teamA = slot.onCourt.slice(0, 2) as [string, string];
+      const teamB = slot.onCourt.slice(2, 4) as [string, string];
+      const winnerTeam = side === 'A' ? teamA : teamB;
+      const loserTeam  = side === 'A' ? teamB : teamA;
 
-    // Players on other courts are locked — exclude from this court's rotation
-    const lockedSet = new Set(
-      currentSlots.filter(c => c.id !== courtId).flatMap(c => c.onCourt)
-    );
-    const activePlayers = players.filter(p => !lockedSet.has(p) && !activeSittingOut.includes(p));
+      // Players on other courts are locked — exclude from this court's rotation
+      const lockedSet = new Set(
+        currentSlots.filter(c => c.id !== courtId).flatMap(c => c.onCourt)
+      );
+      const activePlayers = players.filter(p => !lockedSet.has(p) && !activeSittingOut.includes(p));
 
-    const planned = planMultiCourtResult(
-      {
-        queue: queueRef.current,
-        courtSlots: currentSlots,
-        lockedPartners: (session.lockedPartners ?? []).map(([a, b]) => ({ a, b })),
-        sittingOut: activeSittingOut,
-        priorityPlayers: activePriorityPlayers,
-      },
-      courtId,
-      [...slot.onCourt],
-      side,
-      'doubles',
-    );
-    if (!planned) {
-      processingCourtIdsRef.current.delete(courtId);
-      return;
-    }
-    const updatedSlots = planned.courtSlots;
-    const newQueue = planned.queue;
-    if (planned.priorityPlayers !== undefined) {
-      setLocalPriorityPlayers(planned.priorityPlayers);
-    }
-
-    const winnerNames = winnerTeam.join(' & ');
-    const entry: MatchHistoryEntry = {
-      id: Date.now(),
-      mode: `Doubles (${slot.name})`,
-      players: `${teamA.join(' & ')} vs ${teamB.join(' & ')}`,
-      winner: winnerNames,
-      score,
-      timestamp: new Date().toLocaleTimeString(),
-    };
-    const previousQueue = [...queueRef.current];
-    const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
-
-    setLocalCourtSlots(updatedSlots);
-    courtSlotsRef.current = updatedSlots;
-    setQueue(newQueue);
-    queueRef.current = newQueue;
-    setLocalHistory(prev => [entry, ...prev]);
-
-    if (session.sessionId) {
-      void session.commitCourtResult({
+      const planned = planMultiCourtResult(
+        {
+          queue: queueRef.current,
+          courtSlots: currentSlots,
+          lockedPartners: (session.lockedPartners ?? []).map(([a, b]) => ({ a, b })),
+          sittingOut: activeSittingOut,
+          priorityPlayers: activePriorityPlayers,
+        },
         courtId,
-        expectedPlayers: [...slot.onCourt],
-        winningSide: side,
-        gameMode: 'doubles',
-        id: entry.id,
-        timestamp: entry.timestamp,
+        [...slot.onCourt],
+        side,
+        'doubles',
+      );
+      if (!planned) {
+        return false;
+      }
+      const updatedSlots = planned.courtSlots;
+      const newQueue = planned.queue;
+      if (planned.priorityPlayers !== undefined) {
+        setLocalPriorityPlayers(planned.priorityPlayers);
+      }
+
+      const winnerNames = winnerTeam.join(' & ');
+      const entry: MatchHistoryEntry = {
+        id: Date.now(),
+        mode: `Doubles (${slot.name})`,
+        players: `${teamA.join(' & ')} vs ${teamB.join(' & ')}`,
+        winner: winnerNames,
         score,
-      }).then(result => {
+        timestamp: new Date().toLocaleTimeString(),
+      };
+      const previousQueue = [...queueRef.current];
+      const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
+
+      setLocalCourtSlots(updatedSlots);
+      courtSlotsRef.current = updatedSlots;
+      setQueue(newQueue);
+      queueRef.current = newQueue;
+      setLocalHistory(prev => [entry, ...prev]);
+
+      if (session.sessionId) {
+        const result = await session.commitCourtResult({
+          courtId,
+          expectedPlayers: [...slot.onCourt],
+          winningSide: side,
+          gameMode: 'doubles',
+          id: entry.id,
+          timestamp: entry.timestamp,
+          score,
+        });
         if (!result || result.status === 'failed') {
           setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
           setQueue(previousQueue);
@@ -1432,7 +1463,7 @@ function QueueSystemContent() {
             ? 'Firebase rejected the result. Host access may have expired; the previous match was restored.'
             : 'The result could not be saved. Check the connection and try again; the previous match was restored.';
           showToast(message);
-          return;
+          return false;
         }
         setQueue(result.queue);
         queueRef.current = result.queue;
@@ -1441,7 +1472,7 @@ function QueueSystemContent() {
         if (result.status === 'stale') {
           setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
           showToast('This court already changed. Its latest assignment has been restored.');
-          return;
+          return false;
         }
         recordCareerResult(entry.players, entry.winner);
         setCareerStats(loadCareerStats());
@@ -1449,14 +1480,17 @@ function QueueSystemContent() {
           message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
           canUndo: true,
         });
-      }).finally(() => processingCourtIdsRef.current.delete(courtId));
-    } else {
-      recordCareerResult(entry.players, entry.winner);
-      setCareerStats(loadCareerStats());
-      showMatchToast({
-        message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
-        canUndo: true,
-      });
+        return true;
+      } else {
+        recordCareerResult(entry.players, entry.winner);
+        setCareerStats(loadCareerStats());
+        showMatchToast({
+          message: `${slot.name}: ${winnerNames} won${score ? ` (${score})` : ''}`,
+          canUndo: true,
+        });
+        return true;
+      }
+    } finally {
       processingCourtIdsRef.current.delete(courtId);
     }
   };
@@ -1609,14 +1643,15 @@ function QueueSystemContent() {
     });
   };
 
-  const handleAddPlayerLive = (name: string) => {
+  const handleAddPlayerLive = (name: string): boolean => {
     const trimmedName = name.trim();
-    if (players.some(player => player.toLowerCase() === trimmedName.toLowerCase())) { showToast(`"${trimmedName}" is already in the session`); return; }
-    if (players.length >= V1_RELEASE.maxPlayers) { showToast(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
-    if (trimmedName.length === 0 || trimmedName.length > 60) { showToast('Player names must be 60 characters or fewer'); return; }
+    if (players.some(player => player.toLowerCase() === trimmedName.toLowerCase())) { showToast(`"${trimmedName}" is already in the session`); return false; }
+    if (players.length >= V1_RELEASE.maxPlayers) { showToast(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return false; }
+    if (trimmedName.length === 0 || trimmedName.length > 60) { showToast('Player names must be 60 characters or fewer'); return false; }
     const np = [...players, trimmedName], nq = [...queue, trimmedName];
     const nextPriority = [...activePriorityPlayers, trimmedName];
     setPlayers(np); setQueue(nq);
+    queueRef.current = nq;
     setLocalPriorityPlayers(nextPriority);
     if (activeQueueMode === 'default' && gameMode === 'doubles') {
       const newPaddleState = addPlayerToWaiting(paddleStateRef.current, trimmedName);
@@ -1641,6 +1676,7 @@ function QueueSystemContent() {
       });
     }
     if (session.sessionId) session.syncField({ players: np, queue: nq, priorityPlayers: nextPriority });
+    return true;
   };
 
   const handleMoveWaitingPlayer = (playerName: string, direction: -1 | 1) => {
@@ -2148,7 +2184,7 @@ function QueueSystemContent() {
           onCancel={() => setPendingCourtScore(null)}
         />
         {swapCourtId && (() => {
-          const slot = courtSlotsRef.current.find(s => s.id === swapCourtId);
+          const slot = courtSlots.find(s => s.id === swapCourtId);
           return slot ? (
             <CourtSwapModal
               courtName={slot.name}
@@ -2256,28 +2292,31 @@ function QueueSystemContent() {
   });
 
   const handleSingleCourtSwapTeams = (newOnCourt: string[]) => {
+    if (localHasScoredPoints || (session.liveScore?.active && ((session.liveScore.scoreA ?? 0) > 0 || (session.liveScore.scoreB ?? 0) > 0))) {
+      showToast('Teams cannot be swapped after scoring has started');
+      return;
+    }
     const onCourtCount = isSingles ? 2 : 4;
     const newQueue = [...newOnCourt, ...queue.slice(onCourtCount)];
     setQueue(newQueue);
     queueRef.current = newQueue;
     breakOpposingPartnerPairs(newOnCourt);
+    if (session.liveScore) {
+      const labels = getSingleCourtLiveScoreLabels(newQueue);
+      const nextLiveScore: LiveScoreState = {
+        ...session.liveScore,
+        labelA: labels.labelA,
+        labelB: labels.labelB,
+      };
+      handleScoreChange(nextLiveScore);
+    }
     if (session.sessionId) {
       session.syncField({ queue: newQueue });
     }
   };
 
   const handleSingleCourtScoreAdjust = (side: 'A' | 'B', delta: number) => {
-    const isSinglesMode = (gameMode ?? 'doubles') === 'singles';
-    const teamA = isSinglesMode
-      ? [queue[0] ?? 'Player 1']
-      : (playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2
-          ? playAllSuggestion.suggestedTeamA
-          : queue.slice(0, 2));
-    const teamB = isSinglesMode
-      ? [queue[1] ?? 'Player 2']
-      : (playAllSuggestion?.suggestedTeamB && playAllSuggestion.suggestedTeamB.length === 2
-          ? playAllSuggestion.suggestedTeamB
-          : queue.slice(2, 4));
+    const labels = getSingleCourtLiveScoreLabels(queue);
 
     const prev = session.liveScore;
     const currentScoreA = prev?.scoreA ?? 0;
@@ -2302,8 +2341,8 @@ function QueueSystemContent() {
     const nextLiveScore: LiveScoreState = {
       scoreA: nextScoreA,
       scoreB: nextScoreB,
-      labelA: prev?.labelA ?? teamA.join(' / '),
-      labelB: prev?.labelB ?? teamB.join(' / '),
+      labelA: labels.labelA,
+      labelB: labels.labelB,
       limit: nextLimit,
       baseLimit,
       deuce: inDeuce && !isGameWon,
@@ -2315,8 +2354,7 @@ function QueueSystemContent() {
   const handleSingleCourtMatchComplete = async (winner: 'A' | 'B', scoreStr?: string): Promise<boolean> => {
     if ((gameMode ?? 'doubles') === 'singles') {
       const winnerName = winner === 'A' ? queue[0] : queue[1];
-      handleSinglesMatch(winnerName, scoreStr);
-      return true;
+      return await handleSinglesMatch(winnerName, scoreStr);
     }
     const firstFour = queue.slice(0, 4);
     const teamA = playAllSuggestion?.suggestedTeamA && playAllSuggestion.suggestedTeamA.length === 2
@@ -2333,12 +2371,11 @@ function QueueSystemContent() {
       const slot = courtSlots.find(c => c.id === courtId);
       if (slot && slot.onCourt.length >= 2) {
         const winnerName = side === 'A' ? slot.onCourt[0] : slot.onCourt[1];
-        handleSinglesMatch(winnerName, scoreStr, courtId);
-        return true;
+        return await handleSinglesMatch(winnerName, scoreStr, courtId);
       }
+      return false;
     }
-    handleCourtMatch(courtId, side, scoreStr);
-    return true;
+    return await handleCourtMatch(courtId, side, scoreStr);
   };
 
   const handleRemovePlayerFromQueue = (name: string) => {
@@ -2482,12 +2519,12 @@ function QueueSystemContent() {
               onMoveWaitingPlayer={handleMoveWaitingPlayer}
               onScoreLimitChange={(newLimit) => {
                 const prev = session.liveScore;
-                const isSinglesMode = (gameMode ?? 'doubles') === 'singles';
+                const labels = getSingleCourtLiveScoreLabels(queue);
                 const nextLiveScore: LiveScoreState = {
                   scoreA: prev?.scoreA ?? 0,
                   scoreB: prev?.scoreB ?? 0,
-                  labelA: prev?.labelA ?? (isSinglesMode ? (queue[0] ?? 'Player 1') : queue.slice(0, 2).join(' / ')),
-                  labelB: prev?.labelB ?? (isSinglesMode ? (queue[1] ?? 'Player 2') : queue.slice(2, 4).join(' / ')),
+                  labelA: labels.labelA,
+                  labelB: labels.labelB,
                   limit: newLimit,
                   baseLimit: newLimit,
                   deuce: false,
@@ -2497,13 +2534,13 @@ function QueueSystemContent() {
               }}
               onResetScore={() => {
                 const prev = session.liveScore;
-                const isSinglesMode = (gameMode ?? 'doubles') === 'singles';
                 const baseLimit = prev?.baseLimit ?? prev?.limit ?? 11;
+                const labels = getSingleCourtLiveScoreLabels(queue);
                 const nextLiveScore: LiveScoreState = {
                   scoreA: 0,
                   scoreB: 0,
-                  labelA: prev?.labelA ?? (isSinglesMode ? (queue[0] ?? 'Player 1') : queue.slice(0, 2).join(' / ')),
-                  labelB: prev?.labelB ?? (isSinglesMode ? (queue[1] ?? 'Player 2') : queue.slice(2, 4).join(' / ')),
+                  labelA: labels.labelA,
+                  labelB: labels.labelB,
                   limit: baseLimit,
                   baseLimit: baseLimit,
                   deuce: false,
@@ -3155,7 +3192,7 @@ function QueueSystemContent() {
         onCancel={() => setPendingCourtScore(null)}
       />
       {swapCourtId && (() => {
-        const slot = courtSlotsRef.current.find(s => s.id === swapCourtId);
+        const slot = courtSlots.find(s => s.id === swapCourtId);
         return slot ? (
           <CourtSwapModal
             courtName={slot.name}

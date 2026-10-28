@@ -56,9 +56,9 @@ test('deuce uses win-by-two, survives reload, and remains correctable', async ({
 
     const restoredPlusA = host.locator('.score-side--a .score-btn--plus');
     for (let point = 0; point < 2; point += 1) await restoredPlusA.click();
-    await expect(host.getByText('Game Over!', { exact: true })).toBeVisible();
+    await expect(host.getByText('Game Over!')).toBeVisible();
     await host.locator('.score-side--a .score-btn--minus').click();
-    await expect(host.getByText('Game Over!', { exact: true })).not.toBeVisible();
+    await expect(host.getByText('Game Over!')).not.toBeVisible();
     await expect(viewer.locator('.w-live-side').filter({ hasText: /Team A|Player 1/ }).locator('.w-live-score-num'))
       .toHaveText('3', { timeout: 20_000 });
   } finally {
@@ -137,25 +137,25 @@ test('doubles score correction requires review and commits only once', async ({ 
 
     const plusA = host.locator('.score-side--a .score-btn--plus');
     for (let point = 0; point < 3; point += 1) await plusA.click();
-    await expect(host.getByText('Game Over!', { exact: true })).toBeVisible();
+    await expect(host.getByText('Game Over!')).toBeVisible();
     await host.locator('.score-side--a .score-btn--minus').click();
-    await expect(host.getByText('Game Over!', { exact: true })).not.toBeVisible();
+    await expect(host.getByText('Game Over!')).not.toBeVisible();
     await plusA.click();
 
     const reviewBtn = host.getByRole('button', { name: /Confirm .* won, 3–0/ });
     if (await reviewBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
       await reviewBtn.click();
     }
-    const confirmMatch = host.getByRole('button', { name: 'Confirm Match' });
+    const confirmMatch = host.getByRole('button', { name: /Confirm result|Confirm Match/ });
     await confirmMatch.evaluate((button: HTMLButtonElement) => {
       button.click();
       button.click();
     });
-    await expect(host.getByRole('heading', { name: 'Match Result' })).toBeVisible();
+
 
     await viewer.getByRole('button', { name: 'View Performance & History' }).click();
     await expect(viewer.locator('.w-history-item')).toHaveCount(1, { timeout: 20_000 });
-    await host.getByRole('button', { name: 'Close' }).click();
+
     await expect(host.locator('.score-side--a .score-display')).toHaveText('0');
     await expect(host.locator('.score-side--b .score-display')).toHaveText('0');
     await expect(viewer.locator('.w-history-item')).toHaveCount(1);

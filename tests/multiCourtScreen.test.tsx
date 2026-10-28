@@ -124,4 +124,63 @@ describe('MultiCourtScreen component suite', () => {
     expect(within(replaceDialog).getByText('Replace john')).toBeDefined();
     expect(within(replaceDialog).getByText('myson')).toBeDefined();
   });
+
+  it('invokes onWin and handles failed commit in direct win mode without crashing', async () => {
+    const onWin = vi.fn().mockResolvedValue(false);
+    render(
+      <MultiCourtScreen
+        courtSlots={mockCourtSlots}
+        statsMap={{}}
+        queue={mockQueue}
+        isHost={true}
+        scorePromptEnabled={false}
+        onWin={onWin}
+        onReplacePlayer={vi.fn()}
+        onSwapCourtPlayers={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    const team1WinsBtns = screen.getAllByText('Team 1 Wins');
+    fireEvent.click(team1WinsBtns[0]);
+
+    expect(onWin).toHaveBeenCalledWith('c1', 'A', undefined);
+    const result = await onWin.mock.results[0].value;
+    expect(result).toBe(false);
+  });
+
+  it('invokes onWin with score and handles failed commit from CourtScoreModal', async () => {
+    const onWin = vi.fn().mockResolvedValue(false);
+    render(
+      <MultiCourtScreen
+        courtSlots={mockCourtSlots}
+        statsMap={{}}
+        queue={mockQueue}
+        isHost={true}
+        scorePromptEnabled={true}
+        onWin={onWin}
+        onReplacePlayer={vi.fn()}
+        onSwapCourtPlayers={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    const team1WinsBtns = screen.getAllByText('Team 1 Wins');
+    fireEvent.click(team1WinsBtns[0]);
+
+    // CourtScoreModal opens
+    const presetBtn = screen.getByText('11 – 9');
+    fireEvent.click(presetBtn);
+
+    const saveBtn = screen.getByText(/Save Score/i);
+    fireEvent.click(saveBtn);
+
+    expect(onWin).toHaveBeenCalledWith('c1', 'A', '11 – 9');
+    const result = await onWin.mock.results[0].value;
+    expect(result).toBe(false);
+  });
 });

@@ -10,6 +10,7 @@ interface Props {
   /** onCourt[0..1] = Team A, onCourt[2..3] = Team B */
   onCourt: string[];
   onConfirm: (newOnCourt: string[]) => void;
+  matchHasStarted?: boolean;
 }
 
 export function EditTeamsDialog({
@@ -18,6 +19,7 @@ export function EditTeamsDialog({
   courtName,
   onCourt,
   onConfirm,
+  matchHasStarted = false,
 }: Props) {
   const [players, setPlayers] = useState<string[]>([...onCourt]);
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -34,6 +36,7 @@ export function EditTeamsDialog({
   if (!isOpen) return null;
 
   const handlePlayerTap = (idx: number) => {
+    if (matchHasStarted) return;
     if (selectedIdx === null) {
       setSelectedIdx(idx);
       return;
@@ -156,7 +159,8 @@ export function EditTeamsDialog({
               onConfirm(players);
               onClose();
             }}
-            disabled={!hasChanges}
+            disabled={!hasChanges || matchHasStarted}
+            title={matchHasStarted ? 'Match has started. Teams cannot be swapped during active play.' : undefined}
             style={{
               height: 'var(--tap-min, 44px)',
               padding: '0 var(--sp-5, 20px)',
@@ -166,8 +170,8 @@ export function EditTeamsDialog({
               color: '#ffffff',
               fontSize: 'var(--fs-sm, 0.9375rem)',
               fontWeight: 700,
-              cursor: hasChanges ? 'pointer' : 'default',
-              opacity: hasChanges ? 1 : 0.4,
+              cursor: (hasChanges && !matchHasStarted) ? 'pointer' : 'not-allowed',
+              opacity: (hasChanges && !matchHasStarted) ? 1 : 0.4,
             }}
           >
             Apply
@@ -176,6 +180,22 @@ export function EditTeamsDialog({
       }
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4, 16px)' }}>
+        {matchHasStarted && (
+          <div
+            role="alert"
+            style={{
+              fontSize: 'var(--fs-xs, 0.8125rem)',
+              color: 'var(--status-warn, #f59e0b)',
+              background: 'rgba(245, 158, 11, 0.12)',
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              padding: '8px 12px',
+              borderRadius: 'var(--r-xs, 6px)',
+              fontWeight: 600,
+            }}
+          >
+            Match scoring has started. Team rosters are locked.
+          </div>
+        )}
         {/* Team A */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2, 8px)' }}>
           <span

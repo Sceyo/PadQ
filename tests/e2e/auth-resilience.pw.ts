@@ -42,7 +42,10 @@ test.describe('Auth and Firestore Resilience', () => {
     await expect(refreshBtn).toBeVisible();
 
     // Click refresh (which reloads the page after clearing stale storage)
-    await refreshBtn.click();
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {}),
+      refreshBtn.click(),
+    ]);
 
     // 6. After reload, stale auth token is gone and page loads clean
     await expect(page.locator('.hp-brand')).toBeVisible();

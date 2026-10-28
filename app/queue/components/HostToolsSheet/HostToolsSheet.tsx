@@ -16,7 +16,7 @@ import { BottomSheet } from '../OverlayHost/BottomSheet';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onAddPlayer: (name: string) => void;
+  onAddPlayer: (name: string) => boolean | void;
   scorePromptEnabled: boolean;
   onToggleScorePrompt: () => void;
   partnerPanelNode?: React.ReactNode;
@@ -39,6 +39,7 @@ export function HostToolsSheet({
   initialSection,
 }: Props) {
   const [playerName, setPlayerName] = useState('');
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [openPartners, setOpenPartners] = useState(initialSection === 'partners');
   const [openManualQueue, setOpenManualQueue] = useState(initialSection === 'queue');
   const [openSitOut, setOpenSitOut] = useState(initialSection === 'sitout');
@@ -58,7 +59,16 @@ export function HostToolsSheet({
     e.preventDefault();
     const trimmed = playerName.trim();
     if (!trimmed) return;
-    onAddPlayer(trimmed);
+    if (trimmed.length > 60) {
+      setErrorMsg('Player names must be 60 characters or fewer');
+      return;
+    }
+    const result = onAddPlayer(trimmed);
+    if (result === false) {
+      setErrorMsg(`"${trimmed}" could not be added (duplicate or session full)`);
+      return;
+    }
+    setErrorMsg(null);
     setPlayerName('');
     onClose();
   };
@@ -95,7 +105,8 @@ export function HostToolsSheet({
               type="text"
               placeholder="Player name…"
               value={playerName}
-              onChange={e => setPlayerName(e.target.value)}
+              maxLength={60}
+              onChange={e => { setPlayerName(e.target.value); if (errorMsg) setErrorMsg(null); }}
               style={{
                 flex: 1,
                 height: 'var(--tap-min, 44px)',
@@ -127,6 +138,11 @@ export function HostToolsSheet({
               Add
             </button>
           </div>
+          {errorMsg && (
+            <div role="alert" style={{ fontSize: 'var(--fs-xs, 0.8125rem)', color: '#f87171', fontWeight: 600 }}>
+              {errorMsg}
+            </div>
+          )}
         </form>
 
         <div style={{ height: '1px', background: 'var(--line-subtle, #252d47)' }} />

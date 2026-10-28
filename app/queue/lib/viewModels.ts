@@ -152,3 +152,29 @@ export function toMultiCourtQueueViewModel(params: {
     onBreak,
   };
 }
+
+
+export function getSingleCourtLiveScoreLabels(params: {
+  queue: string[];
+  gameMode?: 'singles' | 'doubles';
+  suggestedTeamA?: string[] | null;
+  suggestedTeamB?: string[] | null;
+}): { labelA: string; labelB: string } {
+  const isSingles = params.gameMode === 'singles';
+  if (isSingles) {
+    return {
+      labelA: params.queue[0] ?? 'Player 1',
+      labelB: params.queue[1] ?? 'Player 2',
+    };
+  }
+  const teamA = (params.suggestedTeamA && params.suggestedTeamA.length === 2)
+    ? params.suggestedTeamA
+    : params.queue.slice(0, 2);
+  const teamB = (params.suggestedTeamB && params.suggestedTeamB.length === 2)
+    ? params.suggestedTeamB
+    : params.queue.slice(2, 4);
+  return {
+    labelA: teamA.join(' / ') || 'Team A',
+    labelB: teamB.join(' / ') || 'Team B',
+  };
+}

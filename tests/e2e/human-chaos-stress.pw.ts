@@ -46,7 +46,7 @@ test('Human Chaos 1: Mid-match break, late arrival, queue reorder, and departure
     await addInput.fill('Late Arrival Zoe');
     await sheet.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(sheet).not.toBeVisible();
-    await expect(host.locator('.waiting-players-list')).toContainText('Late Arrival Zoe');
+    await expect(host.locator('.pairing-table')).toContainText('Late Arrival Zoe');
 
     // 3. Early departure: remove Player 08 from queue
     await host.getByRole('button', { name: 'Host Tools' }).click();
@@ -61,13 +61,13 @@ test('Human Chaos 1: Mid-match break, late arrival, queue reorder, and departure
     if (!await sheet.locator('.sitout-row').first().isVisible()) {
       await sheet.getByRole('button', { name: 'Manage Players On Break' }).click();
     }
-    await sheet.getByRole('button', { name: 'Return Chaos Player 05', exact: true }).click();
+    await sheet.getByRole('button', { name: /Return Chaos Player 05/ }).click();
     await expect(sheet.locator('.sitout-row').filter({ hasText: 'Chaos Player 05' })).not.toContainText('On break');
     await sheet.getByRole('button', { name: 'Close sheet' }).click();
     await expect(sheet).not.toBeVisible();
 
     // Verify Late Arrival Zoe is in waiting queue
-    await expect(host.locator('.waiting-players-list')).toContainText('Late Arrival Zoe');
+    await expect(host.locator('.pairing-table')).toContainText('Late Arrival Zoe');
   } finally {
     await viewerContext.close();
     await hostContext.close();

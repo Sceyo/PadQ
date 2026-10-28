@@ -23,7 +23,7 @@ interface Props {
   isSaving?: boolean;
   isLive?: boolean;
   children: React.ReactNode;
-  onAddPlayerLive: (name: string) => void;
+  onAddPlayerLive: (name: string) => boolean | void;
   scorePromptEnabled: boolean;
   onToggleScorePrompt: () => void;
   gearMenuProps?: GearMenuProps;
@@ -62,7 +62,7 @@ export function AppShell({
   diagnosticsNode,
 }: Props) {
   const [isHostToolsOpen, setIsHostToolsOpen] = useState(false);
-  const [hostToolsInitialSection, setHostToolsInitialSection] = useState<'partners' | 'queue' | 'sitout' | undefined>();
+
   const isBroadcastingLive = (isLive ?? gearMenuProps?.isLive ?? false) && Boolean(sessionId && isConnected);
 
   return (
@@ -85,11 +85,11 @@ export function AppShell({
               <Image
                 src="/padq-logo.png"
                 alt="PadQ"
-                width={88}
-                height={30}
+                width={74}
+                height={26}
                 priority
                 className={styles.brandLogo}
-                style={{ width: 'auto', height: '26px' }}
+                
               />
               <span className={styles.srOnly}>PadQ</span>
             </div>
@@ -206,7 +206,7 @@ export function AppShell({
           manualQueuePanelNode={manualQueuePanelNode}
           sitOutPanelNode={sitOutPanelNode}
           diagnosticsNode={diagnosticsNode}
-          initialSection={hostToolsInitialSection}
+
         />
       </div>
     </OverlayHost>

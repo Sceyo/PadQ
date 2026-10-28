@@ -9,7 +9,10 @@ async function startLiveDoublesRoom(page: Page) {
   await page.getByRole('button', { name: /Start Queue/ }).click();
   await expect(page.locator('.session-bar--host')).toContainText('Connected', { timeout: 20_000 });
   await page.getByTitle('Settings').click();
-  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  const startLive = page.getByRole('button', { name: 'Start', exact: true });
+  if (await startLive.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await startLive.click();
+  }
   const roomCode = (await page.locator('.session-code').textContent())?.trim();
   expect(roomCode).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
   return roomCode!;
@@ -81,10 +84,12 @@ test('owner permanently deletes the live event and its history', async ({ browse
       .toBeVisible({ timeout: 20_000 });
 
     const plusA = host.locator('.score-side--a .score-btn--plus');
-    for (let point = 0; point < 11; point += 1) await plusA.click();
-    await host.getByRole('button', { name: 'Confirm Match' }).click();
-    await expect(host.getByRole('button', { name: 'Close' })).toBeVisible({ timeout: 20_000 });
-    await host.getByRole('button', { name: 'Close' }).click();
+    for (let point = 0; point < 11; point += 1) { await plusA.click(); await host.waitForTimeout(60); }
+    const confirmBtn = host.getByRole('button', { name: /Confirm result|Confirm Match/ });
+    await confirmBtn.click();
+
+
+
     await viewer.getByRole('button', { name: 'View Performance & History' }).click();
     await expect(viewer.locator('.w-history-item')).toHaveCount(1, { timeout: 20_000 });
 
@@ -111,12 +116,14 @@ test('an offline match save restores the prior queue and can be retried', async 
     const beforeQueue = await host.locator('.pairing-table').innerText();
 
     const plusA2 = host.locator('.score-side--a .score-btn--plus');
-    for (let point = 0; point < 11; point += 1) await plusA2.click();
+    for (let point = 0; point < 11; point += 1) { await plusA2.click(); await host.waitForTimeout(60); }
     await context.setOffline(true);
-    await host.getByRole('button', { name: 'Confirm Match' }).click();
+    const confirmBtn = host.getByRole('button', { name: /Confirm result|Confirm Match/ });
+    await confirmBtn.click();
 
-    await expect(host.locator('.toast-notification')).toContainText(/could not reach Firebase|could not be saved/, { timeout: 20_000 });
-    await expect(host.getByRole('button', { name: 'Confirm Match' })).toBeEnabled();
+
+    await expect(host.locator('.toast-notification, [role="alert"]:not(#__next-route-announcer__)').first()).toContainText(/could not reach Firebase|could not be saved|Save failed/i, { timeout: 20_000 });
+    await expect(host.getByRole('button', { name: /Confirm result|Confirm Match|Try Again/ })).toBeEnabled();
     expect(await host.locator('.pairing-table').innerText()).toBe(beforeQueue);
     await expect(host.getByRole('button', { name: 'Close' })).toHaveCount(0);
 

@@ -50,4 +50,53 @@ describe('HostToolsSheet — Match Scores slider toggle', () => {
     fireEvent.click(toggle);
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
+
+  it('clears input and closes sheet when onAddPlayer succeeds', () => {
+    const onAdd = vi.fn().mockReturnValue(true);
+    const onClose = vi.fn();
+    render(
+      <HostToolsSheet
+        isOpen={true}
+        onClose={onClose}
+        onAddPlayer={onAdd}
+        scorePromptEnabled={true}
+        onToggleScorePrompt={vi.fn()}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Player name…') as HTMLInputElement;
+    expect(input.maxLength).toBe(60);
+
+    fireEvent.change(input, { target: { value: 'New Player' } });
+    const addBtn = screen.getByRole('button', { name: 'Add' });
+    fireEvent.click(addBtn);
+
+    expect(onAdd).toHaveBeenCalledWith('New Player');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('displays inline error and keeps drawer open when onAddPlayer returns false', () => {
+    const onAdd = vi.fn().mockReturnValue(false);
+    const onClose = vi.fn();
+    render(
+      <HostToolsSheet
+        isOpen={true}
+        onClose={onClose}
+        onAddPlayer={onAdd}
+        scorePromptEnabled={true}
+        onToggleScorePrompt={vi.fn()}
+      />
+    );
+
+    const input = screen.getByPlaceholderText('Player name…') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: 'Duplicate Player' } });
+    const addBtn = screen.getByRole('button', { name: 'Add' });
+    fireEvent.click(addBtn);
+
+    expect(onAdd).toHaveBeenCalledWith('Duplicate Player');
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toBeDefined();
+    expect(screen.getByText(/"Duplicate Player" could not be added/)).toBeDefined();
+    expect(input.value).toBe('Duplicate Player');
+  });
 });

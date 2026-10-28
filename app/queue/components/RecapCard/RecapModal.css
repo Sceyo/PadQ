@@ -75,8 +75,10 @@
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #94a3b8;
-  width: 32px;
-  height: 32px;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  min-height: 46px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
@@ -201,6 +203,7 @@
 .recap-action-btn {
   flex: 1;
   min-width: 120px;
+  min-height: 46px;
   padding: 11px 16px;
   border-radius: 12px;
   font: 700 0.88rem inherit;

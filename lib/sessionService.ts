@@ -27,7 +27,7 @@ import {
   Unsubscribe,
   Timestamp,
 } from 'firebase/firestore';
-import { db, ensureAuthenticated } from './firebase';
+import { db, ensureAuthenticated, assertFirebaseConfig } from './firebase';
 import { generateRoomCode } from './roomCode';
 import { planMultiCourtResult } from '@/app/queue/lib/multiCourtResult';
 
@@ -143,6 +143,7 @@ const sessionRef = (id: string) => doc(db, 'sessions', id);
 export async function createSession(
   data: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt' | 'lastActiveAt'>,
 ): Promise<{ sessionId: string }> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   for (let attempt = 0; attempt < 8; attempt++) {
     const sessionId = generateRoomCode();
@@ -237,6 +238,7 @@ export async function updateQueueSafely(
   updater: (current: Pick<SessionDoc, 'queue' | 'players' | 'tournamentMatches'>) =>
     Partial<SessionDoc>,
 ): Promise<number> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   const ref = sessionRef(sessionId);
 
@@ -283,6 +285,7 @@ export async function updateSessionSafely(
   expectedRevision: number,
   patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>,
 ): Promise<number> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   return runTransaction(db, async tx => {
     const ref = sessionRef(sessionId);
@@ -346,6 +349,7 @@ export async function batchMatchResult(
   patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>,
   entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>,
 ): Promise<CommitMatchResult> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   const sRef   = sessionRef(sessionId);
   const hRef   = doc(db, 'sessions', sessionId, 'history', commandId);
@@ -389,6 +393,7 @@ export async function commitMultiCourtResult(
   commandId: string,
   command: CourtResultCommand,
 ): Promise<CourtResultCommit> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   const sRef = sessionRef(sessionId);
   const hRef = doc(db, 'sessions', sessionId, 'history', commandId);
@@ -505,6 +510,7 @@ export async function deleteSession(
 export async function clearHistory(
   sessionId: string,
 ): Promise<void> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   const sessionSnap = await getDoc(sessionRef(sessionId));
   if (sessionSnap.exists() && (sessionSnap.data() as SessionDoc).hostUid !== user.uid) {

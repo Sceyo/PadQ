@@ -83,10 +83,10 @@ export function SetupView({
         <Image
           src="/padq-logo.png"
           alt="PADQ"
-          width={130}
+          width={103}
           height={36}
           priority
-          style={{ width: 'auto', height: '36px', marginBottom: '8px' }}
+          style={{ marginBottom: '8px' }}
         />
         <h1 className="app-name">{gameMode === 'singles' ? 'Singles' : 'Doubles'} Queue</h1>
         <p className="app-subtitle">Add players to get started</p>

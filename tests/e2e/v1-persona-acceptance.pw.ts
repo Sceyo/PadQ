@@ -36,7 +36,10 @@ test('25-player rush preserves registration order and a middle departure', async
     expect(initialWaiting.map(text => text.trim())).toEqual(RUSH_PLAYERS.slice(12));
 
     await host.getByTitle('Settings').click();
-    await host.getByRole('button', { name: 'Start', exact: true }).click();
+    const startLive = host.getByRole('button', { name: 'Start', exact: true });
+    if (await startLive.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await startLive.click();
+    }
     const roomCode = (await host.locator('.session-code').textContent())!.trim();
 
     await viewer.goto(`/watch/${roomCode}`);

@@ -26,8 +26,10 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
     await host.getByRole('button', { name: /Start Queue/ }).click();
     await expect(host.locator('.session-bar--host')).toContainText('Connected', { timeout: 20_000 });
     await expect(host.locator('.session-role-badge')).toHaveText('HOST');
-    await expect(host.getByRole('button', { name: 'Add Player' })).toBeVisible();
+    await host.getByRole('button', { name: 'Host Tools' }).click();
+    await expect(host.getByRole('button', { name: 'Add', exact: true })).toBeVisible();
     await expect(host.getByRole('button', { name: /Set Partners/ })).toBeVisible();
+    await host.getByRole('button', { name: 'Close sheet' }).click();
 
     await host.getByTitle('Settings').click();
     const startLiveButton = host.getByRole('button', { name: 'Start', exact: true });

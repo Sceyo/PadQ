@@ -395,6 +395,8 @@ export function SingleCourtScreen({
                 type="submit"
                 style={{
                   padding: '5px 12px',
+                  minHeight: 'var(--tap-min, 44px)',
+                  justifyContent: 'center',
                   background: 'var(--accent-primary, #5457e0)',
                   color: '#ffffff',
                   border: 'none',
@@ -415,6 +417,11 @@ export function SingleCourtScreen({
                 onClick={() => setIsCustomLimitOpen(false)}
                 style={{
                   padding: '5px 8px',
+                  minHeight: 'var(--tap-min, 44px)',
+                  minWidth: 'var(--tap-min, 44px)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
                   background: 'transparent',
                   color: 'var(--text-muted, #94a3b8)',
                   border: 'none',
@@ -605,6 +612,7 @@ export function SingleCourtScreen({
           courtName={court.name}
           onCourt={onCourtPlayers}
           onConfirm={onSwapTeams}
+          matchHasStarted={court.score.hasStarted}
         />
       )}
     </div>

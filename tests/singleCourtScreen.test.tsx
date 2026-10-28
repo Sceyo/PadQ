@@ -383,4 +383,77 @@ describe('SingleCourtScreen component suite', () => {
     expect(plusButtons[0].hasAttribute('disabled')).toBe(false);
     expect(plusButtons[1].hasAttribute('disabled')).toBe(false);
   });
+
+  it('locks EditTeamsDialog when scoring has started', () => {
+    const onSwapTeams = vi.fn();
+    const courtStarted: CourtViewModel = {
+      ...mockCourt,
+      score: {
+        enabled: true,
+        limit: 11,
+        scoreA: 2,
+        scoreB: 1,
+        hasStarted: true,
+      },
+    };
+
+    render(
+      <SingleCourtScreen
+        court={courtStarted}
+        queue={mockQueue}
+        onMatchComplete={vi.fn()}
+        onScoreAdjust={vi.fn()}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={onSwapTeams}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    // Open Edit Teams
+    fireEvent.click(screen.getByRole('button', { name: 'Edit teams' }));
+
+    // Expect alert banner
+    const dialog = screen.getByRole('dialog', { name: /Edit Teams/i });
+    expect(within(dialog).getByText('Match scoring has started. Team rosters are locked.')).toBeDefined();
+
+    // The Apply button is disabled
+    const applyBtn = within(dialog).getByRole('button', { name: 'Apply' });
+    expect(applyBtn.hasAttribute('disabled')).toBe(true);
+
+    // Tapping a player in the dialog does not initiate a swap
+    const playerBtn = within(dialog).getByRole('button', { name: /john/i });
+    fireEvent.click(playerBtn);
+    expect(applyBtn.hasAttribute('disabled')).toBe(true);
+    expect(onSwapTeams).not.toHaveBeenCalled();
+  });
+
+  it('transitions ConfirmBar to failed stage with retry button when onMatchComplete resolves false', async () => {
+    const onMatchComplete = vi.fn().mockResolvedValue(false);
+    render(
+      <SingleCourtScreen
+        isHost={true}
+        court={{
+          ...mockCourt,
+          score: { ...mockCourt.score, scoreA: 11, scoreB: 9 },
+        }}
+        queue={mockQueue}
+        onMatchComplete={onMatchComplete}
+        onScoreAdjust={vi.fn()}
+        onReplacePlayer={vi.fn()}
+        onSwapTeams={vi.fn()}
+        onPlayerTakeBreak={vi.fn()}
+        onPlayerRemove={vi.fn()}
+        onReturnFromBreak={vi.fn()}
+      />
+    );
+
+    const confirmBtn = screen.getByText('Confirm result');
+    fireEvent.click(confirmBtn);
+
+    expect(onMatchComplete).toHaveBeenCalledWith('A', '11–9');
+    expect(await screen.findByText('Save failed. Check your connection and try again.')).toBeDefined();
+    expect(screen.getByText('Try Again')).toBeDefined();
+  });
 });
