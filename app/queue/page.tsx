@@ -9,7 +9,7 @@ import {
   Sun, Moon, ArrowLeft,
   Star, Sparkles, RefreshCw, Layers,
   BarChart2, Wifi, WifiOff,
-  UserX, ArrowUp, SlidersHorizontal,
+  UserX, ArrowUp, SlidersHorizontal, Loader2,
 } from 'lucide-react';
 import useQueue, {
   suggestNextDoublesMatch,
@@ -1519,12 +1519,30 @@ function QueueSystemContent() {
   // Host can swap any two of the 4 players on a court — changes
   // who is partnered with whom, or which teams face each other.
   // onCourt[0..1] = Team A, onCourt[2..3] = Team B.
+  const breakOpposingPartnerPairs = (onCourt: string[]) => {
+    if (onCourt.length < 4 || lockedPartnersRef.current.length === 0) return;
+    const teamA = new Set([onCourt[0], onCourt[1]]);
+    const teamB = new Set([onCourt[2], onCourt[3]]);
+    const remaining = lockedPartnersRef.current.filter(([p1, p2]) => {
+      const opposing = (teamA.has(p1) && teamB.has(p2)) || (teamB.has(p1) && teamA.has(p2));
+      return !opposing;
+    });
+    if (remaining.length !== lockedPartnersRef.current.length) {
+      setLockedPartners(remaining);
+      lockedPartnersRef.current = remaining;
+      if (session.sessionId) {
+        session.syncField({ lockedPartners: remaining.map(([a, b]) => ({ a, b })) });
+      }
+    }
+  };
+
   const handleSwapPlayers = (courtId: string, newOnCourt: string[]) => {
     const updatedSlots = courtSlotsRef.current.map((s: CourtSlot) =>
       s.id === courtId ? { ...s, onCourt: newOnCourt } : s
     );
     courtSlotsRef.current = updatedSlots;
     setLocalCourtSlots(updatedSlots);
+    breakOpposingPartnerPairs(newOnCourt);
     if (session.sessionId) session.syncField({ courtSlots: updatedSlots });
     setSwapCourtId(null);
   };
@@ -1924,6 +1942,30 @@ function QueueSystemContent() {
     </div>
   );
 
+  // ── RENDER Resuming Loader (prevents flash of setup screen on refresh) ──
+  if (session.isResuming) {
+    return (
+      <div
+        className="resuming-session-wrap"
+        style={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '16px',
+          background: darkMode ? '#0b0d17' : '#f8fafc',
+          color: darkMode ? '#f8fafc' : '#0f172a',
+        }}
+      >
+        <Loader2 className="animate-spin" size={38} style={{ color: 'var(--accent-primary, #6366f1)' }} />
+        <p style={{ fontSize: '0.9375rem', fontWeight: 600, color: darkMode ? '#94a3b8' : '#64748b' }}>
+          Resuming session…
+        </p>
+      </div>
+    );
+  }
+
   // ── RENDER A — Setup ──────────────────────────────────────
   if (players.length === 0) {
     return (
@@ -2218,6 +2260,7 @@ function QueueSystemContent() {
     const newQueue = [...newOnCourt, ...queue.slice(onCourtCount)];
     setQueue(newQueue);
     queueRef.current = newQueue;
+    breakOpposingPartnerPairs(newOnCourt);
     if (session.sessionId) {
       session.syncField({ queue: newQueue });
     }

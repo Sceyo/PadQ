@@ -40,15 +40,18 @@ export function SitOutPanel({
             return (
               <div key={name} className={`sitout-row${out ? ' sitout-row--out' : ''}`}>
                 <span className="sitout-name">{name}</span>
-                {out && <span className="status-pill status-pill--on-break">On break</span>}
-                <button
-                  className={`sitout-btn${out ? ' sitout-btn--return' : ''}`}
-                  onClick={() => onToggle(name)}
-                  type="button"
-                  aria-label={out ? `Return ${name}` : `Sit out ${name}`}
-                >
-                  {out ? 'Back in' : 'Take a break'}
-                </button>
+                {out ? (
+                  <span className="status-pill status-pill--on-break">On break</span>
+                ) : (
+                  <button
+                    className="sitout-btn"
+                    onClick={() => onToggle(name)}
+                    type="button"
+                    aria-label={`Sit out ${name}`}
+                  >
+                    Take a break
+                  </button>
+                )}
               </div>
             );
           })}
@@ -75,7 +78,7 @@ export function SitOutPanel({
                   type="button"
                   className="on-break-return-btn"
                   onClick={(e) => { e.stopPropagation(); onToggle(name); }}
-                  aria-label={`Back in: Return ${name} to queue`}
+                  aria-label={`Return ${name} to queue`}
                 >
                   ↩ Back in
                 </button>

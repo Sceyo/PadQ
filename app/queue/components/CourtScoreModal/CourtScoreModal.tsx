@@ -20,7 +20,7 @@ interface Props {
   onCancel: () => void;
 }
 
-const PRESET_LIMITS = [11, 15, 21] as const;
+const PRESET_LIMITS: readonly number[] = [11, 15, 21];
 
 export const CourtScoreModal: React.FC<Props> = ({
   isOpen,
@@ -170,17 +170,17 @@ export const CourtScoreModal: React.FC<Props> = ({
             onClick={() => setIsCustomTargetOpen(prev => !prev)}
             style={{
               fontSize: '0.8125rem',
-              color: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit as any) ? '#ffffff' : 'var(--text-secondary, #cbd5e1)',
-              background: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit as any) ? 'var(--accent-primary, #5457e0)' : 'var(--surface-elevated, #1a2035)',
-              border: `1px solid ${isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit as any) ? 'transparent' : 'var(--line-subtle, #252d47)'}`,
+              color: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit) ? '#ffffff' : 'var(--text-secondary, #cbd5e1)',
+              background: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit) ? 'var(--accent-primary, #5457e0)' : 'var(--surface-elevated, #1a2035)',
+              border: `1px solid ${isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit) ? 'transparent' : 'var(--line-subtle, #252d47)'}`,
               borderRadius: '9999px',
               padding: '3px 10px',
               cursor: 'pointer',
-              fontWeight: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit as any) ? 700 : 600,
+              fontWeight: isCustomTargetOpen || !PRESET_LIMITS.includes(targetLimit) ? 700 : 600,
               transition: 'all 0.15s ease',
             }}
           >
-            {!PRESET_LIMITS.includes(targetLimit as any) ? `Special (${targetLimit})` : 'Special'}
+            {!PRESET_LIMITS.includes(targetLimit) ? `Special (${targetLimit})` : 'Special'}
           </button>
         </div>
 

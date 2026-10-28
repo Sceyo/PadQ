@@ -154,7 +154,7 @@ export async function createSession(
           ...data,
           hostUid: user.uid,
           revision: 0,
-          isLive:       false,
+          isLive:       data.isLive ?? false,
           createdAt:    serverTimestamp(),
           updatedAt:    serverTimestamp(),
           lastActiveAt: serverTimestamp(),

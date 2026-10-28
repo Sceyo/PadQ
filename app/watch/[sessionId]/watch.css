@@ -818,6 +818,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: space-between;
   padding: 20px 14px;
   gap: 8px;
   transition: background 0.3s;
@@ -858,8 +859,13 @@
   color: var(--text-primary, #f8fafc);
   text-align: center;
   max-width: 150px;
+  min-height: 2.8em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: var(--lh-snug, 1.25);
   word-break: break-word;
+  flex: 1;
 }
 
 .w-live-score-num {
@@ -870,6 +876,7 @@
   color: var(--text-primary, #f8fafc);
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
+  margin-top: auto;
   transition: color 0.2s, transform 0.15s;
 }
 .w-live-side--winner .w-live-score-num {

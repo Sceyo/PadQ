@@ -3764,7 +3764,15 @@ body.dark-mode .sitout-row {
   box-shadow: none;
 }
 body.dark-mode .sitout-row:hover { background: rgba(255,255,255,.08); }
-.sitout-row--out { opacity: .55; }
+.sitout-row--out {
+  background: rgba(245, 158, 11, 0.12) !important;
+  border: 1px solid rgba(245, 158, 11, 0.35) !important;
+  opacity: 1;
+}
+body.dark-mode .sitout-row--out {
+  background: rgba(245, 158, 11, 0.14) !important;
+  border-color: rgba(245, 158, 11, 0.4) !important;
+}
 
 .sitout-name {
   font-size: .8rem; font-weight: 600; color: var(--txt-1, #1e293b);

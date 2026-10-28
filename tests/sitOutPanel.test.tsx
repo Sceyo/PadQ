@@ -74,7 +74,7 @@ describe('SitOutPanel (Phase 2 Visibility & Return)', () => {
     expect(handleToggle).toHaveBeenCalledWith('Alice');
 
     // Bob is sitting out, button says "Return"
-    const returnBob = screen.getByRole('button', { name: /return bob$/i });
+    const returnBob = screen.getByRole('button', { name: /return bob to queue/i });
     expect(returnBob).toBeDefined();
     fireEvent.click(returnBob);
     expect(handleToggle).toHaveBeenCalledWith('Bob');

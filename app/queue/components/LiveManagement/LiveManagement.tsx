@@ -135,6 +135,7 @@ export const PartnerPanel: React.FC<{
   const [open, setOpen] = useState(hideToggle);
   const [selected, setSelected] = useState<string | null>(null);
   const [draftPairs, setDraftPairs] = useState<LockedPartnerPair[]>(pairs);
+  const [justSaved, setJustSaved] = useState(false);
 
   React.useEffect(() => {
     setDraftPairs(pairs);
@@ -176,6 +177,8 @@ export const PartnerPanel: React.FC<{
 
   const savePairs = () => {
     onChange(draftPairs);
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2000);
     if (!hideToggle) setOpen(false);
     setSelected(null);
   };
@@ -244,8 +247,13 @@ export const PartnerPanel: React.FC<{
 
           <div className="partner-panel-actions">
             <button type="button" className="partner-panel-cancel" onClick={toggleOpen}>Cancel</button>
-            <button type="button" className="partner-panel-save" onClick={savePairs}>
-              Save {draftPairs.length === 1 ? '1 pair' : `${draftPairs.length} pairs`}
+            <button
+              type="button"
+              className="partner-panel-save"
+              onClick={savePairs}
+              style={justSaved ? { background: '#22c55e', borderColor: '#16a34a', color: '#ffffff' } : undefined}
+            >
+              {justSaved ? '✓ Pairs Confirmed!' : `Save ${draftPairs.length === 1 ? '1 pair' : `${draftPairs.length} pairs`}`}
             </button>
           </div>
         </div>
