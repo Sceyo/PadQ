@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React, { useState, useRef, useEffect } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, act, cleanup, fireEvent } from '@testing-library/react';
+import { render, renderHook, act, cleanup, fireEvent } from '@testing-library/react';
 import type { LiveScoreState } from '@/lib/sessionService';
 import { ScoreBoard } from '@/app/queue/components/ScoreBoard/ScoreBoard';
 
@@ -66,9 +66,9 @@ describe('Optimistic Live-Score Sync & Error Contracts (Item C)', () => {
   // C.1 Failed write contract
   // ─────────────────────────────────────────────────────────────
   it('C.1: on failed write, host UI stays optimistic while spectator snapshot stays at last confirmed score', async () => {
-    let unhandledCaught: unknown = null;
+    let unhandledError: unknown = null;
     const ignoreUnhandled = (err: unknown) => {
-      unhandledCaught = err;
+      unhandledError = err;
     };
     process.on('unhandledRejection', ignoreUnhandled);
 
@@ -91,37 +91,27 @@ describe('Optimistic Live-Score Sync & Error Contracts (Item C)', () => {
         active: true,
       };
 
-      let harness!: ReturnType<typeof useOptimisticLiveScoreHarness>;
-
-      function TestComponent() {
-        harness = useOptimisticLiveScoreHarness({
+      const { result } = renderHook(() =>
+        useOptimisticLiveScoreHarness({
           sessionId: 'TEST01',
           liveScore: initialScore,
           syncField: mockSyncField,
-        });
-        return (
-          <div>
-            <span data-testid="score-a">{harness.displayedScore?.scoreA}</span>
-            <span data-testid="score-b">{harness.displayedScore?.scoreB}</span>
-          </div>
-        );
-      }
+        })
+      );
 
-      const { getByTestId } = render(<TestComponent />);
-
-      expect(getByTestId('score-a').textContent).toBe('2');
-      expect(getByTestId('score-b').textContent).toBe('1');
-      expect(harness.pendingScoreWritesRef.current).toBe(0);
+      expect(result.current.displayedScore?.scoreA).toBe(2);
+      expect(result.current.displayedScore?.scoreB).toBe(1);
+      expect(result.current.pendingScoreWritesRef.current).toBe(0);
 
       // Host taps point to score 3-1
       const nextScore: LiveScoreState = { ...initialScore, scoreA: 3 };
       act(() => {
-        harness.handleScoreChange(nextScore);
+        result.current.handleScoreChange(nextScore);
       });
 
       // Host UI optimistically renders 3-1 immediately
-      expect(getByTestId('score-a').textContent).toBe('3');
-      expect(harness.pendingScoreWritesRef.current).toBe(1);
+      expect(result.current.displayedScore?.scoreA).toBe(3);
+      expect(result.current.pendingScoreWritesRef.current).toBe(1);
 
       // Simulate rejection from Firestore network/rule error
       await act(async () => {
@@ -135,17 +125,20 @@ describe('Optimistic Live-Score Sync & Error Contracts (Item C)', () => {
 
       // Contract Verification:
       // 1. pendingScoreWritesRef decrements to 0
-      expect(harness.pendingScoreWritesRef.current).toBe(0);
+      expect(result.current.pendingScoreWritesRef.current).toBe(0);
 
       // 2. Host UI does NOT automatically rollback; it stays optimistic at 3-1
       // (Actual intended behavior in app/queue/page.tsx: optimisticLiveScore is not rolled back in a catch handler)
-      expect(getByTestId('score-a').textContent).toBe('3');
-      expect(harness.optimisticLiveScore?.scoreA).toBe(3);
+      expect(result.current.displayedScore?.scoreA).toBe(3);
+      expect(result.current.optimisticLiveScore?.scoreA).toBe(3);
 
       // 3. Spectator view: In Firestore, the write failed, so session.liveScore remains at 2-1.
       // The spectator snapshot never received 3-1, remaining consistent at 2-1.
       expect(initialScore.scoreA).toBe(2);
       expect(initialScore.scoreB).toBe(1);
+      if (unhandledError) {
+        expect(unhandledError).toBeDefined();
+      }
     } finally {
       process.off('unhandledRejection', ignoreUnhandled);
     }
@@ -173,42 +166,32 @@ describe('Optimistic Live-Score Sync & Error Contracts (Item C)', () => {
       active: true,
     };
 
-    let harness!: ReturnType<typeof useOptimisticLiveScoreHarness>;
-
-    function TestComponent() {
-      harness = useOptimisticLiveScoreHarness({
+    const { result } = renderHook(() =>
+      useOptimisticLiveScoreHarness({
         sessionId: 'TEST02',
         liveScore: initialScore,
         syncField: mockSyncField,
-      });
-      return (
-        <div>
-          <span data-testid="score-a">{harness.displayedScore?.scoreA}</span>
-          <span data-testid="score-b">{harness.displayedScore?.scoreB}</span>
-        </div>
-      );
-    }
-
-    const { getByTestId } = render(<TestComponent />);
+      })
+    );
 
     // Tap point to score 6-4
     const optimisticScore: LiveScoreState = { ...initialScore, scoreA: 6 };
     act(() => {
-      harness.handleScoreChange(optimisticScore);
+      result.current.handleScoreChange(optimisticScore);
     });
 
-    expect(getByTestId('score-a').textContent).toBe('6');
-    expect(harness.pendingScoreWritesRef.current).toBe(1);
+    expect(result.current.displayedScore?.scoreA).toBe(6);
+    expect(result.current.pendingScoreWritesRef.current).toBe(1);
 
     // An older/stale snapshot arrives from Firestore (e.g. 5-4) while pendingScoreWritesRef > 0
     act(() => {
       const staleSnapshot: LiveScoreState = { ...initialScore, scoreA: 5, scoreB: 4 };
-      harness.deliverSnapshot(staleSnapshot);
+      result.current.deliverSnapshot(staleSnapshot);
     });
 
     // Assert displayed score was NOT clobbered back to 5
-    expect(getByTestId('score-a').textContent).toBe('6');
-    expect(harness.latestLiveScoreRef.current?.scoreA).toBe(6);
+    expect(result.current.displayedScore?.scoreA).toBe(6);
+    expect(result.current.latestLiveScoreRef.current?.scoreA).toBe(6);
 
     // Write resolves, pending count decrements
     await act(async () => {
@@ -216,17 +199,16 @@ describe('Optimistic Live-Score Sync & Error Contracts (Item C)', () => {
       await writePromise;
     });
 
-    expect(harness.pendingScoreWritesRef.current).toBe(0);
+    expect(result.current.pendingScoreWritesRef.current).toBe(0);
 
     // Newer snapshot reflecting the confirmed score arrives from Firestore
     const confirmedSnapshot: LiveScoreState = { ...initialScore, scoreA: 6, scoreB: 4 };
     act(() => {
-      harness.deliverSnapshot(confirmedSnapshot);
+      result.current.deliverSnapshot(confirmedSnapshot);
     });
 
     // Newer snapshot is applied cleanly
-    expect(getByTestId('score-a').textContent).toBe('6');
-    expect(harness.displayedScore?.scoreA).toBe(6);
+    expect(result.current.displayedScore?.scoreA).toBe(6);
   });
 
   // ─────────────────────────────────────────────────────────────
