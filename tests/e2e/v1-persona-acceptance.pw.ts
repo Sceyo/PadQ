@@ -27,11 +27,19 @@ test('25-player rush preserves registration order and a middle departure', async
     await host.getByRole('button', { name: /Start Queue/ }).click();
     await expect(host.locator('.session-bar--host')).toContainText('Connected', { timeout: 30_000 });
 
+    const expandWaiting = host.getByRole('button', { name: /Expand waiting queue/i });
+    if (await expandWaiting.isVisible().catch(() => false)) {
+      await expandWaiting.click();
+    }
+
     const initialWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
     expect(initialWaiting.map(text => text.trim())).toEqual(RUSH_PLAYERS.slice(12));
 
     await host.getByTitle('Settings').click();
-    await host.getByRole('button', { name: 'Start', exact: true }).click();
+    const startLive = host.getByRole('button', { name: 'Start', exact: true });
+    if (await startLive.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await startLive.click();
+    }
     const roomCode = (await host.locator('.session-code').textContent())!.trim();
 
     await viewer.goto(`/watch/${roomCode}`);
@@ -41,9 +49,12 @@ test('25-player rush preserves registration order and a middle departure', async
     await expect(viewer.locator('.w-next-up')).toContainText(RUSH_PLAYERS[15]);
     await expect(viewer.locator('.w-next-up')).toContainText('+9 waiting');
 
-    await host.getByRole('button', { name: 'Manage Queue' }).click();
+    await host.getByRole('button', { name: 'Host Tools' }).click();
+    const sheet = host.getByRole('dialog', { name: 'Host Tools' });
+    await sheet.getByRole('button', { name: 'Manage Queue' }).click();
     const departingPlayer = RUSH_PLAYERS[18];
-    await host.locator('.mqp-btn--remove').filter({ hasText: departingPlayer }).click();
+    await sheet.locator('.mqp-btn--remove').filter({ hasText: departingPlayer }).click();
+    await sheet.getByRole('button', { name: 'Close sheet' }).click();
 
     const remainingWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
     expect(remainingWaiting.map(text => text.trim())).toEqual([

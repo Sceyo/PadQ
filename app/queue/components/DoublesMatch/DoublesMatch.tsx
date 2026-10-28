@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useState } from 'react';
-import { Swords, Sparkles, Trophy, Play, UserX } from 'lucide-react';
+import { Swords, Sparkles, Trophy, Play, UserX, Check } from 'lucide-react';
 import type { PlayerStat } from '../../lib/types';
 import type { LiveScoreState } from '@/lib/sessionService';
 import { PlayerLabel } from '../atoms/PlayerLabel';
@@ -35,6 +35,10 @@ export const DoublesMatch: React.FC<{
   const [winner, setWinner] = useState<'A' | 'B' | null>(null);
   const [pendingScore, setPendingScore] = useState<string | undefined>(undefined);
   const [submitting, setSubmitting] = useState(false);
+  const [saveStage, setSaveStage] = useState<'idle' | 'saving' | 'slow' | 'failed'>('idle');
+  const savingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const slowTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   // scoreWinner: set by ScoreBoard when a team reaches the score limit.
   // While set, the losing team's winner button is locked out.
   const [scoreWinner, setScoreWinner] = useState<'A' | 'B' | null>(null);
@@ -44,6 +48,13 @@ export const DoublesMatch: React.FC<{
   });
   const isReplaceBlocked = Boolean(replaceDisabled || hasScoredPoints);
   const submittingRef = useRef(false);
+
+  React.useEffect(() => {
+    return () => {
+      if (savingTimerRef.current) clearTimeout(savingTimerRef.current);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
+    };
+  }, []);
 
   const toggle = (p: string) => {
     if (!isHost) return;
@@ -58,13 +69,29 @@ export const DoublesMatch: React.FC<{
     if (!isHost || submittingRef.current) return;
     if (teamA.length !== 2 || teamB.length !== 2) { alert('Assign all 4 players first'); return; }
     if (!winner) { alert('Select the winning team'); return; }
-    // Lock synchronously. State alone would not stop a second click dispatched
-    // before React replaces this match card with the next pairing.
+
     submittingRef.current = true;
     setSubmitting(true);
+    setSaveStage('idle');
+
+    savingTimerRef.current = setTimeout(() => {
+      setSaveStage('saving');
+    }, 1000);
+
+    slowTimerRef.current = setTimeout(() => {
+      setSaveStage('slow');
+    }, 8000);
+
     try {
-      await onMatch(teamA, teamB, winner, pendingScore);
+      const ok = await onMatch(teamA, teamB, winner, pendingScore);
+      if (ok === false) {
+        setSaveStage('failed');
+      }
+    } catch {
+      setSaveStage('failed');
     } finally {
+      if (savingTimerRef.current) clearTimeout(savingTimerRef.current);
+      if (slowTimerRef.current) clearTimeout(slowTimerRef.current);
       submittingRef.current = false;
       setSubmitting(false);
     }
@@ -107,7 +134,7 @@ export const DoublesMatch: React.FC<{
 
   return (
     <div className="match-section">
-      <h3 className="match-section-title"><Swords size={15} /> Form Teams</h3>
+      <h3 className="match-section-title"><Swords size={15} /> Current Match</h3>
       {suggestedTeamA && suggestedTeamB && (
         <div className="playall-badge">
           <Sparkles size={12} />Maximum-novelty suggestion
@@ -151,6 +178,7 @@ export const DoublesMatch: React.FC<{
         viewerScore={!isHost ? viewerScore : null}
         persistedScore={isHost ? persistedScore : null}
         scoreReady={scoreReady}
+        hideInlineConfirm={true}
       />
       <div className="winning-team">
         <span className="winning-label">Winner:</span>
@@ -169,7 +197,38 @@ export const DoublesMatch: React.FC<{
           <Trophy size={12} /> Team B {winner === 'B' && pendingScore && `(${pendingScore})`}
         </button>
       </div>
-      {isHost && <button onClick={submit} className="match-action-btn" disabled={submitting}><Play size={13} /> {submitting ? 'Saving Match…' : 'Confirm Match'}</button>}
+
+      {isHost && winner && (
+        <div className="floating-confirm-wrap">
+          <div className="floating-confirm-bar" role="region" aria-label="Confirm Match Result">
+            <div className="floating-confirm-info">
+              <span className="floating-confirm-badge">Match Ready</span>
+              <span className="floating-confirm-summary">
+                <strong>{winner === 'A' ? (teamA.join(' & ') || 'Team A') : (teamB.join(' & ') || 'Team B')}</strong> won
+                {pendingScore ? ` (${pendingScore})` : ''}
+              </span>
+            </div>
+            {saveStage === 'failed' && (
+              <div className="floating-confirm-error" role="alert">
+                Save failed. Check your connection and try again.
+              </div>
+            )}
+            <button
+              type="button"
+              className="floating-confirm-btn"
+              onClick={submit}
+              disabled={submitting}
+            >
+              <Check size={16} />
+              {submitting
+                ? (saveStage === 'slow' ? 'Still saving, check your connection…' : 'Saving…')
+                : (saveStage === 'failed'
+                  ? 'Try Again'
+                  : `Confirm ${winner === 'A' ? (teamA.join(' & ') || 'Team A') : (teamB.join(' & ') || 'Team B')} won${pendingScore ? `, ${pendingScore}` : ''}`)}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

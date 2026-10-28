@@ -8,16 +8,56 @@ export function SitOutPanel({
   sittingOut,
   onToggle,
   onSelectPlayer,
+  hideToggle = false,
 }: {
   players:    string[];
   sittingOut: string[];
   onToggle:   (name: string) => void;
   onSelectPlayer?: (name: string) => void;
+  hideToggle?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(hideToggle);
 
   return (
-    <div className="sitout-wrap">
+    <div className="sitout-wrap live-panel">
+      {!hideToggle && (
+        <button
+          className={`live-panel-toggle sitout-toggle-btn${open ? ' sitout-toggle-btn--open' : ''}`}
+          onClick={() => setOpen(o => !o)}
+          type="button"
+          aria-expanded={open}
+          aria-label={`Sit Out${sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}`}
+        >
+          <UserMinus size={13} />
+          Sit Out{sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}
+        </button>
+      )}
+
+      {(open || hideToggle) && (
+        <div className="sitout-panel">
+          {players.map(name => {
+            const out = sittingOut.includes(name);
+            return (
+              <div key={name} className={`sitout-row${out ? ' sitout-row--out' : ''}`}>
+                <span className="sitout-name">{name}</span>
+                {out ? (
+                  <span className="status-pill status-pill--on-break">On break</span>
+                ) : (
+                  <button
+                    className="sitout-btn"
+                    onClick={() => onToggle(name)}
+                    type="button"
+                    aria-label={`Sit out ${name}`}
+                  >
+                    Take a break
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {sittingOut.length > 0 && (
         <div className="on-break-strip" role="region" aria-label="Players on break">
           <div className="on-break-strip-header">
@@ -38,46 +78,13 @@ export function SitOutPanel({
                   type="button"
                   className="on-break-return-btn"
                   onClick={(e) => { e.stopPropagation(); onToggle(name); }}
-                  aria-label={`Back in: Return ${name} to queue`}
+                  aria-label={`Return ${name} to queue`}
                 >
                   ↩ Back in
                 </button>
               </div>
             ))}
           </div>
-        </div>
-      )}
-
-      <button
-        className={`sitout-toggle-btn${open ? ' sitout-toggle-btn--open' : ''}`}
-        onClick={() => setOpen(o => !o)}
-        type="button"
-        aria-expanded={open}
-        aria-label={`Sit Out${sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}`}
-      >
-        <UserMinus size={13} />
-        Sit Out{sittingOut.length > 0 ? ` (${sittingOut.length})` : ''}
-      </button>
-
-      {open && (
-        <div className="sitout-panel">
-          {players.map(name => {
-            const out = sittingOut.includes(name);
-            return (
-              <div key={name} className={`sitout-row${out ? ' sitout-row--out' : ''}`}>
-                <span className="sitout-name">{name}</span>
-                {out && <span className="status-pill status-pill--on-break">On break</span>}
-                <button
-                  className={`sitout-btn${out ? ' sitout-btn--return' : ''}`}
-                  onClick={() => onToggle(name)}
-                  type="button"
-                  aria-label={out ? `Return ${name}` : `Sit out ${name}`}
-                >
-                  {out ? 'Back in' : 'Take a break'}
-                </button>
-              </div>
-            );
-          })}
         </div>
       )}
     </div>

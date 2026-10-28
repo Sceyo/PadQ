@@ -1,0 +1,8 @@
+{
+  "nonStandardBreakpoints": ["480px", "600px", "640px", "641px", "860px"],
+  "inputsUnder16px": 11,
+  "buttonsUnder44px": 6,
+  "vhWithoutDvh": 4,
+  "zindexViolations": 6,
+  "bannedVocabularyOccurrences": 4
+}

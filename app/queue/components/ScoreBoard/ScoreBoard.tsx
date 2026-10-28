@@ -4,22 +4,23 @@ import React, { useRef, useState } from 'react';
 import { Plus, Minus, Check, RotateCcw, Target, Settings } from 'lucide-react';
 import type { LiveScoreState } from '@/lib/sessionService';
 
-const SCORE_PRESETS = [11, 21] as const;
+const SCORE_PRESETS = [11, 15, 21] as const;
 
 export const SCORING_ENABLED_STORAGE_KEY = 'padq_scoring_enabled';
 
 type ScoreBoardProps = {
-  labelA:         string;
-  labelB:         string;
-  onWin:          (side: 'A' | 'B', sA: number, sB: number) => void;
-  disabled?:      boolean;
-  onScoreChange?: (score: LiveScoreState | null) => void;
-  viewerScore?:   LiveScoreState | null;
-  persistedScore?: LiveScoreState | null;
-  scoreReady?:    boolean;
+  labelA:             string;
+  labelB:             string;
+  onWin:              (side: 'A' | 'B', sA: number, sB: number) => void | Promise<void | boolean>;
+  disabled?:          boolean;
+  onScoreChange?:     (score: LiveScoreState | null) => void;
+  viewerScore?:       LiveScoreState | null;
+  persistedScore?:    LiveScoreState | null;
+  scoreReady?:        boolean;
+  hideInlineConfirm?: boolean;
 };
 
-const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, disabled = false, onScoreChange, viewerScore, persistedScore }) => {
+const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, disabled = false, onScoreChange, viewerScore, persistedScore, hideInlineConfirm }) => {
 
   const savedScore = persistedScore?.labelA === labelA && persistedScore?.labelB === labelB
     ? persistedScore
@@ -98,11 +99,16 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
     onScoreChange?.({ scoreA: nextA, scoreB: nextB, limit: nextLimit, baseLimit, labelA, labelB, deuce: nextDeuce, active: true });
   };
 
-  const confirmResult = () => {
+  const confirmResult = async () => {
     if (!finished || disabled || submittingResultRef.current) return;
     submittingResultRef.current = true;
     setSubmittingResult(true);
-    onWin(scoreA >= limit ? 'A' : 'B', scoreA, scoreB);
+    try {
+      await onWin(scoreA >= limit ? 'A' : 'B', scoreA, scoreB);
+    } catch {
+      submittingResultRef.current = false;
+      setSubmittingResult(false);
+    }
   };
 
   const applyCustomLimit = () => {
@@ -152,11 +158,27 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
         <div className={`scoreboard ${finished ? 'scoreboard--finished' : ''} ${inDeuce ? 'scoreboard--deuce' : ''}`}>
           <div className={`score-side score-side--a ${scoreA >= limit ? 'score-side--winner' : ''}`}>
             <div className="score-team-badge score-team-badge--a">Team A</div>
-            <div className="score-player-name">{labelA}</div>
-            <div className="score-display">{scoreA}</div>
-            <div className="score-btns">
-              <button onClick={() => increment('A')} disabled={finished} className="score-btn score-btn--plus"><Plus size={16} /></button>
-              <button onClick={() => decrement('A')} disabled={scoreA === 0} className="score-btn score-btn--minus" aria-label={`Remove point from ${labelA}`}><Minus size={14} /></button>
+            <div className="score-player-name" title={labelA}>{labelA}</div>
+            <div className="score-stepper-row">
+              <button
+                type="button"
+                onClick={() => decrement('A')}
+                disabled={scoreA === 0 || disabled}
+                className="score-btn score-btn--minus"
+                aria-label={`Remove point for ${labelA}`}
+              >
+                <Minus size={18} />
+              </button>
+              <span className="score-display" aria-live="polite">{scoreA}</span>
+              <button
+                type="button"
+                onClick={() => increment('A')}
+                disabled={finished || disabled}
+                className="score-btn score-btn--plus"
+                aria-label={`Add point for ${labelA}`}
+              >
+                <Plus size={20} />
+              </button>
             </div>
           </div>
           <div className="score-centre">
@@ -166,20 +188,36 @@ const ScoreBoardReady: React.FC<ScoreBoardProps> = ({ labelA, labelB, onWin, dis
           </div>
           <div className={`score-side score-side--b ${scoreB >= limit ? 'score-side--winner' : ''}`}>
             <div className="score-team-badge score-team-badge--b">Team B</div>
-            <div className="score-player-name">{labelB}</div>
-            <div className="score-display">{scoreB}</div>
-            <div className="score-btns">
-              <button onClick={() => increment('B')} disabled={finished} className="score-btn score-btn--plus"><Plus size={16} /></button>
-              <button onClick={() => decrement('B')} disabled={scoreB === 0} className="score-btn score-btn--minus" aria-label={`Remove point from ${labelB}`}><Minus size={14} /></button>
+            <div className="score-player-name" title={labelB}>{labelB}</div>
+            <div className="score-stepper-row">
+              <button
+                type="button"
+                onClick={() => decrement('B')}
+                disabled={scoreB === 0 || disabled}
+                className="score-btn score-btn--minus"
+                aria-label={`Remove point for ${labelB}`}
+              >
+                <Minus size={18} />
+              </button>
+              <span className="score-display" aria-live="polite">{scoreB}</span>
+              <button
+                type="button"
+                onClick={() => increment('B')}
+                disabled={finished || disabled}
+                className="score-btn score-btn--plus"
+                aria-label={`Add point for ${labelB}`}
+              >
+                <Plus size={20} />
+              </button>
             </div>
           </div>
         </div>
       )}
-      {active && finished && (
+      {active && finished && !hideInlineConfirm && (
         <div className="score-confirm-row">
           <span>Check the score. You can still use − to correct a misclick.</span>
           <button type="button" className="score-confirm-btn" onClick={confirmResult} disabled={submittingResult}>
-            <Check size={14} /> {submittingResult ? 'Applying result…' : `Confirm ${scoreA >= limit ? labelA : labelB} won, ${scoreA}–${scoreB}`}
+            <Check size={14} /> {submittingResult ? 'Saving result…' : `Confirm ${scoreA >= limit ? labelA : labelB} won, ${scoreA}–${scoreB}`}
           </button>
         </div>
       )}

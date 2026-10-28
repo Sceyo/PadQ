@@ -6,10 +6,23 @@ export const PaddleStatusPanel: React.FC<{
   allPlayers:  string[];
 }> = ({ paddleState, allPlayers }) => {
   const { phase, winnersPool: winners, losersPool: losers, playedThisCycle } = paddleState;
-
-  if (phase === 'INIT' && winners.length === 0 && losers.length === 0) return null;
-
   const unplayed = allPlayers.filter(p => !playedThisCycle.has(p));
+
+  if (phase === 'INIT' && winners.length === 0 && losers.length === 0) {
+    return (
+      <div className="paddle-status">
+        <div className="paddle-status-header">
+          <span className="paddle-phase-label">⚡ Warm-up (Init Match {paddleState.matchIndexInPhase + 1} of 2)</span>
+          {unplayed.length > 0 && (
+            <span className="paddle-waiting-badge">⏳ {unplayed.length} waiting</span>
+          )}
+        </div>
+        <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary, #94a3b8)', marginTop: '4px' }}>
+          Winners and Losers pools will form after the initial matches complete.
+        </div>
+      </div>
+    );
+  }
   const phaseLabel =
     phase === 'INIT'    ? '⚡ Warm-up (2 init matches)' :
     phase === 'WINNERS' ? '🏆 Winners Cycle' :

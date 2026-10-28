@@ -26,8 +26,10 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
     await host.getByRole('button', { name: /Start Queue/ }).click();
     await expect(host.locator('.session-bar--host')).toContainText('Connected', { timeout: 20_000 });
     await expect(host.locator('.session-role-badge')).toHaveText('HOST');
+    await host.getByRole('button', { name: 'Host Tools' }).click();
     await expect(host.getByRole('button', { name: 'Add Player' })).toBeVisible();
     await expect(host.getByRole('button', { name: /Set Partners/ })).toBeVisible();
+    await host.getByRole('button', { name: 'Close sheet' }).click();
 
     await host.getByTitle('Settings').click();
     const startLiveButton = host.getByRole('button', { name: 'Start', exact: true });
@@ -64,6 +66,10 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
     const beforeResult = await viewer.getByRole('tabpanel').innerText();
     const courtThreeCard = host.locator('.courts-grid > div').filter({ hasText: 'Court 3' });
     await courtThreeCard.getByRole('button', { name: /wins?$/i }).first().click();
+    const skipBtn1 = host.getByRole('button', { name: /Skip Score/i });
+    if (await skipBtn1.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await skipBtn1.click();
+    }
 
     await expect.poll(
       async () => viewer.getByRole('tabpanel').innerText(),
@@ -114,11 +120,13 @@ test('multi-court mode reveals Undo Last Match in settings and restores court an
 
     // Complete match on Court 1 (Team A win)
     await courtOneCard.getByRole('button', { name: /wins?$/i }).first().click();
+    const skipBtn2 = host.getByRole('button', { name: /Skip Score/i });
+    if (await skipBtn2.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await skipBtn2.click();
+    }
 
-    // WinnerModal opens after a win; autoClose is false by default, so dismiss it.
-    await expect(host.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
-    await host.keyboard.press('Escape');
-    await expect(host.locator('.modal-overlay')).not.toBeVisible({ timeout: 3_000 });
+    // MatchCompletionToast confirms win with undo capability
+    await expect(host.locator('text=/won/i')).toBeVisible({ timeout: 5_000 });
 
     // Now Court 1 rotated: Player 09 and Player 10 were pulled onto Court 1
     await expect(courtOneCard).not.toContainText('Player 01 & Player 02');

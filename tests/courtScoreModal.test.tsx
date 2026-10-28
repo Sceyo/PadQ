@@ -154,4 +154,111 @@ describe('CourtScoreModal component', () => {
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalledTimes(2);
   });
+
+  it('renders individual player names for singles matches and handles target presets', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const mockSinglesMatch: PendingCourtMatch = {
+      courtId: 'court-1',
+      courtName: 'Court 1',
+      side: 'A',
+      teamA: ['Alice'],
+      teamB: ['Bob'],
+      mode: 'singles',
+    };
+
+    const { getByText, getByRole, getByLabelText } = render(
+      <CourtScoreModal
+        isOpen={true}
+        match={mockSinglesMatch}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    );
+
+    // Shows 1v1 names without ampersand
+    expect(getByText('Alice')).toBeTruthy();
+    expect(getByText('Bob')).toBeTruthy();
+
+    // Select limit preset 15
+    const limit15Btn = getByRole('button', { name: '15' });
+    fireEvent.click(limit15Btn);
+
+    const winnerInput = getByLabelText('Score for Alice') as HTMLInputElement;
+    expect(winnerInput.value).toBe('15');
+
+    // Tap quick preset '15 – 10'
+    fireEvent.click(getByRole('button', { name: '15 – 10' }));
+
+    // Confirm score
+    fireEvent.click(getByRole('button', { name: 'Save Score & Continue' }));
+    expect(onConfirm).toHaveBeenCalledWith('15 – 10');
+  });
+
+  it('enforces win-by-2 margin on deuce scores in CourtScoreModal', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const mockMatch: PendingCourtMatch = {
+      courtId: 'court-1',
+      courtName: 'Court 1',
+      side: 'A',
+      teamA: ['Alice'],
+      teamB: ['Bob'],
+      mode: 'singles',
+    };
+
+    const { getByRole, getByLabelText } = render(
+      <CourtScoreModal
+        isOpen={true}
+        match={mockMatch}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    );
+
+    const loserInput = getByLabelText('Score for Bob') as HTMLInputElement;
+    // Enter loser score 10 (target is 11) -> deuce triggers winner score to become 12
+    fireEvent.change(loserInput, { target: { value: '10' } });
+
+    const winnerInput = getByLabelText('Score for Alice') as HTMLInputElement;
+    expect(winnerInput.value).toBe('12');
+
+    // Save Score & Continue
+    fireEvent.click(getByRole('button', { name: 'Save Score & Continue' }));
+    expect(onConfirm).toHaveBeenCalledWith('12 – 10');
+  });
+
+  it('defaults blank opponent score to 0 when Save Score & Continue is clicked', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { getByRole } = render(
+      <CourtScoreModal
+        isOpen={true}
+        match={mockDoublesMatchA}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    );
+
+    // Loser score is left blank -> defaults to 0 (11 - 0 victory for Team A)
+    fireEvent.click(getByRole('button', { name: 'Save Score & Continue' }));
+    expect(onConfirm).toHaveBeenCalledWith('11 – 0');
+  });
+
+  it('defaults blank opponent score to 0 when Side B wins', () => {
+    const onConfirm = vi.fn();
+    const onCancel = vi.fn();
+    const { getByRole } = render(
+      <CourtScoreModal
+        isOpen={true}
+        match={mockDoublesMatchB}
+        onConfirm={onConfirm}
+        onCancel={onCancel}
+      />
+    );
+
+    // Loser score is left blank -> defaults to 0 (0 - 11 victory for Team B)
+    fireEvent.click(getByRole('button', { name: 'Save Score & Continue' }));
+    expect(onConfirm).toHaveBeenCalledWith('0 – 11');
+  });
 });

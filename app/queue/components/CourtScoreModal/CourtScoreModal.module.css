@@ -66,6 +66,10 @@
 }
 
 .closeX {
+  width: var(--tap-min, 44px);
+  height: var(--tap-min, 44px);
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
   background: none;
   border: none;
   color: var(--txt-3, #94a3b8);
@@ -194,11 +198,12 @@
 }
 
 .presetBtn {
+  min-height: 46px;
   background: var(--btn, #f1f5f9);
   border: 1px solid var(--border, #e2e8f0);
   border-radius: 6px;
-  padding: 5px 9px;
-  font-size: 0.78rem;
+  padding: 8px 12px;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--txt-2, #64748b);
   cursor: pointer;
@@ -225,6 +230,8 @@
 }
 
 .saveBtn {
+  min-height: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -257,6 +264,8 @@
 .skipBtn,
 .cancelBtn {
   flex: 1;
+  min-height: 48px;
+  height: 48px;
   padding: 9px 12px;
   border-radius: var(--r-sm, 8px);
   font-size: 0.8rem;

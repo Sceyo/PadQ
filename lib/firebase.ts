@@ -28,6 +28,22 @@ import {
 } from 'firebase/firestore';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
+export function assertFirebaseConfig(): void {
+  const isTest = process.env.NODE_ENV === 'test';
+  const isEmulator = process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === 'true';
+  if (isTest || isEmulator) return;
+
+  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const appId = process.env.NEXT_PUBLIC_FIREBASE_APP_ID;
+
+  if (!apiKey || apiKey === 'AIzaSyFakeKeyForTestingPurposesOnly00' || !projectId || !appId) {
+    throw new Error(
+      'Firebase configuration is missing or incomplete. Please set NEXT_PUBLIC_FIREBASE_API_KEY, NEXT_PUBLIC_FIREBASE_PROJECT_ID, and NEXT_PUBLIC_FIREBASE_APP_ID in your environment.'
+    );
+  }
+}
+
 const firebaseConfig = {
   apiKey:            process.env.NEXT_PUBLIC_FIREBASE_API_KEY || 'AIzaSyFakeKeyForTestingPurposesOnly00',
   authDomain:        process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || 'padq-test.firebaseapp.com',

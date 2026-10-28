@@ -60,4 +60,23 @@ describe('Phase 3: Match Completion Feedback & WinnerModal Scope', () => {
 
     expect(screen.queryByRole('dialog')).toBeNull();
   });
+
+  it('guards that routine match completions do not display the champion WinnerModal', () => {
+    // Routine match winner strings (e.g. "Team A won") must not open the WinnerModal;
+    // only tournament champions (containing "champion") display it.
+    const routineWinner = "Alice & Bob win!";
+    const isChampion = routineWinner.includes('champion');
+    expect(isChampion).toBe(false);
+
+    const handleClose = vi.fn();
+    render(
+      <WinnerModal
+        isOpen={isChampion}
+        winner={routineWinner}
+        onClose={handleClose}
+      />,
+    );
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
 });

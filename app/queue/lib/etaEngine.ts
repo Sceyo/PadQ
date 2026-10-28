@@ -35,5 +35,5 @@ export function formatEtaLabel(
   if (!isMultiCourt) {
     return m === 1 ? 'On deck' : null;
   }
-  return m === 1 ? 'Up next' : `~${m} matches`;
+  return m === 1 ? 'Up next' : `Wait: ${m} matches`;
 }

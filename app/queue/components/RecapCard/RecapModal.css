@@ -5,7 +5,7 @@
 .recap-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-modal, 1100);
   background: rgba(4, 6, 12, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -75,8 +75,10 @@
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #94a3b8;
-  width: 32px;
-  height: 32px;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  min-height: 46px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
@@ -172,7 +174,7 @@
   height: 1080px;
   overflow: hidden;
   pointer-events: none;
-  z-index: -9999;
+  z-index: -1;
 }
 
 /* ── Feedback Toast ─────────────────────────────────── */
@@ -201,6 +203,7 @@
 .recap-action-btn {
   flex: 1;
   min-width: 120px;
+  min-height: 46px;
   padding: 11px 16px;
   border-radius: 12px;
   font: 700 0.88rem inherit;

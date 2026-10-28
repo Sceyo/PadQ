@@ -30,15 +30,18 @@ export const ManualQueuePanel: React.FC<{
   statsMap:   Record<string, PlayerStat>;
   onAdd:      (p: string) => void;
   onRemove:   (i: number) => void;
-}> = ({ allPlayers, queue, statsMap, onAdd, onRemove }) => {
-  const [open, setOpen] = useState(false);
+  hideToggle?: boolean;
+}> = ({ allPlayers, queue, statsMap, onAdd, onRemove, hideToggle = false }) => {
+  const [open, setOpen] = useState(hideToggle);
   const notQueued = allPlayers.filter(p => !queue.includes(p));
   return (
     <div className="live-panel">
-      <button className="live-panel-toggle" onClick={() => setOpen(o => !o)}>
-        <ListOrdered size={13} /> {open ? 'Hide' : 'Manage'} Queue
-      </button>
-      {open && (
+      {!hideToggle && (
+        <button className="live-panel-toggle" onClick={() => setOpen(o => !o)}>
+          <ListOrdered size={13} /> {open ? 'Hide' : 'Manage'} Queue
+        </button>
+      )}
+      {(open || hideToggle) && (
         <div className="mqp-body">
           <div className="mqp-col">
             <div className="mqp-col-header"><UserCheck size={11} /> Available</div>
@@ -127,10 +130,17 @@ export const PartnerPanel: React.FC<{
   playerGroups: string[][];
   pairs:        LockedPartnerPair[];
   onChange:     (pairs: LockedPartnerPair[]) => void;
-}> = ({ players, playerGroups, pairs, onChange }) => {
-  const [open, setOpen] = useState(false);
+  hideToggle?:  boolean;
+}> = ({ players, playerGroups, pairs, onChange, hideToggle = false }) => {
+  const [open, setOpen] = useState(hideToggle);
   const [selected, setSelected] = useState<string | null>(null);
   const [draftPairs, setDraftPairs] = useState<LockedPartnerPair[]>(pairs);
+  const [justSaved, setJustSaved] = useState(false);
+
+  React.useEffect(() => {
+    setDraftPairs(pairs);
+  }, [pairs]);
+
   const maxPairs = getMaxPartnerPairs(players.length);
   const availablePlayers = getAvailablePartnerPlayers(players, draftPairs);
   const compatiblePlayers = getCompatiblePartnerPlayers(availablePlayers, playerGroups, selected);
@@ -145,8 +155,18 @@ export const PartnerPanel: React.FC<{
       setSelected(null);
       return;
     }
-    if (!limitReached) setDraftPairs(addPartnerPair(players, draftPairs, selected, player));
+    if (!limitReached) {
+      const nextPairs = addPartnerPair(players, draftPairs, selected, player);
+      setDraftPairs(nextPairs);
+      if (hideToggle) onChange(nextPairs);
+    }
     setSelected(null);
+  };
+
+  const removePair = (index: number) => {
+    const nextPairs = draftPairs.filter((_, pairIndex) => pairIndex !== index);
+    setDraftPairs(nextPairs);
+    if (hideToggle) onChange(nextPairs);
   };
 
   const toggleOpen = () => {
@@ -157,18 +177,22 @@ export const PartnerPanel: React.FC<{
 
   const savePairs = () => {
     onChange(draftPairs);
-    setOpen(false);
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2000);
+    if (!hideToggle) setOpen(false);
     setSelected(null);
   };
 
   return (
     <div className="live-panel partner-panel">
-      <button className="live-panel-toggle" onClick={toggleOpen} type="button">
-        <Link2 size={13} /> {open ? 'Hide Partners' : 'Set Partners'}
-        <span className="partner-panel-count">{pairs.length}/{maxPairs}</span>
-      </button>
+      {!hideToggle && (
+        <button className="live-panel-toggle" onClick={toggleOpen} type="button">
+          <Link2 size={13} /> {open ? 'Hide Partners' : 'Set Partners'}
+          <span className="partner-panel-count">{pairs.length}/{maxPairs}</span>
+        </button>
+      )}
 
-      {open && (
+      {(open || hideToggle) && (
         <div className="partner-panel-body">
           <div className="partner-panel-heading">
             <div>
@@ -188,7 +212,7 @@ export const PartnerPanel: React.FC<{
                     type="button"
                     title={`Remove ${a} and ${b}`}
                     aria-label={`Remove partner pair ${a} and ${b}`}
-                    onClick={() => setDraftPairs(draftPairs.filter((_, pairIndex) => pairIndex !== index))}
+                    onClick={() => removePair(index)}
                   >
                     <X size={11} />
                   </button>
@@ -223,8 +247,13 @@ export const PartnerPanel: React.FC<{
 
           <div className="partner-panel-actions">
             <button type="button" className="partner-panel-cancel" onClick={toggleOpen}>Cancel</button>
-            <button type="button" className="partner-panel-save" onClick={savePairs}>
-              Save {draftPairs.length === 1 ? '1 pair' : `${draftPairs.length} pairs`}
+            <button
+              type="button"
+              className="partner-panel-save"
+              onClick={savePairs}
+              style={justSaved ? { background: '#22c55e', borderColor: '#16a34a', color: '#ffffff' } : undefined}
+            >
+              {justSaved ? '✓ Pairs Confirmed!' : `Save ${draftPairs.length === 1 ? '1 pair' : `${draftPairs.length} pairs`}`}
             </button>
           </div>
         </div>

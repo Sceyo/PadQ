@@ -325,11 +325,12 @@ service cloud.firestore {
       return data.revision == resource.data.revision + 1 &&
         changed.hasOnly([
           'queue', 'courtSlots', 'doublesEngineState', 'singlesEngineState',
-          'priorityPlayers',
+          'sittingOut', 'priorityPlayers',
           'revision', 'updatedAt', 'lastActiveAt'
         ]) &&
         (!changed.hasAny(['queue']) || validPlayerSubset(data.queue, players)) &&
         (!changed.hasAny(['courtSlots']) || validCourts(courts, data.gameMode, players)) &&
+        (!changed.hasAny(['sittingOut']) || validPlayerSubset(data.get('sittingOut', []), players)) &&
         (!changed.hasAny(['priorityPlayers']) || validPlayerSubset(data.get('priorityPlayers', []), players)) &&
         (!changed.hasAny(['doublesEngineState']) ||
           (data.get('doublesEngineState', null) == null ||

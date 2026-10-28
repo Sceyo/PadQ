@@ -345,7 +345,9 @@ describe('playerUtils — generateSuggestions', () => {
   it('flags team-balance imbalance when the next 4 in queue differ by more than 30 combined win rate', () => {
     const stats = [stat('A', 5, 90, 0), stat('B', 5, 90, 0), stat('C', 5, 10, 0), stat('D', 5, 10, 0)];
     const suggestions = generateSuggestions(stats, ['A', 'B', 'C', 'D']);
-    expect(suggestions.find(s => s.type === 'team-balance')).toBeDefined();
+    const balance = suggestions.find(s => s.type === 'team-balance');
+    expect(balance).toBeDefined();
+    expect(balance?.message).toContain('Next doubles match (A & B vs C & D) may be unbalanced (90% vs 10% avg win rate). Try swapping B and C.');
   });
 
   it('does not check team-balance if queue has fewer than 4 players', () => {

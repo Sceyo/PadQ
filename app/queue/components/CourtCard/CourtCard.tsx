@@ -14,19 +14,24 @@ interface Props {
   onEdit?: (courtId: string) => void;
   onMarkAbsent?: (player: string) => void;
   onSelectPlayer?: (player: string) => void;
+  gameMode?: 'singles' | 'doubles';
 }
 
-export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent, onSelectPlayer }: Props) {
-  const teamA = slot.onCourt.slice(0, 2);
-  const teamB = slot.onCourt.slice(2, 4);
-  const ready = slot.onCourt.length >= 4;
+export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent, onSelectPlayer, gameMode = 'doubles' }: Props) {
+  const isSingles = gameMode === 'singles';
+  const requiredPlayers = isSingles ? 2 : 4;
+  const teamA = slot.onCourt.slice(0, isSingles ? 1 : 2);
+  const teamB = slot.onCourt.slice(isSingles ? 1 : 2, requiredPlayers);
+  const ready = slot.onCourt.length >= requiredPlayers;
+  const labelA = isSingles ? (teamA[0] ?? 'Player 1') : 'Team 1';
+  const labelB = isSingles ? (teamB[0] ?? 'Player 2') : 'Team 2';
 
   return (
     <div className={styles.card}>
       <div className={styles.header}>
         <span className={styles.courtName}>{slot.name}</span>
         {ready && <span className={styles.liveDot} />}
-        {isHost && ready && onEdit && (
+        {isHost && ready && onEdit && !isSingles && (
           <button
             className={styles.editBtn}
             onClick={() => onEdit(slot.id)}
@@ -41,7 +46,7 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent,
         <>
           <div className={styles.matchup}>
             <div className={`${styles.team} ${styles.teamA}`}>
-              <div className={styles.teamHeader}>Team 1</div>
+              <div className={styles.teamHeader}>{labelA}</div>
               <div className={styles.playerList}>
                 {teamA.map((p, i) => (
                   <div key={`a-${i}-${p}`} className={styles.playerRow}>
@@ -70,7 +75,7 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent,
             </div>
             <div className={styles.vsBadge}>VS</div>
             <div className={`${styles.team} ${styles.teamB}`}>
-              <div className={styles.teamHeader}>Team 2</div>
+              <div className={styles.teamHeader}>{labelB}</div>
               <div className={styles.playerList}>
                 {teamB.map((p, i) => (
                   <div key={`b-${i}-${p}`} className={styles.playerRow}>
@@ -104,18 +109,20 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent,
               <button
                 className={`${styles.winBtn} ${styles.winBtnA}`}
                 onClick={() => onWin(slot.id, 'A')}
-                title={`${teamA.join(' & ')} win`}
+                aria-label={`${isSingles ? labelA : 'Team 1'} wins`}
+                title={`${isSingles ? labelA : teamA.join(' & ')} wins`}
               >
                 <Trophy size={12} />
-                Team 1 Wins
+                {isSingles ? `${labelA} Wins` : 'Team 1 Wins'}
               </button>
               <button
                 className={`${styles.winBtn} ${styles.winBtnB}`}
                 onClick={() => onWin(slot.id, 'B')}
-                title={`${teamB.join(' & ')} win`}
+                aria-label={`${isSingles ? labelB : 'Team 2'} wins`}
+                title={`${isSingles ? labelB : teamB.join(' & ')} wins`}
               >
                 <Trophy size={12} />
-                Team 2 Wins
+                {isSingles ? `${labelB} Wins` : 'Team 2 Wins'}
               </button>
             </div>
           )}

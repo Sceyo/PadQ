@@ -57,6 +57,7 @@ export interface SessionState {
   isSaving:          boolean;   // true while a write is in-flight
   isReconnecting:    boolean;   // true when onSnapshot drops and is retrying
   isExpired:         boolean;   // true when session was deleted (TTL or hard reset)
+  isResuming:        boolean;   // true while reconnecting to a session found in localStorage
 
   // Persisted fields (mirrors Firestore document)
   players:           string[];
@@ -148,6 +149,7 @@ const INITIAL_STATE: SessionState = {
   isSaving:          false,
   isReconnecting:    false,
   isExpired:         false,
+  isResuming:        false,
   players:           [],
   queue:             [],
   playAllRel:        {},
@@ -171,7 +173,13 @@ const INITIAL_STATE: SessionState = {
 
 export function useSession(): SessionState & SessionActions {
 
-  const [state, setState] = useState<SessionState>(INITIAL_STATE);
+  const [state, setState] = useState<SessionState>(() => {
+    const hasStored = typeof window !== 'undefined' && Boolean(localStorage.getItem('padq_host_session_id'));
+    return {
+      ...INITIAL_STATE,
+      isResuming: hasStored,
+    };
+  });
 
   // Refs so async callbacks always see the latest values
   // without stale closures
@@ -236,7 +244,7 @@ export function useSession(): SessionState & SessionActions {
         const code = (err as { code?: string })?.code ?? '';
         if (code.includes('permission-denied')) {
           clearHostFromStorage();
-          setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+          setState(prev => ({ ...INITIAL_STATE, isExpired: true, isResuming: false }));
         } else {
           setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
         }
@@ -313,14 +321,17 @@ export function useSession(): SessionState & SessionActions {
 
   useEffect(() => {
     const { sessionId } = loadHostFromStorage();
-    if (!sessionId) return;
+    if (!sessionId) {
+      setState(prev => prev.isResuming ? { ...prev, isResuming: false } : prev);
+      return;
+    }
 
     loadSession(sessionId).then(data => {
       if (!data) {
         // Session expired (TTL deleted it) or never existed.
         // Clear stale storage so the host starts fresh.
         clearHostFromStorage();
-        setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+        setState({ ...INITIAL_STATE, isExpired: true });
         return;
       }
 
@@ -335,6 +346,7 @@ export function useSession(): SessionState & SessionActions {
         ...prev,
         sessionId,
         isHost: data.hostUid === auth.currentUser?.uid,
+        isResuming: false,
         ...docToState(data),
       }));
 
@@ -345,7 +357,7 @@ export function useSession(): SessionState & SessionActions {
         triggerFatalAuthError(err);
       } else {
         clearHostFromStorage();
-        setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+        setState({ ...INITIAL_STATE, isExpired: true });
       }
     });
 

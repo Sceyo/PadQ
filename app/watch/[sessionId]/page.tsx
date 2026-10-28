@@ -20,11 +20,12 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
-  Wifi, Check,
+  Wifi, Check, Sun, Moon,
   BarChart2, TrendingUp, Activity, AlertCircle,
   Loader2, Share2, Coffee,
 } from 'lucide-react';
@@ -127,6 +128,27 @@ function WatchPageContent() {
 
   // ── Access control: PIN gate ─────────────────────────────
   const { access, submitPin } = useSessionAccess(sessionId);
+
+  // ── Theme State ──────────────────────────────────────────
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem('padq_dark_mode');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    document.body.classList.toggle('dark-mode', darkMode);
+    document.documentElement.classList.toggle('dark-mode', darkMode);
+    try {
+      localStorage.setItem('padq_dark_mode', String(darkMode));
+    } catch {
+      // storage unavailable
+    }
+  }, [darkMode]);
 
   // ── Firebase state ──────────────────────────────────────
   const [session,         setSession]         = useState<SessionDoc | null>(null);
@@ -241,14 +263,16 @@ function WatchPageContent() {
     // Multi-court match detection
     if (session.courtSlots && session.courtSlots.length > 0) {
       if (prevCourtSlotsRef.current) {
+        const minOnCourt = session.gameMode === 'singles' ? 2 : 4;
         const changedCourt = session.courtSlots.find(curr => {
           const prev = prevCourtSlotsRef.current?.find(p => p.id === curr.id);
-          return prev && curr.onCourt.length >= 4 && curr.onCourt.join(',') !== prev.onCourt.join(',');
+          return prev && curr.onCourt.length >= minOnCourt && curr.onCourt.join(',') !== prev.onCourt.join(',');
         });
 
         if (changedCourt) {
-          const tA = changedCourt.onCourt.slice(0, 2).join(' & ');
-          const tB = changedCourt.onCourt.slice(2, 4).join(' & ');
+          const isSingles = session.gameMode === 'singles';
+          const tA = isSingles ? changedCourt.onCourt[0] : changedCourt.onCourt.slice(0, 2).join(' & ');
+          const tB = isSingles ? changedCourt.onCourt[1] : changedCourt.onCourt.slice(2, 4).join(' & ');
           const payload = {
             label: `🎾 NOW PLAYING ON ${changedCourt.name.toUpperCase()}`,
             text: `${tA}  vs  ${tB}`,
@@ -472,44 +496,70 @@ function WatchPageContent() {
           <div className="w-announcement-inner">
             <div className="w-announcement-label">{announcement.label}</div>
             <div className="w-announcement-match">{announcement.text}</div>
-            <button className="w-announcement-close" onClick={() => setAnnouncement(null)}>✕</button>
+            <button className="w-announcement-close" aria-label="Close match announcement" onClick={() => setAnnouncement(null)}>✕</button>
           </div>
         </div>
       )}
 
       {/* ── Top bar ── */}
-      <div className="w-topbar">
-        <button className="w-back-btn" onClick={() => router.push('/')}>
-          <ArrowLeft size={14} /> Home
-        </button>
-        <Link
-          className="w-back-btn"
-          href="/privacy"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              sessionStorage.setItem('padq_privacy_from', window.location.pathname + window.location.search);
-            }
-          }}
-        >
-          Privacy
-        </Link>
+      <header className="w-topbar">
+        <div className="w-topbar-left">
+          <button className="w-back-btn" onClick={() => router.push('/')} aria-label="Back to home">
+            <ArrowLeft size={14} /> Home
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', margin: '0 4px' }}>
+            <Image
+              src="/padq-logo.png"
+              alt="PadQ"
+              width={74}
+              height={26}
+              priority
 
-        <div className="w-session-info">
-          <span className={`w-dot ${status === 'live' ? 'w-dot--live' : 'w-dot--off'}`} />
-          <span className="w-live-label">LIVE</span>
-          <span className="w-room-code">{sessionId}</span>
+            />
+          </div>
         </div>
 
-        <div className="w-topbar-mode">
-          {gameMode === 'singles' ? <Swords size={14} /> : <Users size={14} />}
-          {gameMode === 'singles' ? 'Singles' : 'Doubles'} ·{' '}
-          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : 'Default'}
+        <div className="w-topbar-right">
+          <div className="w-session-info">
+            <span className={`w-dot ${status === 'live' ? 'w-dot--live' : 'w-dot--off'}`} />
+            <span className="w-live-label">LIVE</span>
+            <span className="w-room-code">{sessionId}</span>
+          </div>
+
+          <Link
+            className="w-back-btn"
+            href="/privacy"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('padq_privacy_from', window.location.pathname + window.location.search);
+              }
+            }}
+          >
+            Privacy
+          </Link>
+
+          <button
+            type="button"
+            className="w-theme-toggle"
+            onClick={() => setDarkMode(d => !d)}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
         </div>
-      </div>
+      </header>
 
       {/* ── Viewer read-only banner ── */}
       <div className="w-viewer-banner">
-        <Wifi size={13} /> You are watching live. Only the host can make changes.
+        <div className="w-viewer-banner-text">
+          <Wifi size={13} /> You are watching live. Only the host can make changes.
+        </div>
+        <div className="w-topbar-mode">
+          {gameMode === 'singles' ? <Swords size={12} /> : <Users size={12} />}
+          {gameMode === 'singles' ? 'Singles' : 'Doubles'} ·{' '}
+          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : 'Default'}
+        </div>
       </div>
 
       <div className="w-body">
@@ -520,8 +570,9 @@ function WatchPageContent() {
             ══════════════════════════════════════════════════ */}
         {!isMultiCourt && session.liveScore?.active && (() => {
           const ls = session.liveScore!;
-          const aWon = ls.scoreA >= ls.limit;
-          const bWon = ls.scoreB >= ls.limit;
+          const limit = ls.limit ?? 11;
+          const aWon = ls.scoreA >= limit && ls.scoreA - ls.scoreB >= 2;
+          const bWon = ls.scoreB >= limit && ls.scoreB - ls.scoreA >= 2;
           return (
             <div className="w-live-score-hero">
               <div className="w-live-score-badge">
@@ -531,7 +582,7 @@ function WatchPageContent() {
               </div>
               <div className="w-live-score-board">
                 <div className={`w-live-side ${aWon ? 'w-live-side--winner' : ''}`}>
-                  <div className="w-live-team-label">Team A</div>
+                  <div className="w-live-team-label">{gameMode === 'singles' ? 'Player 1' : 'Team A'}</div>
                   <div className="w-live-player-name">{ls.labelA}</div>
                   <div className="w-live-score-num">{ls.scoreA}</div>
                 </div>
@@ -540,7 +591,7 @@ function WatchPageContent() {
                   {(aWon || bWon) && <div className="w-live-gameover">Game Over!</div>}
                 </div>
                 <div className={`w-live-side ${bWon ? 'w-live-side--winner' : ''}`}>
-                  <div className="w-live-team-label">Team B</div>
+                  <div className="w-live-team-label">{gameMode === 'singles' ? 'Player 2' : 'Team B'}</div>
                   <div className="w-live-player-name">{ls.labelB}</div>
                   <div className="w-live-score-num">{ls.scoreB}</div>
                 </div>
@@ -680,6 +731,7 @@ function WatchPageContent() {
               sittingOut={session?.sittingOut ?? []}
               players={session?.players ?? []}
               priorityPlayers={session?.priorityPlayers ?? []}
+              lockedPartners={session?.lockedPartners ?? []}
             />
           </div>
         )}
@@ -730,8 +782,8 @@ function WatchPageContent() {
             ══════════════════════════════════════════════════ */}
         {!isTournament && !isSkilled && !isMultiCourt && (
           <>
-            {/* Current match */}
-            {currentSinglesMatch && (
+            {/* Current match — only show standalone On Court card if Live Score hero is not already active */}
+            {!session.liveScore?.active && currentSinglesMatch && (
               <div className="w-section">
                 <h2 className="w-section-title"><Swords size={16} /> On Court Now</h2>
                 <div className="w-vs-row">
@@ -748,7 +800,7 @@ function WatchPageContent() {
               </div>
             )}
 
-            {currentDoublesNext && (
+            {!session.liveScore?.active && currentDoublesNext && (
               <div className="w-section">
                 <h2 className="w-section-title"><Users size={16} /> On Court Now</h2>
                 <div className="w-vs-row">

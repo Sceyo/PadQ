@@ -46,13 +46,13 @@ describe('Deterministic Queue ETA (ADR-0002)', () => {
       expect(formatEtaLabel(8, 4, false)).toBeNull();
     });
 
-    it('multi-court displays "Up next" for m = 1 and "~m matches" for m > 1', () => {
+    it('multi-court displays "Up next" for m = 1 and "Wait: m matches" for m > 1', () => {
       expect(formatEtaLabel(1, 4, true)).toBe('Up next');
       expect(formatEtaLabel(4, 4, true)).toBe('Up next');
-      expect(formatEtaLabel(5, 4, true)).toBe('~2 matches');
-      expect(formatEtaLabel(8, 4, true)).toBe('~2 matches');
-      expect(formatEtaLabel(9, 4, true)).toBe('~3 matches');
-      expect(formatEtaLabel(20, 4, true)).toBe('~5 matches');
+      expect(formatEtaLabel(5, 4, true)).toBe('Wait: 2 matches');
+      expect(formatEtaLabel(8, 4, true)).toBe('Wait: 2 matches');
+      expect(formatEtaLabel(9, 4, true)).toBe('Wait: 3 matches');
+      expect(formatEtaLabel(20, 4, true)).toBe('Wait: 5 matches');
     });
 
     it('returns null for invalid inputs', () => {

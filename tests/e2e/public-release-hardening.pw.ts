@@ -9,7 +9,10 @@ async function startLiveDoublesRoom(page: Page) {
   await page.getByRole('button', { name: /Start Queue/ }).click();
   await expect(page.locator('.session-bar--host')).toContainText('Connected', { timeout: 20_000 });
   await page.getByTitle('Settings').click();
-  await page.getByRole('button', { name: 'Start', exact: true }).click();
+  const startLive = page.getByRole('button', { name: 'Start', exact: true });
+  if (await startLive.isVisible({ timeout: 2000 }).catch(() => false)) {
+    await startLive.click();
+  }
   const roomCode = (await page.locator('.session-code').textContent())?.trim();
   expect(roomCode).toMatch(/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/);
   return roomCode!;
@@ -80,16 +83,19 @@ test('owner permanently deletes the live event and its history', async ({ browse
     await expect(viewer.getByText('You are watching live. Only the host can make changes.'))
       .toBeVisible({ timeout: 20_000 });
 
-    await host.getByRole('button', { name: 'Team A', exact: true }).click();
-    await host.getByRole('button', { name: 'Confirm Match' }).click();
-    await expect(host.getByRole('button', { name: 'Close' })).toBeVisible({ timeout: 20_000 });
-    await host.getByRole('button', { name: 'Close' }).click();
+    const plusA = host.locator('.score-side--a .score-btn--plus');
+    for (let point = 0; point < 11; point += 1) { await plusA.click(); await host.waitForTimeout(60); }
+    const confirmBtn = host.getByRole('button', { name: /Confirm result|Confirm Match/ });
+    await confirmBtn.click();
+
+
+
     await viewer.getByRole('button', { name: 'View Performance & History' }).click();
     await expect(viewer.locator('.w-history-item')).toHaveCount(1, { timeout: 20_000 });
 
     await host.getByTitle('Settings').click();
     await host.getByRole('menuitem', { name: 'End & Delete Event' }).click();
-    await expect(host.getByRole('dialog')).toContainText('Delete this event and all match history');
+    await expect(host.getByRole('dialog')).toContainText('Nothing will be saved after the session has ended');
     await host.getByRole('button', { name: 'Confirm', exact: true }).click();
     await expect(host).toHaveURL('/', { timeout: 20_000 });
 
@@ -109,12 +115,15 @@ test('an offline match save restores the prior queue and can be retried', async 
     await startLiveDoublesRoom(host);
     const beforeQueue = await host.locator('.pairing-table').innerText();
 
+    const plusA2 = host.locator('.score-side--a .score-btn--plus');
+    for (let point = 0; point < 11; point += 1) { await plusA2.click(); await host.waitForTimeout(60); }
     await context.setOffline(true);
-    await host.getByRole('button', { name: 'Team A', exact: true }).click();
-    await host.getByRole('button', { name: 'Confirm Match' }).click();
+    const confirmBtn = host.getByRole('button', { name: /Confirm result|Confirm Match/ });
+    await confirmBtn.click();
 
-    await expect(host.locator('.toast-notification')).toContainText(/could not reach Firebase|could not be saved/, { timeout: 20_000 });
-    await expect(host.getByRole('button', { name: 'Confirm Match' })).toBeEnabled();
+
+    await expect(host.locator('.toast-notification, [role="alert"]:not(#__next-route-announcer__)').first()).toContainText(/could not reach Firebase|could not be saved|Save failed/i, { timeout: 20_000 });
+    await expect(host.getByRole('button', { name: /Confirm result|Confirm Match|Try Again/ })).toBeEnabled();
     expect(await host.locator('.pairing-table').innerText()).toBe(beforeQueue);
     await expect(host.getByRole('button', { name: 'Close' })).toHaveCount(0);
 
@@ -134,4 +143,43 @@ test('responses include the public-release security headers', async ({ request }
   expect(headers['x-frame-options']).toBe('DENY');
   expect(headers['referrer-policy']).toBe('strict-origin-when-cross-origin');
   expect(headers['permissions-policy']).toContain('camera=(self)');
+});
+
+test('player substitution at 0-0 updates live spectator view in real-time', async ({ browser }) => {
+  const hostContext = await browser.newContext();
+  const viewerContext = await browser.newContext();
+  const host = await hostContext.newPage();
+  const viewer = await viewerContext.newPage();
+
+  try {
+    const roomCode = await startLiveDoublesRoom(host);
+
+    await viewer.goto(`/watch/${roomCode}`);
+    await expect(viewer.getByText('You are watching live. Only the host can make changes.')).toBeVisible({ timeout: 20_000 });
+
+    // Initial on-court players: Delete Player 1 & Delete Player 2 vs Delete Player 3 & Delete Player 4
+    await expect(viewer.locator('.w-body')).toContainText('Delete Player 2', { timeout: 10_000 });
+
+    // Host replaces Delete Player 2 with Delete Player 5 at 0-0
+    await host.getByRole('button', { name: 'Delete Player 2' }).click();
+    await host.getByRole('button', { name: /Replace player/i }).click();
+
+    // Select Delete Player 5 in Replace dialog and confirm
+    const replaceDialog = host.getByRole('dialog', { name: /Replace/i });
+    await expect(replaceDialog).toBeVisible({ timeout: 5000 });
+    await replaceDialog.getByRole('button', { name: 'Delete Player 5' }).click();
+    await replaceDialog.getByRole('button', { name: 'Replace', exact: true }).click();
+    await expect(replaceDialog).toHaveCount(0);
+
+    // Host court now shows Delete Player 5 on court
+    await expect(host.locator('.score-side--a')).toContainText('Delete Player 5');
+
+    // Viewer observes Delete Player 5 on court without reloading, and Delete Player 2 removed from court
+    const onCourtSection = viewer.locator('.w-vs-row, .w-live-score-board').first();
+    await expect(onCourtSection).toContainText('Delete Player 5', { timeout: 15_000 });
+    await expect(onCourtSection).not.toContainText('Delete Player 2');
+  } finally {
+    await viewerContext.close();
+    await hostContext.close();
+  }
 });
