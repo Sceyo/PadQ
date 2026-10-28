@@ -267,10 +267,6 @@ test('optimistic live-score reload mid-game and minus after win with deuce (Feed
 
     // Confirm match commits exactly once
     await deuceConfirm.click();
-    const confirmCommit = host.getByRole('button', { name: /Confirm result|Confirm Match/ });
-    if (await confirmCommit.isVisible({ timeout: 1000 }).catch(() => false)) {
-      await confirmCommit.click();
-    }
 
     // Verify exactly one match in history on spectator
     await viewer.getByRole('button', { name: 'View Performance & History' }).click();
