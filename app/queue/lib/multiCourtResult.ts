@@ -1,3 +1,5 @@
+export const MULTI_COURT_SINGLES_MAX_STREAK = 3;
+
 import { rotateMultiCourtDoubles, pairKey, teamPairKey, type LockedPartnerPair } from './doublesEngine';
 
 export interface MultiCourtSlot {
@@ -23,6 +25,28 @@ export interface PlannedCourtResult {
   players: string;
   winner: string;
   priorityPlayers?: string[];
+}
+
+function getCourtSinglesStreak(
+  courtName: string,
+  winner: string,
+  history?: Array<{ id?: number; mode?: string; courtName?: string; players: string; winner: string }>,
+): number {
+  if (!history || history.length === 0) return 0;
+  let streak = 0;
+  for (const h of history) {
+    const isThisCourt =
+      (h.courtName && h.courtName === courtName) ||
+      (h.mode && (h.mode.includes(`(${courtName})`) || h.mode.includes(courtName)));
+    if (isThisCourt) {
+      if (h.winner === winner) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+  }
+  return streak;
 }
 
 export function planMultiCourtResult(
@@ -66,7 +90,11 @@ export function planMultiCourtResult(
     let nextOnCourt: string[];
     let consumedWaitingCount: number;
 
-    if (isWinnerAvailable) {
+    const priorWins = getCourtSinglesStreak(slot.name, winner, state.history as any);
+    const isStreakMaxed = (priorWins + 1) >= MULTI_COURT_SINGLES_MAX_STREAK;
+    const canRotateKing = isStreakMaxed && (orderedWaiting.length >= 2 || (orderedWaiting.length >= 1 && isLoserAvailable));
+
+    if (isWinnerAvailable && !canRotateKing) {
       const nextChallenger = orderedWaiting[0];
       if (nextChallenger) {
         nextOnCourt = [winner, nextChallenger];
@@ -79,7 +107,7 @@ export function planMultiCourtResult(
         consumedWaitingCount = 0;
       }
     } else {
-      // Winner is sitting out -> steps down to break
+      // Winner is sitting out or max streak reached -> king steps down to queue/break
       const challengerA = orderedWaiting[0] ?? '';
       const challengerB = orderedWaiting[1] ?? (isLoserAvailable ? loser : '');
       nextOnCourt = [challengerA, challengerB];
@@ -90,9 +118,11 @@ export function planMultiCourtResult(
     const remainingWaiting = state.queue.filter(
       player => !consumedChallengers.has(player) && !unavailable.has(player),
     );
-    const queue = isLoserAvailable && !nextOnCourt.includes(loser)
-      ? [...remainingWaiting, loser]
-      : remainingWaiting;
+    const queue = [
+      ...remainingWaiting,
+      ...(isLoserAvailable && !nextOnCourt.includes(loser) ? [loser] : []),
+      ...(isWinnerAvailable && !nextOnCourt.includes(winner) ? [winner] : []),
+    ];
 
     const courtSlots = state.courtSlots.map(court =>
       court.id === courtId ? { ...court, onCourt: nextOnCourt } : court,
