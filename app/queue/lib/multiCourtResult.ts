@@ -30,7 +30,7 @@ export interface PlannedCourtResult {
 function getCourtSinglesStreak(
   courtName: string,
   winner: string,
-  history?: Array<{ id?: number; mode?: string; courtName?: string; players: string; winner: string }>,
+  history?: Array<{ id?: number; mode?: string; courtName?: string; players?: string; winner?: string }>,
 ): number {
   if (!history || history.length === 0) return 0;
   let streak = 0;
@@ -90,7 +90,7 @@ export function planMultiCourtResult(
     let nextOnCourt: string[];
     let consumedWaitingCount: number;
 
-    const priorWins = getCourtSinglesStreak(slot.name, winner, state.history as unknown as Array<{ mode?: string; winner?: string }>);
+    const priorWins = getCourtSinglesStreak(slot.name, winner, state.history);
     const isStreakMaxed = (priorWins + 1) >= MULTI_COURT_SINGLES_MAX_STREAK;
     const canRotateKing = isStreakMaxed && (orderedWaiting.length >= 2 || (orderedWaiting.length >= 1 && isLoserAvailable));
 

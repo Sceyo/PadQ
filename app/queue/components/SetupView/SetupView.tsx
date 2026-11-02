@@ -381,7 +381,10 @@ export function SetupView({
 
         {tempPlayers.length > 0 && (
           <div className="players-list">
-            <h3><Users size={13} /> Checked In ({tempPlayers.length})</h3>
+            <div className="setup-players-header">
+              <h3><Users size={13} /> Players ({tempPlayers.length})</h3>
+              <span className="setup-checked-in-pill">Checked In</span>
+            </div>
             <ul>
               {tempPlayers.map((p, i) => (
                 <li key={i}>
