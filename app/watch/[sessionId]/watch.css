@@ -1061,6 +1061,24 @@
   background: var(--accent-surface, rgba(99, 102, 241, 0.2));
   color: var(--accent-primary, #818cf8);
 }
+.w-status-pill--alert-on {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+}
+.w-queue-chip--interactive {
+  cursor: pointer;
+  user-select: none;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.w-queue-chip--interactive:hover {
+  border-color: rgba(99, 102, 241, 0.5);
+  transform: translateY(-1px);
+}
+.w-queue-chip--watched {
+  border-color: rgba(34, 197, 94, 0.7) !important;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.35);
+}
 .w-status-pill--eta {
   background: rgba(148, 163, 184, 0.12);
   color: var(--text-secondary, #94a3b8);

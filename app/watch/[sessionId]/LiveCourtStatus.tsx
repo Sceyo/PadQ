@@ -15,6 +15,8 @@ interface Props {
   players?: string[];
   priorityPlayers?: string[];
   lockedPartners?: Array<{ a: string; b: string }>;
+  watchedPlayer?: string | null;
+  onToggleWatchPlayer?: (playerName: string) => void;
 }
 
 export function resolveSelectedCourt(courtSlots: CourtSlot[], selectedCourtId: string) {
@@ -35,6 +37,8 @@ export function LiveCourtStatus({
   players,
   priorityPlayers = [],
   lockedPartners = [],
+  watchedPlayer = null,
+  onToggleWatchPlayer,
 }: Props) {
   const selectedCourt = resolveSelectedCourt(courtSlots, selectedCourtId);
   const playersNeeded = gameMode === 'doubles' ? 4 : 2;
@@ -174,9 +178,17 @@ export function LiveCourtStatus({
             {waitingQueue.map((player, index) => {
               const isOnDeck = index < playersNeeded;
               const etaLabel = formatEtaLabel(index + 1, playersNeeded, courtSlots.length > 1);
+              const isWatched = watchedPlayer === player;
 
               return (
-                <span key={`${index}-${player}`} className="w-queue-chip">
+                <span
+                  key={`${index}-${player}`}
+                  className={`w-queue-chip ${onToggleWatchPlayer ? 'w-queue-chip--interactive' : ''} ${isWatched ? 'w-queue-chip--watched' : ''}`}
+                  onClick={() => onToggleWatchPlayer?.(player)}
+                  role={onToggleWatchPlayer ? 'button' : undefined}
+                  tabIndex={onToggleWatchPlayer ? 0 : undefined}
+                  title={onToggleWatchPlayer ? (isWatched ? 'Tap to disable turn alert' : 'Tap to alert when on deck') : undefined}
+                >
                   <span className="w-queue-num">#{index + 1}</span> {player}
                   {partnerMap[player] && (
                     <span className="w-partner-pill" title={`Paired with ${partnerMap[player]}`}>
@@ -185,6 +197,11 @@ export function LiveCourtStatus({
                   )}
                   {prioritySet.has(player) && (
                     <span className="w-status-pill w-status-pill--priority">Next up</span>
+                  )}
+                  {isWatched && (
+                    <span className="w-status-pill w-status-pill--alert-on" title="Turn alert armed">
+                      🔔 Alert on
+                    </span>
                   )}
                   {isOnDeck ? (
                     <span className="w-status-pill w-status-pill--on-deck">On deck</span>

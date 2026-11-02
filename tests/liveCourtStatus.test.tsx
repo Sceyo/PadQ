@@ -184,4 +184,19 @@ describe('Live Court Status', () => {
     expect(html).toContain('w-status-pill--priority');
     expect(html).toContain('Next up');
   });
+  it('renders watched player alert badge when spectator taps their name', () => {
+    const html = renderToStaticMarkup(
+      <LiveCourtStatus
+        courtSlots={courts}
+        gameMode="doubles"
+        queue={['A', 'B', 'N', 'O', 'P', 'Q']}
+        selectedCourtId="court-3"
+        onSelectCourt={() => undefined}
+        watchedPlayer="O"
+      />,
+    );
+
+    expect(html).toContain('w-status-pill--alert-on');
+    expect(html).toContain('🔔 Alert on');
+  });
 });

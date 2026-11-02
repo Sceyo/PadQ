@@ -46,6 +46,14 @@ import { buildPlayerStats, comparePlayerStats, formatPointDiff, formatMatchupStr
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
 import { RecapModal } from '@/app/queue/components/RecapCard';
 import { LiveCourtStatus } from './LiveCourtStatus';
+import {
+  getPlayerTurnZone,
+  shouldTriggerTurnAlert,
+  fireBrowserTurnAlert,
+  getWatchedPlayer,
+  setWatchedPlayer,
+  type PlayerTurnZone,
+} from '@/app/queue/lib/turnAlert';
 import './watch.css';
 
 // ═══════════════════════════════════════════════════════════
@@ -181,6 +189,40 @@ function WatchPageContent() {
   const [announcement,   setAnnouncement]    = useState<{ label: string; text: string } | null>(null);
   const prevMatchKeyRef = useRef<string>('');
   const prevCourtSlotsRef = useRef<CourtSlot[] | null>(null);
+
+  // Spectator Turn Alert
+  const [watchedPlayer, setWatchedPlayerState] = useState<string | null>(() => getWatchedPlayer(sessionId));
+  const prevTurnZoneRef = useRef<PlayerTurnZone | null>(null);
+
+  useEffect(() => {
+    if (!watchedPlayer || !session) {
+      prevTurnZoneRef.current = null;
+      return;
+    }
+    const playersPerMatch = session.gameMode === 'singles' ? 2 : 4;
+    const courts = session.courtSlots ?? [];
+    const q = session.queue ?? [];
+    const zoneResult = getPlayerTurnZone(watchedPlayer, courts, q, playersPerMatch);
+
+    if (prevTurnZoneRef.current && shouldTriggerTurnAlert(prevTurnZoneRef.current, zoneResult.zone)) {
+      const alertMsg = zoneResult.zone === 'on-court'
+        ? `You are on court${zoneResult.courtName ? ` (${zoneResult.courtName})` : ''}!`
+        : 'You are on deck! Get ready to play.';
+      fireBrowserTurnAlert(alertMsg);
+    }
+    prevTurnZoneRef.current = zoneResult.zone;
+  }, [watchedPlayer, session]);
+
+  const toggleWatchPlayer = (playerName: string) => {
+    setWatchedPlayerState(current => {
+      const next = current === playerName ? null : playerName;
+      setWatchedPlayer(sessionId, next);
+      if (next) {
+        fireBrowserTurnAlert();
+      }
+      return next;
+    });
+  };
 
   // ── Guardrail: validate session exists before subscribing ──
 
