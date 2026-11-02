@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { BarChart2, TrendingUp, Activity, Clock, Flame, Layers, Share2, Trophy } from 'lucide-react';
+import { BarChart2, TrendingUp, Activity, Clock, Flame, Layers, Share2, Trophy, ArrowLeftRight } from 'lucide-react';
+import { flipHistoryEntryWinner } from '../../lib/historyCorrection';
 import type { PlayerStat, MatchHistoryEntry } from '../../lib/types';
 import { comparePlayerStats, formatPointDiff, formatMatchupStrength } from '../../lib/playerUtils';
 import type { CareerStatsMap } from '@/lib/sessionService';
@@ -32,7 +33,8 @@ export const AnalyticsDashboard: React.FC<{
   roomCode?: string | null;
   mode?: string;
   initialTab?: 'session' | 'history' | 'skilled';
-}> = ({ stats, careerStats: _careerStats, skilledBrackets, history = [], roomCode, mode = 'Doubles', initialTab }) => {
+  onCorrectHistoryEntry?: (entryId: number, updated: MatchHistoryEntry) => void;
+}> = ({ stats, careerStats: _careerStats, skilledBrackets, history = [], roomCode, mode = 'Doubles', initialTab, onCorrectHistoryEntry }) => {
   const hasSkilled = !!skilledBrackets && (
     skilledBrackets.beginner.length > 0 ||
     skilledBrackets.intermediate.length > 0 ||
@@ -370,6 +372,17 @@ export const AnalyticsDashboard: React.FC<{
                     {e.winner}
                   </div>
                   {e.score && <div className="history-score">{e.score}</div>}
+                  {onCorrectHistoryEntry && (
+                    <button
+                      type="button"
+                      className="history-flip-btn"
+                      onClick={() => onCorrectHistoryEntry(e.id, flipHistoryEntryWinner(e))}
+                      title="Retroactively flip match winner"
+                      aria-label={`Flip winner for match ${e.id}`}
+                    >
+                      <ArrowLeftRight size={11} /> Flip Winner
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

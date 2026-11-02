@@ -125,4 +125,31 @@ describe('AnalyticsDashboard component', () => {
     const firstCard = mobileCards[0].querySelector('.analytics-player-card');
     expect(firstCard).not.toBeNull();
   });
+  it('renders Flip Winner button and calls onCorrectHistoryEntry when clicked', () => {
+    const history = [
+      { id: 1, mode: 'doubles (Court 1)', players: 'Alice & Bob vs Charlie & Dave', winner: 'Alice & Bob', score: '11-7', timestamp: '4:20 PM' },
+    ];
+    let correctedId: number | null = null;
+    let correctedEntry: unknown = null;
+
+    const { getByText } = render(
+      <AnalyticsDashboard
+        stats={mockStats}
+        history={history}
+        initialTab="history"
+        onCorrectHistoryEntry={(id, updated) => {
+          correctedId = id;
+          correctedEntry = updated;
+        }}
+      />
+    );
+
+    const flipBtn = getByText('Flip Winner');
+    expect(flipBtn).toBeDefined();
+    fireEvent.click(flipBtn);
+
+    expect(correctedId).toBe(1);
+    expect((correctedEntry as { winner: string }).winner).toBe('Charlie & Dave');
+    expect((correctedEntry as { score: string }).score).toBe('7-11');
+  });
 });

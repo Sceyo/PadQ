@@ -4758,3 +4758,24 @@ body.dark-mode .format-option-btn--active {
 .remove-expected-btn:hover {
   color: var(--danger, #ef4444);
 }
+
+/* History Correction Button */
+.history-flip-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(99, 102, 241, 0.08);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: var(--r-sm, 6px);
+  color: var(--primary, #818cf8);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+.history-flip-btn:hover {
+  background: rgba(99, 102, 241, 0.18);
+  border-color: var(--primary, #818cf8);
+}

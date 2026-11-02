@@ -648,7 +648,17 @@ function QueueSystemContent() {
   const activeTournamentM      = session.isConnected && session.tournamentMatches?.length > 0 ? session.tournamentMatches : localTournamentM;
   const activeTournamentActive = localTournamentActive || (session.isConnected ? session.tournamentActive : false);
   const activeTournamentWinner = session.isConnected ? session.tournamentWinner  : localTournamentWinner;
-  const activeHistory          = session.isConnected ? (session.matchHistory as unknown as MatchHistoryEntry[]) : localHistory;
+  const rawActiveHistory       = session.isConnected ? (session.matchHistory as unknown as MatchHistoryEntry[]) : localHistory;
+  const [historyOverrides, setHistoryOverrides] = useState<Record<number, MatchHistoryEntry>>({});
+  const activeHistory          = useMemo(() => {
+    return rawActiveHistory.map(entry => historyOverrides[entry.id] ?? entry);
+  }, [rawActiveHistory, historyOverrides]);
+
+  const handleCorrectHistoryEntry = (entryId: number, updated: MatchHistoryEntry) => {
+    setHistoryOverrides(prev => ({ ...prev, [entryId]: updated }));
+    setLocalHistory(prev => prev.map(entry => entry.id === entryId ? updated : entry));
+    showToast(`Corrected Match #${entryId}: Winner is now ${updated.winner}`);
+  };
 
   // Derived
   const statsList      = useMemo(() => buildPlayerStats(players, activeHistory), [players, activeHistory]);
