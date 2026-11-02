@@ -13,8 +13,8 @@ const HEADER_PATTERN = /^(?:players?\s*(?:list)?|rsvp|waitlist|confirmed|attende
 // Leading numbers and bullets: "1.", "2)", "[3]", "#4", "-", "•", "*"
 const LEADING_NUMBER_OR_BULLET_PATTERN = /^\s*(?:\[\d+\]|\d+[\.\)\-:]|\#\d+|\-\s*|•\s*|\*\s*)/i;
 
-// Payment tags and status notes: "[PAID]", "(paid)", "[gcash]", "(via gcash)", "guest", etc.
-const STATUS_TAG_PATTERN = /[\(\[\{]\s*(?:paid|unpaid|gcash|cash|guest|sub|waitlist|via\s+\w+|\d+k?|\₱?\d+)\s*[\)\]\}]/gi;
+// Payment tags and status notes: "[PAID]", "(paid)", "[gcash]", "(via gcash)", "[confirmed]", "(late)", "guest", etc.
+const STATUS_TAG_PATTERN = /[\(\[\{]\s*(?:paid|unpaid|gcash|cash|guest|sub|waitlist|confirmed|late|check(?:ed)?[\s-]?in|via\s+\w+|\d+k?|\₱?\d+)\s*[\)\]\}]/gi;
 const STANDALONE_STATUS_PATTERN = /\b(?:paid|unpaid|gcash|cash)\b/gi;
 
 // Phone numbers e.g. 09171234567 or +63917... or 555-1234

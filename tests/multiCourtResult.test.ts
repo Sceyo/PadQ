@@ -18,7 +18,13 @@ describe('multiCourtResult singles 3-win streak cap', () => {
       ],
     };
 
-    const next = planMultiCourtResult(state as any, 'c1', ['KingPlayer', 'Challenger3'], 'A', 'singles');
+    const next = planMultiCourtResult(
+      state as unknown as Parameters<typeof planMultiCourtResult>[0],
+      'c1',
+      ['KingPlayer', 'Challenger3'],
+      'A',
+      'singles',
+    );
     expect(next).not.toBeNull();
     // KingPlayer won 3 in a row. King must rotate out to the back of the queue!
     expect(next!.courtSlots[0].onCourt).toEqual(['Challenger4', 'Challenger5']);

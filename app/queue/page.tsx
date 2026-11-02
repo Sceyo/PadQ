@@ -248,37 +248,31 @@ function QueueSystemContent() {
       return next;
     });
   };
-  const [lateArrivals, setLateArrivals] = useState<string[]>([]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined' || !session.sessionId) return;
-    try {
-      const raw = localStorage.getItem(`padq_late_arrivals_${session.sessionId}`);
-      if (raw) setLateArrivals(JSON.parse(raw));
-    } catch {}
-  }, [session.sessionId]);
-
-  const handleCheckInLateArrival = async (name: string) => {
-    await handleAddPlayerLive(name);
-    setLateArrivals(prev => {
-      const next = prev.filter(p => p !== name);
-      try {
-        if (session.sessionId) localStorage.setItem(`padq_late_arrivals_${session.sessionId}`, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+  const handleCheckInPlayer = (name: string) => {
+    setExpectedPlayers(prev => prev.filter(p => p !== name));
+    setTempPlayers(prev => (prev.includes(name) ? prev : [...prev, name]));
   };
 
-  const handleDismissLateArrival = (name: string) => {
-    setLateArrivals(prev => {
-      const next = prev.filter(p => p !== name);
-      try {
-        if (session.sessionId) localStorage.setItem(`padq_late_arrivals_${session.sessionId}`, JSON.stringify(next));
-      } catch {}
-      return next;
-    });
+  const handleUndoCheckInPlayer = (name: string) => {
+    setTempPlayers(prev => prev.filter(p => p !== name));
+    setExpectedPlayers(prev => (prev.includes(name) ? prev : [...prev, name]));
   };
-  const [expectedPlayers, setExpectedPlayers] = useState<string[]>([]);
+
+  const handleCheckInAll = () => {
+    setTempPlayers(prev => {
+      const combined = [...prev];
+      for (const p of expectedPlayers) {
+        if (!combined.includes(p)) combined.push(p);
+      }
+      return combined;
+    });
+    setExpectedPlayers([]);
+  };
+
+  const handleRemoveExpectedPlayer = (name: string) => {
+    setExpectedPlayers(prev => prev.filter(p => p !== name));
+  };
   const [currentName,  setCurrentName]  = useState('');
   const [pasteInput,   setPasteInput]   = useState('');
   const [modalOpen,    setModalOpen]    = useState(false);

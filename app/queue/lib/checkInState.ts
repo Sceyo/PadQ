@@ -12,6 +12,14 @@ export function createInitialCheckInState(): PreSessionCheckInState {
   };
 }
 
+export function initCheckInState(expectedNames: string[] = []): PreSessionCheckInState {
+  const initial = createInitialCheckInState();
+  if (expectedNames.length > 0) {
+    return addPlayersToCheckIn(initial, expectedNames, 'expected');
+  }
+  return initial;
+}
+
 /**
  * Adds new player names to either 'expected' or 'checkedIn'.
  * Automatically deduplicates case-insensitively across both lists.
@@ -23,8 +31,8 @@ export function addPlayersToCheckIn(
   target: 'expected' | 'checkedIn',
   maxTotal = 30,
 ): PreSessionCheckInState {
-  let expected = [...state.expected];
-  let checkedIn = [...state.checkedIn];
+  const expected = [...state.expected];
+  const checkedIn = [...state.checkedIn];
 
   for (const raw of names) {
     const clean = sanitizePlayerName(raw);
