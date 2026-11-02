@@ -144,4 +144,22 @@ describe('RecapModal component', () => {
     fireEvent.click(overlay);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+  it('allows switching to Player Card tab and selecting any player to render their personal spotlight card', () => {
+    const { getByText, getByLabelText, getAllByText } = render(
+      <RecapModal
+        isOpen={true}
+        onClose={() => {}}
+        stats={mockStats}
+        history={mockHistory}
+        roomCode="PADQ01"
+        mode="Doubles"
+      />
+    );
+
+    fireEvent.click(getByText(/Player Card/i));
+    const select = getByLabelText(/Select player/i) as HTMLSelectElement;
+    expect(select).toBeTruthy();
+    fireEvent.change(select, { target: { value: mockStats[1].name } });
+    expect(getAllByText(new RegExp(`#2 OF ${mockStats.length}`, 'i')).length).toBe(2);
+  });
 });
