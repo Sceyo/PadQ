@@ -72,6 +72,7 @@ import {
 import { V1_RELEASE } from './lib/releaseConfig';
 import { planMultiCourtResult } from './lib/multiCourtResult';
 import { formatEtaLabel } from './lib/etaEngine';
+import { parsePlayerListPaste } from './lib/pasteParser';
 import {
   toggleSitOutTransition,
   removeFromQueueTransition,
@@ -216,6 +217,8 @@ function QueueSystemContent() {
   // UI-only state
   
   const [tempPlayers,  setTempPlayers]  = useState<string[]>([]);
+  const [expectedPlayers, setExpectedPlayers] = useState<string[]>([]);
+  const [expectedPlayers, setExpectedPlayers] = useState<string[]>([]);
   const [currentName,  setCurrentName]  = useState('');
   const [pasteInput,   setPasteInput]   = useState('');
   const [modalOpen,    setModalOpen]    = useState(false);
@@ -784,6 +787,16 @@ function QueueSystemContent() {
     resetSinglesState(orderedPlayers);
     resetPoolSinglesState();
     setPlayers(orderedPlayers);
+    if (expectedPlayers.length > 0) {
+      try {
+        localStorage.setItem(`padq_late_arrivals_${session.sessionId ?? 'draft'}`, JSON.stringify(expectedPlayers));
+      } catch {}
+    }
+    if (expectedPlayers.length > 0) {
+      try {
+        localStorage.setItem(`padq_late_arrivals_${session.sessionId ?? 'draft'}`, JSON.stringify(expectedPlayers));
+      } catch {}
+    }
     setTempPlayers([]);
     setLocalHistory([]);
     setLocalTournamentActive(localQueueMode === 'tournament');
@@ -2054,6 +2067,11 @@ function QueueSystemContent() {
         errorMsg={setupErrorMsg ?? undefined}
         singlesFormat={singlesFormat}
         onSinglesFormatChange={setSinglesFormat}
+        expectedPlayers={expectedPlayers}
+        onCheckInPlayer={handleCheckInPlayer}
+        onUndoCheckInPlayer={handleUndoCheckInPlayer}
+        onCheckInAll={handleCheckInAll}
+        onRemoveExpectedPlayer={handleRemoveExpectedPlayer}
       />
     );
   }

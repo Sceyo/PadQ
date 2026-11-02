@@ -4665,3 +4665,96 @@ body.dark-mode .format-option-btn--active {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+/* ── Expected Arrivals & Pre-Session Check-in ── */
+.expected-arrivals-panel {
+  text-align: left;
+  margin-bottom: 16px;
+  background: var(--card-alt);
+  border: 1px dashed var(--border);
+  border-radius: var(--r-md);
+  padding: 14px 16px;
+}
+.expected-arrivals-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.expected-arrivals-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--txt-2);
+}
+.checkin-all-btn {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.checkin-all-btn:hover {
+  background: rgba(34, 197, 94, 0.25);
+}
+.expected-chips-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.expected-player-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: var(--surface-bg, #0d111e);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm, 8px);
+  font-size: 0.85rem;
+}
+.expected-name {
+  font-weight: 600;
+  color: var(--txt-1);
+}
+.expected-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.checkin-btn {
+  background: var(--primary, #3b82f6);
+  color: #fff;
+  border: none;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.remove-expected-btn {
+  background: none;
+  border: none;
+  color: var(--txt-3);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0 4px;
+}
+.remove-expected-btn:hover {
+  color: var(--danger, #ef4444);
+}
