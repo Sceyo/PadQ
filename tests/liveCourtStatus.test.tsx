@@ -47,7 +47,22 @@ describe('Live Court Status', () => {
     expect(html).toContain('w-vs-badge');
     expect(html).toContain('Assignment is confirmed when the next court becomes available.');
     expect(html).toContain('#1</span> M');
-    expect(html).toContain('+1 waiting');
+    expect(html).toContain('Wait: 2 matches');
+  });
+
+  it('renders all waiting players with deterministic ETA badges instead of hiding players #5+', () => {
+    const html = renderToStaticMarkup(
+      <LiveCourtStatus
+        courtSlots={courts}
+        gameMode="doubles"
+        queue={['W1', 'W2', 'W3', 'W4', 'W5', 'W6']}
+        selectedCourtId="court-1"
+        onSelectCourt={() => undefined}
+      />,
+    );
+    expect(html).toContain('W5');
+    expect(html).toContain('W6');
+    expect(html).toContain('Wait: 2 matches');
   });
 
   it('uses the correct next-player group size for singles and doubles', () => {

@@ -1061,6 +1061,11 @@
   background: var(--accent-surface, rgba(99, 102, 241, 0.2));
   color: var(--accent-primary, #818cf8);
 }
+.w-status-pill--eta {
+  background: rgba(148, 163, 184, 0.12);
+  color: var(--text-secondary, #94a3b8);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
 .w-status-pill--on-break {
   background: var(--status-warn-bg, rgba(245, 158, 11, 0.15));
   color: var(--status-warn, #f59e0b);

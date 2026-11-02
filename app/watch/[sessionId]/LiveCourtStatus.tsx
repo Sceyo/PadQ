@@ -1,6 +1,7 @@
 import React from 'react';
 import type { CourtSlot } from '@/lib/sessionService';
 import { accountPlayers } from '@/app/queue/lib/queueTransitions';
+import { formatEtaLabel } from '@/app/queue/lib/etaEngine';
 
 type GameMode = 'singles' | 'doubles';
 
@@ -168,25 +169,31 @@ export function LiveCourtStatus({
           <span className="w-court-focus-kicker">Next in queue</span>
           <p>Assignment is confirmed when the next court becomes available.</p>
         </div>
-        {nextPlayers.length > 0 ? (
+        {waitingQueue.length > 0 ? (
           <div className="w-queue-chips">
-            {nextPlayers.map((player, index) => (
-              <span key={`${index}-${player}`} className="w-queue-chip">
-                <span className="w-queue-num">#{index + 1}</span> {player}
-                {partnerMap[player] && (
-                  <span className="w-partner-pill" title={`Paired with ${partnerMap[player]}`}>
-                    🔗
-                  </span>
-                )}
-                {prioritySet.has(player) && (
-                  <span className="w-status-pill w-status-pill--priority">Next up</span>
-                )}
-                <span className="w-status-pill w-status-pill--on-deck">On deck</span>
-              </span>
-            ))}
-            {waitingQueue.length > nextPlayers.length && (
-              <span className="w-queue-more">+{waitingQueue.length - nextPlayers.length} waiting</span>
-            )}
+            {waitingQueue.map((player, index) => {
+              const isOnDeck = index < playersNeeded;
+              const etaLabel = formatEtaLabel(index + 1, playersNeeded, courtSlots.length > 1);
+
+              return (
+                <span key={`${index}-${player}`} className="w-queue-chip">
+                  <span className="w-queue-num">#{index + 1}</span> {player}
+                  {partnerMap[player] && (
+                    <span className="w-partner-pill" title={`Paired with ${partnerMap[player]}`}>
+                      🔗
+                    </span>
+                  )}
+                  {prioritySet.has(player) && (
+                    <span className="w-status-pill w-status-pill--priority">Next up</span>
+                  )}
+                  {isOnDeck ? (
+                    <span className="w-status-pill w-status-pill--on-deck">On deck</span>
+                  ) : (
+                    etaLabel && <span className="w-status-pill w-status-pill--eta">{etaLabel}</span>
+                  )}
+                </span>
+              );
+            })}
           </div>
         ) : (
           <span className="w-muted">All active players are assigned.</span>
