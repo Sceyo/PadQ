@@ -56,7 +56,7 @@
   export function parsePlayerListPaste(rawText: string): ParsedPlayerEntry[];
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/pasteParser.test.ts`:
 ```ts
@@ -99,12 +99,12 @@ describe('pasteParser', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/pasteParser.test.ts --run`
 Expected: FAIL with "Cannot find module '../app/queue/lib/pasteParser'"
 
-- [ ] **Step 3: Implement `parsePlayerListPaste` and `sanitizePlayerName` in `app/queue/lib/pasteParser.ts`**
+- [x] **Step 3: Implement `parsePlayerListPaste` and `sanitizePlayerName` in `app/queue/lib/pasteParser.ts`**
 
 Implement regex sanitization rules:
 - Split on newlines first; if a line has no pipe metadata and contains commas, split on commas.
@@ -115,12 +115,12 @@ Implement regex sanitization rules:
 - Extract pipe metadata (`/\|\s*rating\s*=\s*([0-9.]+)/i`, `/\|\s*duprId\s*=\s*([a-zA-Z0-9]+)/i`).
 - Trim, collapse whitespace, clamp to 60 chars, and deduplicate case-insensitively.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/pasteParser.test.ts --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/lib/pasteParser.ts tests/pasteParser.test.ts
@@ -162,7 +162,7 @@ git commit -m "feat(queue): add smart text and Reclub paste parser utility"
   ): PartnerAwareSelection;
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add unit test in `tests/doublesEngine.test.ts`:
 ```ts
@@ -181,12 +181,12 @@ it('balances 4 unlocked players using anti-repeat partner history while preservi
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/doublesEngine.test.ts -t "balances 4 unlocked players" --run`
 Expected: FAIL with "balanceSelectedMatch is not defined"
 
-- [ ] **Step 3: Implement `balanceSelectedMatch` and wire into `rotateMultiCourtDoubles` & `multiCourtResult.ts`**
+- [x] **Step 3: Implement `balanceSelectedMatch` and wire into `rotateMultiCourtDoubles` & `multiCourtResult.ts`**
 
 1. In `app/queue/lib/doublesEngine.ts`:
    - If `selectedPlayers.length === 4` and no locked pair is contained inside `selectedPlayers`: call `formTeams` with `recentPairs`, `recentMatches`, `lastMatchPlayers`, `skillMap`, returning `[...teamA, ...teamB]`.
@@ -194,12 +194,12 @@ Expected: FAIL with "balanceSelectedMatch is not defined"
 2. In `app/queue/lib/multiCourtResult.ts`:
    - Derive `recentPairs` and `recentMatches` from `state.history` (last 6 doubles matches) when calling `rotateMultiCourtDoubles`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/doublesEngine.test.ts tests/multiCourtEngine.test.ts --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/lib/doublesEngine.ts app/queue/lib/multiCourtResult.ts tests/doublesEngine.test.ts
@@ -218,7 +218,7 @@ git commit -m "feat(doubles): add team anti-repeat and skill balance to multi-co
 - Consumes: `MultiCourtResultInput` in `app/queue/lib/multiCourtResult.ts`.
 - Produces: `export const MULTI_COURT_SINGLES_MAX_STREAK = 3;` and automatic king rotation after 3 consecutive wins on a court.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/multiCourtResult.test.ts`:
 ```ts
@@ -246,12 +246,12 @@ describe('multiCourtResult singles 3-win streak cap', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/multiCourtResult.test.ts --run`
 Expected: FAIL because `KingPlayer` remains on court `[KingPlayer, Challenger4]`.
 
-- [ ] **Step 3: Implement 3-win streak cap in `app/queue/lib/multiCourtResult.ts`**
+- [x] **Step 3: Implement 3-win streak cap in `app/queue/lib/multiCourtResult.ts`**
 
 In `app/queue/lib/multiCourtResult.ts`:
 - Add optional `history?: Array<{ mode?: string; players: string; winner: string }>` to `MultiCourtResultInput`.
@@ -260,12 +260,12 @@ In `app/queue/lib/multiCourtResult.ts`:
   - Assign `[orderedWaiting[0], orderedWaiting[1]]` to `nextOnCourt`.
   - Append both `loser` and `winner` (in that order) to the back of the waiting queue.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/multiCourtResult.test.ts --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/lib/multiCourtResult.ts tests/multiCourtResult.test.ts
@@ -284,7 +284,7 @@ git commit -m "feat(singles): enforce 3-win streak cap in multi-court singles ro
 - Consumes: `lockedPartners` state in `app/queue/page.tsx`.
 - Produces: Active `LockedPartnerPair[]` passed to `seedMultiCourtDoubles` and persisted to `session.startSession`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/partnerAwareMultiCourt.test.ts`:
 ```ts
@@ -303,19 +303,19 @@ describe('partnerAwareMultiCourt seeding', () => {
 });
 ```
 
-- [ ] **Step 2: Run test and inspect `app/queue/page.tsx:723,764`**
+- [x] **Step 2: Run test and inspect `app/queue/page.tsx:723,764`**
 
 Run: `npm.cmd test -- tests/partnerAwareMultiCourt.test.ts --run`
 Update `app/queue/page.tsx`:
 - Line 723: Filter `lockedPartners` to pairs where both players exist in `orderedPlayers`, pass `activeLockedPairs` into `seedMultiCourtDoubles(orderedPlayers, courtCount, activeLockedPairs)`.
 - Line 764: Pass `lockedPartners: activeLockedPairs.map(([a, b]) => ({ a, b }))` instead of `[]`, and preserve `lockedPartners` state instead of clearing to `[]` on line 788.
 
-- [ ] **Step 3: Run test to verify it passes**
+- [x] **Step 3: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/partnerAwareMultiCourt.test.ts --run`
 Expected: PASS
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add app/queue/page.tsx tests/partnerAwareMultiCourt.test.ts
@@ -354,7 +354,7 @@ git commit -m "fix(setup): preserve locked partner pairs during initial multi-co
   export function clearCheckInDraft(storageKey: string): void;
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/checkInState.test.ts` testing:
 - Arrival order preservation (`checkedIn` is FIFO).
@@ -363,21 +363,21 @@ Create `tests/checkInState.test.ts` testing:
 - `checkInAllPlayers` respects the 30-player cap (`maxCheckedIn = 30`).
 - `saveCheckInDraft` / `loadCheckInDraft` / `clearCheckInDraft` round-trip.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/checkInState.test.ts --run`
 Expected: FAIL with "Cannot find module '../app/queue/lib/checkInState'"
 
-- [ ] **Step 3: Implement `app/queue/lib/checkInState.ts`**
+- [x] **Step 3: Implement `app/queue/lib/checkInState.ts`**
 
 Implement pure state transitions and `try/catch`-wrapped `localStorage` helpers.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/checkInState.test.ts --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/lib/checkInState.ts tests/checkInState.test.ts
@@ -405,19 +405,19 @@ git commit -m "feat(setup): add pre-session check-in state engine and draft pers
   onRemoveExpectedPlayer?: (name: string) => void;
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/SetupView.test.tsx`:
 - Renders **Checked In** list with arrival numbers (`#1`, `#2`) and **Expected (Not Yet Here)** list with 1-tap `Check in` buttons and `Check In All`.
 - Keeps `Start Queue` button disabled until `tempPlayers.length >= minPlayers` (checked-in count), even if `expectedPlayers` has 10 names.
 - Clicking `Check in` fires `onCheckInPlayer(name)`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/SetupView.test.tsx --run`
 Expected: FAIL (Expected Arrivals section not rendered yet).
 
-- [ ] **Step 3: Implement two-tier Check-In UI in `SetupView.tsx`, `page.tsx`, and `QueueSystem.css`**
+- [x] **Step 3: Implement two-tier Check-In UI in `SetupView.tsx`, `page.tsx`, and `QueueSystem.css`**
 
 - In `SetupView.tsx`:
   - Render **Expected / Not Yet Here** panel when `expectedPlayers.length > 0` with `Check In All` button and per-player `+ Check In` chip.
@@ -425,12 +425,12 @@ Expected: FAIL (Expected Arrivals section not rendered yet).
 - In `page.tsx`:
   - Route paste/roster imports into `expectedPlayers` (or provide a quick `Check In All` 1-tap button), and when `handleStartQueue` succeeds, persist remaining `expectedPlayers` to `localStorage` under `padq_late_arrivals_${sessionId}`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/SetupView.test.tsx --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/components/SetupView/SetupView.tsx app/queue/page.tsx app/queue/QueueSystem.css tests/SetupView.test.tsx
@@ -451,29 +451,29 @@ git commit -m "feat(setup): render two-tier check-in UI with arrival order and e
 - Consumes: `padq_late_arrivals_${sessionId}` from `localStorage` and `handleAddPlayerLive`.
 - Produces: Optional `lateArrivals?: string[]`, `onCheckInLateArrival?: (name: string) => void`, `onDismissLateArrival?: (name: string) => void` in `AddPlayerPanel` (`LiveManagement.tsx`).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/lateArrivalTray.test.tsx`:
 - Renders `Late Arrivals` tray inside `AddPlayerPanel` when `lateArrivals` is non-empty.
 - Clicking `+ Check In` next to an expected player invokes `onCheckInLateArrival(name)`.
 - Clicking `×` dismisses the no-show from the tray.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/lateArrivalTray.test.tsx --run`
 Expected: FAIL
 
-- [ ] **Step 3: Implement Late Arrivals tray in `LiveManagement.tsx` and wire in `page.tsx`**
+- [x] **Step 3: Implement Late Arrivals tray in `LiveManagement.tsx` and wire in `page.tsx`**
 
 - In `LiveManagement.tsx` (`AddPlayerPanel`): Render the `Late Arrivals (Not Yet Checked In)` chip list above the manual input field.
 - In `page.tsx`: When `handleCheckInLateArrival(name)` is triggered, call `handleAddPlayerLive(name)` and remove `name` from `lateArrivals` state + `localStorage`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/lateArrivalTray.test.tsx --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/components/LiveManagement/LiveManagement.tsx app/queue/page.tsx app/queue/QueueSystem.css tests/lateArrivalTray.test.tsx
@@ -495,7 +495,7 @@ git commit -m "feat(host): add 1-tap late arrival check-in tray to live host too
 - Consumes: `formatEtaLabel` from `app/queue/lib/etaEngine.ts`.
 - Produces: Full numbered waiting list in `LiveCourtStatus` with `Up next` / `Wait: N matches` badges for every waiting player (replacing the hidden `+N waiting` truncation).
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add test in `tests/liveCourtStatus.test.tsx`:
 ```ts
@@ -521,23 +521,23 @@ it('renders all waiting players with deterministic ETA badges instead of hiding 
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/liveCourtStatus.test.tsx --run`
 Expected: FAIL because `W5` and `W6` are currently hidden behind `+2 waiting`.
 
-- [ ] **Step 3: Update `LiveCourtStatus.tsx` to render full waiting queue with `formatEtaLabel`**
+- [x] **Step 3: Update `LiveCourtStatus.tsx` to render full waiting queue with `formatEtaLabel`**
 
 In `app/watch/[sessionId]/LiveCourtStatus.tsx`:
 - Import `formatEtaLabel` from `@/app/queue/lib/etaEngine`.
 - Render `waitingQueue.map((player, index) => ...)` with `#${index + 1}`, partner badge `🔗`, priority badge, and `formatEtaLabel(index + 1, playersNeeded, true)`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/liveCourtStatus.test.tsx --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/watch/[sessionId]/LiveCourtStatus.tsx app/watch/[sessionId]/watch.css tests/liveCourtStatus.test.tsx
@@ -572,7 +572,7 @@ git commit -m "feat(watch): display full waiting queue with deterministic ETA ba
   export function fireBrowserTurnAlert(message: string): void;
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/turnAlert.test.ts`:
 ```ts
@@ -600,24 +600,24 @@ describe('turnAlert', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/turnAlert.test.ts --run`
 Expected: FAIL with "Cannot find module '../app/queue/lib/turnAlert'"
 
-- [ ] **Step 3: Implement `app/queue/lib/turnAlert.ts` and wire tap-to-watch in `LiveCourtStatus.tsx` & `watch/[sessionId]/page.tsx`**
+- [x] **Step 3: Implement `app/queue/lib/turnAlert.ts` and wire tap-to-watch in `LiveCourtStatus.tsx` & `watch/[sessionId]/page.tsx`**
 
 1. In `app/queue/lib/turnAlert.ts`:
    - Implement `getPlayerTurnZone`, `shouldTriggerTurnAlert`, and `fireBrowserTurnAlert` (triggers `navigator.vibrate?.([200, 100, 200])` and plays a gentle Web Audio API dual-tone chime wrapped in `try/catch`).
 2. In `LiveCourtStatus.tsx` & `watch/[sessionId]/page.tsx`:
    - Allow spectators to tap any player chip in the queue to toggle `watchedPlayer` (saved in `sessionStorage` under `padq_watch_player_${sessionId}`), displaying a `🔔 Alert On` pill on their name and firing `fireBrowserTurnAlert` when `shouldTriggerTurnAlert` returns `true`.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/turnAlert.test.ts tests/liveCourtStatus.test.tsx --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/lib/turnAlert.ts app/watch/[sessionId]/LiveCourtStatus.tsx app/watch/[sessionId]/page.tsx tests/turnAlert.test.ts
@@ -645,7 +645,7 @@ git commit -m "feat(watch): add tap-your-name turn alerts with vibration and aud
   export function speakCourtCallout(text: string): boolean;
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/courtSpeechAndTimer.test.ts`:
 ```ts
@@ -670,12 +670,12 @@ describe('courtSpeechAndTimer', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/courtSpeechAndTimer.test.ts --run`
 Expected: FAIL with "Cannot find module '../app/queue/lib/courtSpeechAndTimer'"
 
-- [ ] **Step 3: Implement `courtSpeechAndTimer.ts` and integrate into `CourtCard.tsx`**
+- [x] **Step 3: Implement `courtSpeechAndTimer.ts` and integrate into `CourtCard.tsx`**
 
 1. In `app/queue/lib/courtSpeechAndTimer.ts`:
    - Implement `formatElapsedSeconds`, `buildCourtCalloutText`, and `speakCourtCallout` (using `window.speechSynthesis` safely).
@@ -684,12 +684,12 @@ Expected: FAIL with "Cannot find module '../app/queue/lib/courtSpeechAndTimer'"
    - Display a subtle elapsed timer badge (`04:12`) in the header when `ready` is true.
    - Render a `Volume2` (`🔊`) callout button in the header for hosts to announce the court matchup on tap.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/courtSpeechAndTimer.test.ts tests/multiCourtScreen.test.tsx --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/lib/courtSpeechAndTimer.ts app/queue/components/CourtCard/CourtCard.tsx app/queue/components/CourtCard/CourtCard.module.css tests/courtSpeechAndTimer.test.ts
@@ -714,7 +714,7 @@ git commit -m "feat(court): add client-side elapsed match timer and TTS voice ca
   ```
   And optional `onCorrectHistoryEntry?: (entryId: number, updated: MatchHistoryEntry) => void` on `AnalyticsDashboard`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/historyCorrection.test.ts`:
 ```ts
@@ -748,12 +748,12 @@ describe('historyCorrection', () => {
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/historyCorrection.test.ts --run`
 Expected: FAIL with "Cannot find module '../app/queue/lib/historyCorrection'"
 
-- [ ] **Step 3: Implement `flipHistoryEntryWinner` and wire host action in `AnalyticsDashboard.tsx` & `page.tsx`**
+- [x] **Step 3: Implement `flipHistoryEntryWinner` and wire host action in `AnalyticsDashboard.tsx` & `page.tsx`**
 
 1. In `app/queue/lib/historyCorrection.ts`:
    - Split `entry.players` on `' vs '` to get `[sideA, sideB]`.
@@ -764,12 +764,12 @@ Expected: FAIL with "Cannot find module '../app/queue/lib/historyCorrection'"
 3. In `page.tsx`:
    - Update `localHistory` state immediately so `stats` and standings recalculate on the spot.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/historyCorrection.test.ts tests/analyticsDashboard.test.tsx --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/lib/historyCorrection.ts app/queue/components/AnalyticsDashboard/AnalyticsDashboard.tsx app/queue/page.tsx tests/historyCorrection.test.ts
@@ -800,7 +800,7 @@ git commit -m "feat(history): allow host to retroactively flip match winner and 
   }
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Add test in `tests/RecapModal.test.tsx`:
 ```ts
@@ -823,24 +823,24 @@ it('allows switching to Player Card tab and selecting any player to render their
 });
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/RecapModal.test.tsx --run`
 Expected: FAIL (no `Player Card` tab or selector yet).
 
-- [ ] **Step 3: Add `'player'` variant to `RecapCard.tsx` and tab + dropdown to `RecapModal.tsx`**
+- [x] **Step 3: Add `'player'` variant to `RecapCard.tsx` and tab + dropdown to `RecapModal.tsx`**
 
 1. In `RecapCard.tsx`:
    - When `variant === 'player'`, locate the selected player's rank (`#rank OF total`) and render a large spotlight card showing their Name, Rank Badge, `W - L`, `Win %`, `Point Diff`, `Matchup Strength`, and `Streak`.
 2. In `RecapModal.tsx`:
    - Add a `Player Card` toggle button alongside `Podium` and `Standings`, plus a `<select aria-label="Select player">` dropdown populated with sorted player names.
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `npm.cmd test -- tests/RecapModal.test.tsx --run`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/components/RecapCard/RecapCard.tsx app/queue/components/RecapCard/RecapModal.tsx app/queue/components/RecapCard/RecapCard.css tests/RecapModal.test.tsx
@@ -858,7 +858,7 @@ git commit -m "feat(recap): add individual player spotlight stat card variant to
 - Consumes: All modules created and modified in Tasks 1–12.
 - Produces: Full end-to-end simulation and release verification.
 
-- [ ] **Step 1: Write comprehensive end-to-end simulation test**
+- [x] **Step 1: Write comprehensive end-to-end simulation test**
 
 Create `tests/fullSessionParity.test.ts` covering:
 1. Pasting 20 noisy WhatsApp/Reclub player lines via `parsePlayerListPaste`.
@@ -870,22 +870,22 @@ Create `tests/fullSessionParity.test.ts` covering:
 7. Flipping a misreported match winner via `flipHistoryEntryWinner` and verifying recalculated 4-tier standings.
 8. Enforcing the 3-win streak cap in multi-court singles (`planMultiCourtResult`).
 
-- [ ] **Step 2: Run full Vitest test suite**
+- [x] **Step 2: Run full Vitest test suite**
 
 Run: `npm.cmd test -- --run`
 Expected: ALL test files pass (455+ existing tests + all new test suites).
 
-- [ ] **Step 3: Run TypeScript compiler check**
+- [x] **Step 3: Run TypeScript compiler check**
 
 Run: `npx.cmd tsc --noEmit`
 Expected: 0 errors.
 
-- [ ] **Step 4: Run ESLint**
+- [x] **Step 4: Run ESLint**
 
 Run: `npm.cmd run lint`
 Expected: 0 errors.
 
-- [ ] **Step 5: Final commit**
+- [x] **Step 5: Final commit**
 
 ```bash
 git add tests/fullSessionParity.test.ts
