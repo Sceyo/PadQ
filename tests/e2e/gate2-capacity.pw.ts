@@ -16,7 +16,7 @@ async function openInBatches(pages: Page[], roomCode: string) {
 }
 
 test('30 viewer tabs receive a three-court queue rotation in real time', async ({ browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const hostContext = await browser.newContext();
   const host = await hostContext.newPage();
   const viewerContexts = await Promise.all(

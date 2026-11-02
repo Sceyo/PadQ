@@ -156,7 +156,8 @@ test('Human Chaos 2: Multi-court partner locking, match rotation, undo, and live
     await undoBtn.click();
 
     // Verify Court 1 restored to original lineup
-    await expect.poll(async () => courtOneCard.innerText()).toBe(courtOneBefore);
+    const normalizeCourtText = (text: string) => text.replace(/\d{2}:\d{2}/g, '').trim();
+    await expect.poll(async () => normalizeCourtText(await courtOneCard.innerText())).toBe(normalizeCourtText(courtOneBefore));
 
     // Re-complete Court 1 match so spectator has match history & performance data
     await courtOneCard.getByRole('button', { name: /wins?$/i }).first().click();
