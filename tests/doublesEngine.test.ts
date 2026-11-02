@@ -475,3 +475,21 @@ describe('doublesEngine — Golden Equivalence across N=5..30 x 20 seeds (Phase 
     }
   });
 });
+
+
+describe('doublesEngine — balanceSelectedMatch', () => {
+  it('balances 4 unlocked players using anti-repeat partner history while preserving locked pairs', async () => {
+    const { balanceSelectedMatch } = await import('@/app/queue/lib/doublesEngine');
+    const players = ['P1', 'P2', 'P3', 'P4'];
+    const recentPairs = ['P1+P2']; // P1 and P2 just partnered
+    const balanced = balanceSelectedMatch(players, [], recentPairs, [], new Set());
+    const teamA = balanced.slice(0, 2);
+    const teamB = balanced.slice(2, 4);
+    expect(teamA.slice().sort()).not.toEqual(['P1', 'P2']);
+    expect(teamB.slice().sort()).not.toEqual(['P1', 'P2']);
+
+    // When P1+P2 is an explicit locked pair, they MUST stay together regardless of recentPairs
+    const withLock = balanceSelectedMatch(players, [['P1', 'P2']], recentPairs, [], new Set());
+    expect(withLock.slice(0, 2).sort()).toEqual(['P1', 'P2']);
+  });
+});

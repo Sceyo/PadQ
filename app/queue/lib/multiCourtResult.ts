@@ -1,4 +1,4 @@
-import { rotateMultiCourtDoubles, type LockedPartnerPair } from './doublesEngine';
+import { rotateMultiCourtDoubles, pairKey, teamPairKey, type LockedPartnerPair } from './doublesEngine';
 
 export interface MultiCourtSlot {
   id: string;
@@ -12,6 +12,8 @@ export interface MultiCourtResultState {
   lockedPartners?: Array<{ a: string; b: string }>;
   sittingOut?: string[];
   priorityPlayers?: string[];
+  history?: Array<{ id?: number; mode?: string; players: string; winner: string; timestamp?: string; score?: string }>;
+  skillMap?: Record<string, number>;
 }
 
 export interface PlannedCourtResult {
@@ -120,7 +122,29 @@ export function planMultiCourtResult(
 
   // Defensively exclude any finisher who is sittingOut so they do not re-enter queue or court
   const availableFinishers = slot.onCourt.filter(player => !unavailable.has(player));
-  const next = rotateMultiCourtDoubles(orderedWaiting, availableFinishers, lockedPartners);
+  const recentPairs: string[] = [];
+  const recentMatches: string[] = [];
+  if (state.history && state.history.length > 0) {
+    for (const h of state.history) {
+      if (h.players && h.players.includes('&') && h.players.includes(' vs ')) {
+        const [left, right] = h.players.split(' vs ').map(s => s.trim());
+        const t1 = left.split('&').map(s => s.trim()) as [string, string];
+        const t2 = right.split('&').map(s => s.trim()) as [string, string];
+        if (t1.length === 2 && t2.length === 2) {
+          recentPairs.push(pairKey(t1[0], t1[1]));
+          recentPairs.push(pairKey(t2[0], t2[1]));
+          recentMatches.push(teamPairKey(t1, t2));
+          if (recentPairs.length >= 8) break;
+        }
+      }
+    }
+  }
+
+  const next = rotateMultiCourtDoubles(orderedWaiting, availableFinishers, lockedPartners, {
+    recentPairs,
+    recentMatches,
+    skillMap: state.skillMap,
+  });
   const courtSlots = state.courtSlots.map(court =>
     court.id === courtId ? { ...court, onCourt: next.onCourt } : court,
   );
