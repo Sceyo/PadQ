@@ -717,10 +717,14 @@ function QueueSystemContent() {
     const orderedPlayers = [...tempPlayers];
 
     // Build initial court slots for multi-court doubles mode
+    const activeLockedPairs: [string, string][] = (lockedPartners ?? []).filter(
+      ([a, b]) => orderedPlayers.includes(a) && orderedPlayers.includes(b),
+    );
+
     let initialCourtSlots: CourtSlot[] | undefined;
     let initialQueue: string[];
     if (gameMode === 'doubles' && courtCount > 1) {
-      const seeded = seedMultiCourtDoubles(orderedPlayers, courtCount, []);
+      const seeded = seedMultiCourtDoubles(orderedPlayers, courtCount, activeLockedPairs);
 
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
         id: `court-${i}`,
@@ -761,7 +765,7 @@ function QueueSystemContent() {
       tournamentWinner: null, isLive: true,
       accessPin: pin,
       courtName,
-      lockedPartners: [],
+      lockedPartners: activeLockedPairs.map(([a, b]) => ({ a, b })),
       ...(initialCourtSlots ? { courtSlots: initialCourtSlots } : {}),
       ...(gameMode === 'singles' && courtCount === 1 ? {
         singlesEngineState: singlesFormat === 'pool'
@@ -785,8 +789,8 @@ function QueueSystemContent() {
     setLocalTournamentActive(localQueueMode === 'tournament');
     setLocalTournamentWinner(null);
     setLocalTournamentM(initialBracket);
-    setLockedPartners([]);
-    lockedPartnersRef.current = [];
+    setLockedPartners(activeLockedPairs);
+    lockedPartnersRef.current = activeLockedPairs;
     setLocalCourtSlots(initialCourtSlots ?? []);
     courtSlotsRef.current = initialCourtSlots ?? [];
     setQueue(initialQueue);
