@@ -1,6 +1,8 @@
 'use client';
 
-import { Trophy, Pencil, UserX } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Trophy, Pencil, UserX, Volume2 } from 'lucide-react';
+import { formatElapsedSeconds, buildCourtCalloutText, speakCourtCallout, getOrInitCourtStartTime } from '../../lib/courtSpeechAndTimer';
 import type { CourtSlot } from '@/lib/sessionService';
 import type { PlayerStat } from '../../lib/types';
 import { PlayerLabel } from '../atoms/PlayerLabel';
@@ -26,20 +28,67 @@ export function CourtCard({ slot, statsMap, isHost, onWin, onEdit, onMarkAbsent,
   const labelA = isSingles ? (teamA[0] ?? 'Player 1') : 'Team 1';
   const labelB = isSingles ? (teamB[0] ?? 'Player 2') : 'Team 2';
 
+  const lineupKey = slot.onCourt.join(',');
+  const [elapsed, setElapsed] = useState(() => {
+    if (!ready) return 0;
+    const start = getOrInitCourtStartTime(slot.id, lineupKey);
+    return Math.floor((Date.now() - start) / 1000);
+  });
+
+  useEffect(() => {
+    if (!ready) {
+      setElapsed(0);
+      return;
+    }
+    const start = getOrInitCourtStartTime(slot.id, lineupKey);
+    setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+
+    const timer = setInterval(() => {
+      setElapsed(Math.max(0, Math.floor((Date.now() - start) / 1000)));
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [slot.id, lineupKey, ready]);
+
+  const handleVoiceCallout = () => {
+    const text = buildCourtCalloutText(slot.name, teamA, teamB, gameMode);
+    speakCourtCallout(text);
+  };
+
   return (
     <div className={styles.card}>
       <div className={styles.header}>
-        <span className={styles.courtName}>{slot.name}</span>
-        {ready && <span className={styles.liveDot} />}
-        {isHost && ready && onEdit && !isSingles && (
-          <button
-            className={styles.editBtn}
-            onClick={() => onEdit(slot.id)}
-            title="Edit player positions"
-          >
-            <Pencil size={11} />
-          </button>
-        )}
+        <div className={styles.headerLeft}>
+          <span className={styles.courtName}>{slot.name}</span>
+          {ready && <span className={styles.liveDot} />}
+          {ready && (
+            <span className={styles.timerBadge} title="Match elapsed time">
+              {formatElapsedSeconds(elapsed)}
+            </span>
+          )}
+        </div>
+        <div className={styles.headerActions}>
+          {ready && (
+            <button
+              type="button"
+              className={styles.calloutBtn}
+              onClick={handleVoiceCallout}
+              title={`Announce ${slot.name} matchup`}
+              aria-label={`Announce ${slot.name} matchup`}
+            >
+              <Volume2 size={12} />
+            </button>
+          )}
+          {isHost && ready && onEdit && !isSingles && (
+            <button
+              className={styles.editBtn}
+              onClick={() => onEdit(slot.id)}
+              title="Edit player positions"
+            >
+              <Pencil size={11} />
+            </button>
+          )}
+        </div>
       </div>
 
       {ready ? (
