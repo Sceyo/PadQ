@@ -211,6 +211,9 @@ export function LiveCourtStatus({
                 </span>
               );
             })}
+            {waitingQueue.length > playersNeeded && (
+              <span className="w-queue-more">+{waitingQueue.length - playersNeeded} waiting</span>
+            )}
           </div>
         ) : (
           <span className="w-muted">All active players are assigned.</span>
