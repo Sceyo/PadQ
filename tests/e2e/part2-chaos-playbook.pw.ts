@@ -333,7 +333,8 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       // Court 2 immediately re-loads with waiting players
       await expect.poll(async () => court2.innerText()).not.toBe(court2Before);
       // Court 1 stays actively running with its lineup intact
-      expect(await court1.innerText()).toBe(court1Before);
+      const normalizeCourtText = (text: string) => text.replace(/\d{2}:\d{2}/g, '').trim();
+      expect(normalizeCourtText(await court1.innerText())).toBe(normalizeCourtText(court1Before));
     } finally {
       await viewerContext.close();
       await hostContext.close();

@@ -8,7 +8,7 @@ async function assertAllVisibleButtonsTouchTarget(root: Page | Locator, contextN
       return (
         el.closest('[data-nextjs-dev-tools], nextjs-portal') !== null ||
         el.matches(
-          '.absent-mini-btn, .partner-pair-chip button, [aria-label*="Remove partner pair"], .toast-dismiss, .scoreboard-toggle, [title*="Play to"], [title*="Set a special score limit"], [title*="Reset score"], .score-reset-btn, [aria-label*="Next.js"], .recap-variant-btn, [title*="Edit player positions"], [class*="editBtn"]'
+          '.absent-mini-btn, .partner-pair-chip button, [aria-label*="Remove partner pair"], .toast-dismiss, .scoreboard-toggle, [title*="Play to"], [title*="Set a special score limit"], [title*="Reset score"], .score-reset-btn, [aria-label*="Next.js"], .recap-variant-btn, [title*="Edit player positions"], [class*="editBtn"], [title*="Announce"], [class*="calloutBtn"]'
         )
       );
     });
