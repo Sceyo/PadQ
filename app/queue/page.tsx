@@ -218,6 +218,66 @@ function QueueSystemContent() {
   
   const [tempPlayers,  setTempPlayers]  = useState<string[]>([]);
   const [expectedPlayers, setExpectedPlayers] = useState<string[]>([]);
+  const [lateArrivals, setLateArrivals] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !session.sessionId) return;
+    try {
+      const raw = localStorage.getItem(`padq_late_arrivals_${session.sessionId}`);
+      if (raw) setLateArrivals(JSON.parse(raw));
+    } catch {}
+  }, [session.sessionId]);
+
+  const handleCheckInLateArrival = async (name: string) => {
+    await handleAddPlayerLive(name);
+    setLateArrivals(prev => {
+      const next = prev.filter(p => p !== name);
+      try {
+        if (session.sessionId) localStorage.setItem(`padq_late_arrivals_${session.sessionId}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleDismissLateArrival = (name: string) => {
+    setLateArrivals(prev => {
+      const next = prev.filter(p => p !== name);
+      try {
+        if (session.sessionId) localStorage.setItem(`padq_late_arrivals_${session.sessionId}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+  const [lateArrivals, setLateArrivals] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !session.sessionId) return;
+    try {
+      const raw = localStorage.getItem(`padq_late_arrivals_${session.sessionId}`);
+      if (raw) setLateArrivals(JSON.parse(raw));
+    } catch {}
+  }, [session.sessionId]);
+
+  const handleCheckInLateArrival = async (name: string) => {
+    await handleAddPlayerLive(name);
+    setLateArrivals(prev => {
+      const next = prev.filter(p => p !== name);
+      try {
+        if (session.sessionId) localStorage.setItem(`padq_late_arrivals_${session.sessionId}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
+
+  const handleDismissLateArrival = (name: string) => {
+    setLateArrivals(prev => {
+      const next = prev.filter(p => p !== name);
+      try {
+        if (session.sessionId) localStorage.setItem(`padq_late_arrivals_${session.sessionId}`, JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
   const [expectedPlayers, setExpectedPlayers] = useState<string[]>([]);
   const [currentName,  setCurrentName]  = useState('');
   const [pasteInput,   setPasteInput]   = useState('');
@@ -2680,7 +2740,12 @@ function QueueSystemContent() {
             {canControl && showHostTools && (
               <div className="host-tools-drawer">
                 <div className="live-tools-row">
-                  <AddPlayerPanel onAdd={handleAddPlayerLive} />
+                  <AddPlayerPanel
+                    onAdd={handleAddPlayerLive}
+                    lateArrivals={lateArrivals}
+                    onCheckInLateArrival={handleCheckInLateArrival}
+                    onDismissLateArrival={handleDismissLateArrival}
+                  />
                   {!isSkilled && (
                     <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
                       onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}

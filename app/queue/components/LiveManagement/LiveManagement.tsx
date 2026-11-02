@@ -5,12 +5,69 @@ import { UserPlus, PlusCircle, ListOrdered, UserCheck, Link2, X } from 'lucide-r
 import type { PlayerStat } from '../../lib/types';
 import { PlayerLabel } from '../atoms/PlayerLabel';
 
-export const AddPlayerPanel: React.FC<{ onAdd: (name: string) => void }> = ({ onAdd }) => {
+export interface AddPlayerPanelProps {
+  onAdd?: (name: string) => void;
+  onAddPlayer?: (name: string) => void;
+  allPlayers?: string[];
+  lateArrivals?: string[];
+  onCheckInLateArrival?: (name: string) => void;
+  onDismissLateArrival?: (name: string) => void;
+}
+
+export const AddPlayerPanel: React.FC<AddPlayerPanelProps> = ({
+  onAdd,
+  onAddPlayer,
+  lateArrivals = [],
+  onCheckInLateArrival,
+  onDismissLateArrival,
+}) => {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState('');
-  const commit = () => { const t = val.trim(); if (!t) return; onAdd(t); setVal(''); setOpen(false); };
+  const addFn = onAddPlayer ?? onAdd ?? (() => {});
+  const commit = () => {
+    const t = val.trim();
+    if (!t) return;
+    addFn(t);
+    setVal('');
+    setOpen(false);
+  };
+
   return (
     <div className="live-panel">
+      {lateArrivals.length > 0 && (
+        <div className="late-arrivals-tray" style={{ marginBottom: '10px' }}>
+          <div className="late-arrivals-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--txt-2, #94a3b8)', marginBottom: '6px' }}>
+            <UserCheck size={12} /> Late Arrivals ({lateArrivals.length})
+          </div>
+          <div className="late-arrivals-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {lateArrivals.map(name => (
+              <span key={`late-${name}`} className="late-arrival-chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 8px', borderRadius: '6px', background: 'var(--card-alt, #1e2438)', fontSize: '0.8rem', border: '1px solid var(--border, #333d5e)' }}>
+                <span>{name}</span>
+                {onCheckInLateArrival && (
+                  <button
+                    type="button"
+                    onClick={() => onCheckInLateArrival(name)}
+                    style={{ background: 'var(--primary, #3b82f6)', color: '#fff', border: 'none', borderRadius: '4px', padding: '1px 6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    Check In
+                  </button>
+                )}
+                {onDismissLateArrival && (
+                  <button
+                    type="button"
+                    onClick={() => onDismissLateArrival(name)}
+                    title={`Dismiss ${name}`}
+                    style={{ background: 'none', border: 'none', color: 'var(--txt-3, #64748b)', cursor: 'pointer', fontSize: '0.9rem', padding: '0 2px' }}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <button className="live-panel-toggle" onClick={() => setOpen(o => !o)}>
         <UserPlus size={13} /> {open ? 'Cancel' : 'Add Player'}
       </button>
