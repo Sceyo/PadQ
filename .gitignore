@@ -49,3 +49,4 @@ next-env.d.ts
 .aider*
 .claude/settings.local.json
 *.zip 
+.superpowers/
