@@ -305,12 +305,18 @@ export function SetupView({
         </div>
         {errorMsg && <p className="setup-error-msg">{errorMsg}</p>}
         <div className="input-group">
-          <input
-            type="text"
+          <textarea
+            rows={2}
+            className="paste-textarea"
             value={pasteInput}
             onChange={e => onPasteInputChange(e.target.value)}
-            placeholder="Paste names separated by commas…"
-            onKeyDown={e => e.key === 'Enter' && onAddFromPaste()}
+            placeholder="Paste names separated by commas or numbered list…"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                onAddFromPaste();
+              }
+            }}
             autoComplete="off"
             data-1p-ignore
             data-lpignore="true"

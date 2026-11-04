@@ -73,6 +73,7 @@ import { V1_RELEASE } from './lib/releaseConfig';
 import { planMultiCourtResult } from './lib/multiCourtResult';
 import { formatEtaLabel } from './lib/etaEngine';
 import { parsePlayerListPaste } from './lib/pasteParser';
+import { resolvePastedPlayers } from './lib/checkInState';
 import {
   toggleSitOutTransition,
   removeFromQueueTransition,
@@ -745,31 +746,25 @@ function QueueSystemContent() {
   };
   const removeTempPlayer = (i: number) => setTempPlayers(prev => prev.filter((_, j) => j !== i));
 
-  const addFromPaste = () => {
-    const names = pasteInput.split(/[,\n]+/).map(n => n.trim()).filter(n => n.length > 0 && n.length <= 60);
-    const available = V1_RELEASE.maxPlayers - tempPlayers.length;
-    const seen = new Set(tempPlayers.map(name => name.toLowerCase()));
-    let duplicateCount = 0;
-    const fresh = names.filter(name => {
-      const key = name.toLowerCase();
-      if (seen.has(key)) {
-        duplicateCount++;
-        return false;
-      }
-      seen.add(key);
-      return true;
-    }).slice(0, available);
-    if (fresh.length === 0) {
-      if (duplicateCount > 0) {
+  const addFromPaste = (target: 'checkedIn' | 'expected' = 'checkedIn') => {
+    const res = resolvePastedPlayers(
+      pasteInput,
+      { expected: expectedPlayers, checkedIn: tempPlayers },
+      target,
+      V1_RELEASE.maxPlayers,
+    );
+    if (res.addedCount === 0) {
+      if (res.duplicateCount > 0) {
         showToast('Duplicate names were skipped. Add initials (e.g. "Mike D.") to distinguish players with the same name.');
       }
       setPasteInput('');
       return;
     }
-    if (duplicateCount > 0) {
-      showToast(`${duplicateCount} duplicate name${duplicateCount > 1 ? 's were' : ' was'} skipped. Use initials (e.g. "Ben J.") to distinguish identical names.`);
+    if (res.duplicateCount > 0) {
+      showToast(`${res.duplicateCount} duplicate name${res.duplicateCount > 1 ? 's were' : ' was'} skipped. Use initials (e.g. "Ben J.") to distinguish identical names.`);
     }
-    setTempPlayers(prev => [...prev, ...fresh]);
+    setTempPlayers(res.nextState.checkedIn);
+    setExpectedPlayers(res.nextState.expected);
     setPasteInput('');
   };
 

@@ -1,8 +1,99 @@
-import { sanitizePlayerName } from './pasteParser';
+import { sanitizePlayerName, cleanPlayerName, HEADER_PATTERN } from './pasteParser';
 
 export interface PreSessionCheckInState {
   expected: string[];
   checkedIn: string[];
+}
+
+const WAITLIST_CUTOFF_PATTERN = /^\s*(?:waitlist|waiting\s*list)\s*:?\s*$/i;
+
+/**
+ * Resolves pasted player lists against the current check-in state.
+ * Stops processing at any Waitlist section, sanitizes noisy chat/bullet markers,
+ * deduplicates against both checkedIn and expected lists, and promotes expected
+ * players to checkedIn when target is 'checkedIn'.
+ */
+export function resolvePastedPlayers(
+  rawInput: string,
+  state: PreSessionCheckInState,
+  target: 'expected' | 'checkedIn',
+  maxTotal = 30,
+): { nextState: PreSessionCheckInState; addedCount: number; duplicateCount: number } {
+  if (!rawInput || !rawInput.trim()) {
+    return { nextState: state, addedCount: 0, duplicateCount: 0 };
+  }
+
+  let effectiveText = rawInput;
+  const lines = rawInput.split(/\r?\n/);
+  const waitlistIndex = lines.findIndex(l => WAITLIST_CUTOFF_PATTERN.test(l.trim()));
+  if (waitlistIndex !== -1) {
+    effectiveText = lines.slice(0, waitlistIndex).join('\n');
+  }
+
+  const rawSegments: string[] = [];
+  const effectiveLines = effectiveText.split(/\r?\n/);
+  for (const line of effectiveLines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (HEADER_PATTERN.test(trimmed)) continue;
+
+    if (!trimmed.includes('|') && (trimmed.includes(',') || trimmed.includes(';'))) {
+      const parts = trimmed.split(/[,;]+/);
+      for (const p of parts) {
+        if (p.trim()) rawSegments.push(p.trim());
+      }
+    } else {
+      rawSegments.push(trimmed);
+    }
+  }
+
+  const expected = [...state.expected];
+  const checkedIn = [...state.checkedIn];
+  let addedCount = 0;
+  let duplicateCount = 0;
+
+  for (const raw of rawSegments) {
+    const clean = cleanPlayerName(raw);
+    if (!clean) continue;
+    const lower = clean.toLowerCase();
+
+    const inExpectedIdx = expected.findIndex(p => p.toLowerCase() === lower);
+    const inCheckedInIdx = checkedIn.findIndex(p => p.toLowerCase() === lower);
+
+    if (target === 'checkedIn') {
+      if (inCheckedInIdx !== -1) {
+        duplicateCount++;
+        continue;
+      }
+      if (inExpectedIdx !== -1) {
+        const existingName = expected[inExpectedIdx];
+        expected.splice(inExpectedIdx, 1);
+        checkedIn.push(existingName);
+        addedCount++;
+      } else {
+        if (checkedIn.length + expected.length < maxTotal) {
+          checkedIn.push(clean);
+          addedCount++;
+        }
+      }
+    } else {
+      // target === 'expected'
+      if (inCheckedInIdx !== -1 || inExpectedIdx !== -1) {
+        duplicateCount++;
+        continue;
+      }
+      if (checkedIn.length + expected.length < maxTotal) {
+        expected.push(clean);
+        addedCount++;
+      }
+    }
+  }
+
+  return {
+    nextState: { expected, checkedIn },
+    addedCount,
+    duplicateCount,
+  };
 }
 
 export function createInitialCheckInState(): PreSessionCheckInState {

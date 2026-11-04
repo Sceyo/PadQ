@@ -8,7 +8,7 @@ export interface ParsedPlayerEntry {
 const MAX_NAME_LENGTH = 60;
 
 // Patterns for common chat noise and headers
-const HEADER_PATTERN = /^(?:players?\s*(?:list)?|rsvp|waitlist|confirmed|attendees|names?|lineup)\s*:?\s*$/i;
+export const HEADER_PATTERN = /^(?:players?\s*(?:list)?|rsvp|waitlist|waiting\s*list|confirmed|attendees|names?|lineup)\s*:?\s*$/i;
 
 // Leading numbers and bullets: "1.", "2)", "[3]", "#4", "-", "•", "*"
 const LEADING_NUMBER_OR_BULLET_PATTERN = /^\s*(?:\[\d+\]|\d+[\.\)\-:]|\#\d+|\-\s*|•\s*|\*\s*)/i;
@@ -19,6 +19,26 @@ const STANDALONE_STATUS_PATTERN = /\b(?:paid|unpaid|gcash|cash)\b/gi;
 
 // Phone numbers e.g. 09171234567 or +63917... or 555-1234
 const PHONE_PATTERN = /(?:\+?\d{1,3}[-.\s]?)?\(?\d{3,4}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g;
+
+/**
+ * Cleans metadata, bullets, status notes and phone numbers from a raw player string.
+ */
+export function cleanPlayerName(raw: string): string {
+  let text = raw;
+  if (text.includes('|')) {
+    text = text.split('|')[0] || '';
+  }
+  text = text.replace(LEADING_NUMBER_OR_BULLET_PATTERN, '');
+  text = text.replace(STATUS_TAG_PATTERN, ' ');
+  text = text.replace(PHONE_PATTERN, ' ');
+  // Strip emojis e.g. ✅, 🎾, 👍
+  text = text.replace(/\p{Extended_Pictographic}/gu, ' ');
+  // Strip status suffixes e.g. "- Guest", "- Sub", "- Paid", "- Confirmed"
+  text = text.replace(/[-–—:]\s*(?:guest|sub|paid|unpaid|gcash|cash|late|confirmed)\b/gi, ' ');
+  text = text.replace(STANDALONE_STATUS_PATTERN, ' ');
+  text = text.replace(/\s*[-–—:]\s*$/, '');
+  return sanitizePlayerName(text);
+}
 
 /**
  * Sanitizes a single player name string to alphanumeric / punctuation,
@@ -101,22 +121,7 @@ export function parsePlayerListPaste(rawText: string): ParsedPlayerEntry[] {
       }
     }
 
-    // Strip leading number or bullets
-    text = text.replace(LEADING_NUMBER_OR_BULLET_PATTERN, '');
-
-    // Strip status tags in brackets/parentheses
-    text = text.replace(STATUS_TAG_PATTERN, ' ');
-
-    // Strip phone numbers
-    text = text.replace(PHONE_PATTERN, ' ');
-
-    // Strip trailing or standalone status words
-    text = text.replace(STANDALONE_STATUS_PATTERN, ' ');
-
-    // Strip trailing dashes or separators e.g. "Rafael Nadal - "
-    text = text.replace(/\s*[-–—:]\s*$/, '');
-
-    const name = sanitizePlayerName(text);
+    const name = cleanPlayerName(text);
     if (!name) continue;
 
     const lower = name.toLowerCase();

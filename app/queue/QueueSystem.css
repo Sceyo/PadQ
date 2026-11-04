@@ -84,8 +84,13 @@ body.dark-mode {
 
 .player-input-container{width:100%;max-width:500px;margin:0 auto;text-align:center;}
 .input-group{display:flex;gap:8px;margin-bottom:18px;}
-.input-group input{flex:1;padding:11px 14px;font-size:1rem;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--card);color:var(--txt-1);outline:none;transition:border-color .15s;font-family:inherit;}
-.input-group input:focus{border-color:var(--accent);}
+.input-group input,
+.input-group textarea,
+.paste-textarea{flex:1;padding:11px 14px;font-size:1rem;border:1.5px solid var(--border);border-radius:var(--r-sm);background:var(--card);color:var(--txt-1);outline:none;transition:border-color .15s;font-family:inherit;}
+.input-group input:focus,
+.input-group textarea:focus,
+.paste-textarea:focus{border-color:var(--accent);}
+.paste-textarea{min-height:var(--tap-min,44px);resize:vertical;line-height:1.4;}
 .add-btn{display:flex;align-items:center;gap:5px;background:var(--success);color:#fff;border:none;padding:10px 18px;border-radius:var(--r-sm);cursor:pointer;font-size:.88rem;font-weight:600;transition:opacity .15s,transform .12s;}
 .add-btn:hover{opacity:.88;transform:translateY(-1px);}
 
