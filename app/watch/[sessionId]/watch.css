@@ -41,8 +41,8 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--sp-2, 8px);
-  padding: var(--sp-2, 8px) var(--sp-4, 16px);
-  min-height: var(--header-h, 52px);
+  padding: calc(var(--sp-2, 8px) + var(--safe-top, 0px)) var(--sp-4, 16px) var(--sp-2, 8px);
+  min-height: calc(var(--header-h, 52px) + var(--safe-top, 0px));
   border-bottom: 1px solid var(--line-subtle, #252d47);
   background: var(--surface-bg, #0b0d17);
   position: sticky;
@@ -50,6 +50,7 @@
   z-index: var(--z-sticky, 100);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  box-sizing: border-box;
 }
 
 .w-topbar-left {
@@ -189,7 +190,7 @@
   max-width: 860px;
   width: 100%;
   margin: 0 auto;
-  padding: var(--sp-5, 20px) var(--sp-4, 16px) var(--sp-10, 48px);
+  padding: var(--sp-5, 20px) var(--sp-4, 16px) calc(var(--sp-10, 48px) + var(--safe-bottom, 0px));
   display: flex;
   flex-direction: column;
   gap: var(--sp-5, 20px);
@@ -1070,6 +1071,16 @@
   cursor: pointer;
   user-select: none;
   transition: transform 0.15s ease, border-color 0.15s ease;
+}
+button.w-queue-chip--interactive {
+  min-height: var(--tap-min, 44px);
+  padding: 6px 14px;
+  font-family: inherit;
+  font-size: var(--fs-xs, 0.8125rem);
+  color: var(--text-primary, #f8fafc);
+  outline: none;
+  background: var(--surface-elevated, #1a2035);
+  box-sizing: border-box;
 }
 .w-queue-chip--interactive:hover {
   border-color: rgba(99, 102, 241, 0.5);

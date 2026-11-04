@@ -45,7 +45,8 @@ import { StreakBadge } from '@/app/queue/components/atoms/StreakBadge';
 import { buildPlayerStats, comparePlayerStats, formatPointDiff, formatMatchupStrength } from '@/app/queue/lib/playerUtils';
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
 import { RecapModal } from '@/app/queue/components/RecapCard';
-import { LiveCourtStatus } from './LiveCourtStatus';
+import { LiveCourtStatus, WaitingQueueChips } from './LiveCourtStatus';
+import { resolveWatchTurnContext } from '@/app/queue/lib/watchTurnContext';
 import {
   getPlayerTurnZone,
   shouldTriggerTurnAlert,
@@ -194,15 +195,29 @@ function WatchPageContent() {
   const [watchedPlayer, setWatchedPlayerState] = useState<string | null>(() => getWatchedPlayer(sessionId));
   const prevTurnZoneRef = useRef<PlayerTurnZone | null>(null);
 
+  const watchTurnCtx = useMemo(() => {
+    if (!session) return null;
+    return resolveWatchTurnContext({
+      gameMode: session.gameMode ?? 'doubles',
+      courtName: session.courtName,
+      courtSlots: session.courtSlots,
+      queue: session.queue,
+      sittingOut: session.sittingOut,
+      priorityPlayers: session.priorityPlayers,
+    });
+  }, [session]);
+
   useEffect(() => {
-    if (!watchedPlayer || !session) {
+    if (!watchedPlayer || !watchTurnCtx) {
       prevTurnZoneRef.current = null;
       return;
     }
-    const playersPerMatch = session.gameMode === 'singles' ? 2 : 4;
-    const courts = session.courtSlots ?? [];
-    const q = session.queue ?? [];
-    const zoneResult = getPlayerTurnZone(watchedPlayer, courts, q, playersPerMatch);
+    const zoneResult = getPlayerTurnZone(
+      watchedPlayer,
+      watchTurnCtx.effectiveCourts,
+      watchTurnCtx.waitingQueue,
+      watchTurnCtx.playersPerMatch
+    );
 
     if (prevTurnZoneRef.current && shouldTriggerTurnAlert(prevTurnZoneRef.current, zoneResult.zone)) {
       const alertMsg = zoneResult.zone === 'on-court'
@@ -211,7 +226,7 @@ function WatchPageContent() {
       fireBrowserTurnAlert(alertMsg);
     }
     prevTurnZoneRef.current = zoneResult.zone;
-  }, [watchedPlayer, session]);
+  }, [watchedPlayer, watchTurnCtx]);
 
   const toggleWatchPlayer = (playerName: string) => {
     setWatchedPlayerState(current => {
@@ -774,6 +789,8 @@ function WatchPageContent() {
               players={session?.players ?? []}
               priorityPlayers={session?.priorityPlayers ?? []}
               lockedPartners={session?.lockedPartners ?? []}
+              watchedPlayer={watchedPlayer}
+              onToggleWatchPlayer={toggleWatchPlayer}
             />
           </div>
         )}
@@ -882,6 +899,23 @@ function WatchPageContent() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {watchTurnCtx && watchTurnCtx.waitingQueue.length > 0 && (
+              <div className="w-section">
+                <h2 className="w-section-title">
+                  <Users size={15} /> Next in Queue
+                </h2>
+                <WaitingQueueChips
+                  waitingQueue={watchTurnCtx.waitingQueue}
+                  playersPerMatch={watchTurnCtx.playersPerMatch}
+                  activeCourtCount={1}
+                  prioritySet={new Set(session?.priorityPlayers ?? [])}
+                  partnerMap={session?.lockedPartners ? new Map(session.lockedPartners.flatMap(p => [[p.a, p.b], [p.b, p.a]])) : undefined}
+                  watchedPlayer={watchedPlayer}
+                  onToggleWatchPlayer={toggleWatchPlayer}
+                />
               </div>
             )}
 

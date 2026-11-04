@@ -27,6 +27,100 @@ export function getNextPlayers(queue: string[], gameMode: GameMode) {
   return queue.slice(0, gameMode === 'doubles' ? 4 : 2);
 }
 
+export interface WaitingQueueChipsProps {
+  waitingQueue: string[];
+  playersPerMatch: number;
+  activeCourtCount: number;
+  prioritySet?: Set<string>;
+  partnerMap?: Record<string, string> | Map<string, string>;
+  watchedPlayer?: string | null;
+  onToggleWatchPlayer?: (playerName: string) => void;
+}
+
+export function WaitingQueueChips({
+  waitingQueue,
+  playersPerMatch,
+  activeCourtCount,
+  prioritySet,
+  partnerMap,
+  watchedPlayer,
+  onToggleWatchPlayer,
+}: WaitingQueueChipsProps) {
+  if (waitingQueue.length === 0) {
+    return <span className="w-muted">All active players are assigned.</span>;
+  }
+
+  const getPartner = (p: string) => {
+    if (!partnerMap) return undefined;
+    if (partnerMap instanceof Map) return partnerMap.get(p);
+    return partnerMap[p];
+  };
+
+  const isPriority = (p: string) => prioritySet?.has(p) ?? false;
+
+  return (
+    <div className="w-queue-chips">
+      {waitingQueue.map((player, index) => {
+        const isOnDeck = index < playersPerMatch;
+        const etaLabel = formatEtaLabel(index + 1, playersPerMatch, activeCourtCount > 1);
+        const isWatched = watchedPlayer === player;
+        const partner = getPartner(player);
+
+        const innerContent = (
+          <>
+            <span className="w-queue-num">#{index + 1}</span> {player}
+            {partner && (
+              <span className="w-partner-pill" title={`Paired with ${partner}`}>
+                🔗
+              </span>
+            )}
+            {isPriority(player) && (
+              <span className="w-status-pill w-status-pill--priority">Next up</span>
+            )}
+            {isWatched && (
+              <span className="w-status-pill w-status-pill--alert-on" title="Turn alert armed">
+                🔔 Alert on
+              </span>
+            )}
+            {isOnDeck ? (
+              <span className="w-status-pill w-status-pill--on-deck">On deck</span>
+            ) : (
+              etaLabel && <span className="w-status-pill w-status-pill--eta">{etaLabel}</span>
+            )}
+          </>
+        );
+
+        if (onToggleWatchPlayer) {
+          return (
+            <button
+              type="button"
+              key={`${index}-${player}`}
+              className={`w-queue-chip w-queue-chip--interactive ${isWatched ? 'w-queue-chip--watched' : ''}`}
+              onClick={() => onToggleWatchPlayer(player)}
+              aria-pressed={isWatched}
+              aria-label={`Turn alert: ${player} (${isWatched ? 'on' : 'off'})`}
+            >
+              {innerContent}
+            </button>
+          );
+        }
+
+        return (
+          <span
+            key={`${index}-${player}`}
+            className="w-queue-chip"
+          >
+            {innerContent}
+          </span>
+        );
+      })}
+      {waitingQueue.length > playersPerMatch && (
+        <span className="w-queue-more">+{waitingQueue.length - playersPerMatch} waiting</span>
+      )}
+    </div>
+  );
+}
+
 export function LiveCourtStatus({
   courtSlots,
   gameMode,
@@ -173,51 +267,15 @@ export function LiveCourtStatus({
           <span className="w-court-focus-kicker">Next in queue</span>
           <p>Assignment is confirmed when the next court becomes available.</p>
         </div>
-        {waitingQueue.length > 0 ? (
-          <div className="w-queue-chips">
-            {waitingQueue.map((player, index) => {
-              const isOnDeck = index < playersNeeded;
-              const etaLabel = formatEtaLabel(index + 1, playersNeeded, courtSlots.length > 1);
-              const isWatched = watchedPlayer === player;
-
-              return (
-                <span
-                  key={`${index}-${player}`}
-                  className={`w-queue-chip ${onToggleWatchPlayer ? 'w-queue-chip--interactive' : ''} ${isWatched ? 'w-queue-chip--watched' : ''}`}
-                  onClick={() => onToggleWatchPlayer?.(player)}
-                  role={onToggleWatchPlayer ? 'button' : undefined}
-                  tabIndex={onToggleWatchPlayer ? 0 : undefined}
-                  title={onToggleWatchPlayer ? (isWatched ? 'Tap to disable turn alert' : 'Tap to alert when on deck') : undefined}
-                >
-                  <span className="w-queue-num">#{index + 1}</span> {player}
-                  {partnerMap[player] && (
-                    <span className="w-partner-pill" title={`Paired with ${partnerMap[player]}`}>
-                      🔗
-                    </span>
-                  )}
-                  {prioritySet.has(player) && (
-                    <span className="w-status-pill w-status-pill--priority">Next up</span>
-                  )}
-                  {isWatched && (
-                    <span className="w-status-pill w-status-pill--alert-on" title="Turn alert armed">
-                      🔔 Alert on
-                    </span>
-                  )}
-                  {isOnDeck ? (
-                    <span className="w-status-pill w-status-pill--on-deck">On deck</span>
-                  ) : (
-                    etaLabel && <span className="w-status-pill w-status-pill--eta">{etaLabel}</span>
-                  )}
-                </span>
-              );
-            })}
-            {waitingQueue.length > playersNeeded && (
-              <span className="w-queue-more">+{waitingQueue.length - playersNeeded} waiting</span>
-            )}
-          </div>
-        ) : (
-          <span className="w-muted">All active players are assigned.</span>
-        )}
+        <WaitingQueueChips
+          waitingQueue={waitingQueue}
+          playersPerMatch={playersNeeded}
+          activeCourtCount={courtSlots.length}
+          prioritySet={prioritySet}
+          partnerMap={partnerMap}
+          watchedPlayer={watchedPlayer}
+          onToggleWatchPlayer={onToggleWatchPlayer}
+        />
       </div>
 
       {onBreak.length > 0 && (
