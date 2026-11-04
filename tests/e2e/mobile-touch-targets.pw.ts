@@ -241,4 +241,36 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     await scoreCancelBtn.click();
     await expect(scoreModal).toHaveCount(0);
   });
+
+  test('buttons in SetupView check-in and expected arrivals satisfy touch targets', async ({
+    page,
+  }) => {
+    await page.goto('/queue?mode=doubles');
+    const pasteInput = page.getByPlaceholder(/Paste names separated by commas/);
+    await pasteInput.fill('Alpha, Beta, Gamma');
+    const addExpectedBtn = page.getByRole('button', { name: 'Add as Expected' });
+    await expect(addExpectedBtn).toBeVisible();
+    const addExpectedBox = await addExpectedBtn.boundingBox();
+    expect(Math.round(addExpectedBox!.height)).toBeGreaterThanOrEqual(44);
+    await addExpectedBtn.click();
+
+    const checkinBtn = page.locator('.checkin-btn').first();
+    const checkinAllBtn = page.locator('.checkin-all-btn');
+    const removeBtn = page.locator('.remove-expected-btn').first();
+
+    const checkinBox = await checkinBtn.boundingBox();
+    const checkinAllBox = await checkinAllBtn.boundingBox();
+    const removeBox = await removeBtn.boundingBox();
+
+    expect(Math.round(checkinBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(checkinAllBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(removeBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(removeBox!.width)).toBeGreaterThanOrEqual(44);
+
+    await checkinAllBtn.click();
+    const uncheckAllBtn = page.locator('.uncheck-all-btn');
+    await expect(uncheckAllBtn).toBeVisible();
+    const uncheckBox = await uncheckAllBtn.boundingBox();
+    expect(Math.round(uncheckBox!.height)).toBeGreaterThanOrEqual(44);
+  });
 });

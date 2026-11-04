@@ -808,11 +808,12 @@ function QueueSystemContent() {
   };
   const removeTempPlayer = (i: number) => setTempPlayers(prev => prev.filter((_, j) => j !== i));
 
-  const addFromPaste = (target: 'checkedIn' | 'expected' = 'checkedIn') => {
+  const addFromPaste = (target: 'checkedIn' | 'expected' | unknown = 'checkedIn') => {
+    const resolvedTarget: 'checkedIn' | 'expected' = target === 'expected' ? 'expected' : 'checkedIn';
     const res = resolvePastedPlayers(
       pasteInput,
       { expected: expectedPlayers, checkedIn: tempPlayers },
-      target,
+      resolvedTarget,
       V1_RELEASE.maxPlayers,
     );
     if (res.addedCount === 0) {

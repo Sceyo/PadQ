@@ -342,7 +342,7 @@ export function SetupView({
           />
           <button
             type="button"
-            onClick={onAddFromPaste}
+            onClick={() => onAddFromPaste()}
             className="add-btn add-btn--paste"
             suppressHydrationWarning
             title="Add all"
