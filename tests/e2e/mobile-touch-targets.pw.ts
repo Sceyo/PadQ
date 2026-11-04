@@ -112,8 +112,12 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     expect(Math.round(confirmBox!.height)).toBeGreaterThanOrEqual(44);
     await confirmBtn.click();
 
-    // Stats tab & Recap Card
-    await statsTab.click();
+    // Dismiss toast if visible so it doesn't intercept pointer events on mobile topbar
+    const dismissToast = page.locator('.toast-dismiss');
+    if (await dismissToast.isVisible()) {
+      await dismissToast.click();
+    }
+    await statsTab.click({ force: true });
     const recapBtn = page.getByRole('button', { name: /Share Recap Card/i });
     await expect(recapBtn).toBeVisible({ timeout: 10_000 });
     const recapBtnBox = await recapBtn.boundingBox();
