@@ -70,7 +70,7 @@ import {
   deserializePoolSinglesState,
 } from './lib/singlesPoolEngine';
 import { V1_RELEASE } from './lib/releaseConfig';
-import { planMultiCourtResult } from './lib/multiCourtResult';
+import { planMultiCourtResult, buildNumericSkillMap } from './lib/multiCourtResult';
 import { formatEtaLabel } from './lib/etaEngine';
 import { parsePlayerListPaste } from './lib/pasteParser';
 import { resolvePastedPlayers } from './lib/checkInState';
@@ -648,6 +648,10 @@ function QueueSystemContent() {
   const activeHistory          = useMemo(() => {
     return rawActiveHistory.map(entry => historyOverrides[entry.id] ?? entry);
   }, [rawActiveHistory, historyOverrides]);
+  const activeHistoryRef       = useRef<MatchHistoryEntry[]>([]);
+  useEffect(() => {
+    activeHistoryRef.current = activeHistory;
+  }, [activeHistory]);
 
   const handleCorrectHistoryEntry = (entryId: number, updated: MatchHistoryEntry) => {
     setHistoryOverrides(prev => ({ ...prev, [entryId]: updated }));
@@ -690,6 +694,7 @@ function QueueSystemContent() {
     });
     return base;
   }, [roster, skilledBrackets]);
+  const numericSkillMap = useMemo(() => buildNumericSkillMap(statsList, rosterSkillMap), [statsList, rosterSkillMap]);
   const suggestions = useMemo(() => activeTab === 'queue' ? generateSuggestions(statsList, queue) : [], [statsList, queue, activeTab]);
   const playAllSuggestion = useMemo<PlayAllSuggestion | null>(() => {
     if (activeQueueMode !== 'playall' || gameMode !== 'doubles') return null;
@@ -1160,8 +1165,15 @@ function QueueSystemContent() {
           score,
           timestamp: new Date().toLocaleTimeString(),
         };
+        const currentHistory = activeHistoryRef.current;
         const planned = planMultiCourtResult(
-          { queue: queueRef.current, courtSlots: currentSlots, sittingOut: activeSittingOut, priorityPlayers: activePriorityPlayers },
+          {
+            queue: queueRef.current,
+            courtSlots: currentSlots,
+            sittingOut: activeSittingOut,
+            priorityPlayers: activePriorityPlayers,
+            history: currentHistory.slice(0, 25),
+          },
           courtId,
           [...slot.onCourt],
           winningSide,
@@ -1172,6 +1184,7 @@ function QueueSystemContent() {
         }
         const previousQueue = [...queueRef.current];
         const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
+        const previousHistory = [...currentHistory];
 
         setQueue(planned.queue);
         queueRef.current = planned.queue;
@@ -1180,6 +1193,7 @@ function QueueSystemContent() {
         if (planned.priorityPlayers !== undefined) {
           setLocalPriorityPlayers(planned.priorityPlayers);
         }
+        activeHistoryRef.current = [entry, ...currentHistory];
         setLocalHistory(previous => [entry, ...previous]);
 
         if (session.sessionId) {
@@ -1191,8 +1205,10 @@ function QueueSystemContent() {
             id: entry.id,
             timestamp: entry.timestamp,
             score,
+            history: currentHistory.slice(0, 25),
           });
           if (!result || result.status === 'failed') {
+            activeHistoryRef.current = previousHistory;
             setLocalHistory(previous => previous.filter(item => item.id !== entry.id));
             setQueue(previousQueue);
             queueRef.current = previousQueue;
@@ -1489,6 +1505,7 @@ function QueueSystemContent() {
       );
       const activePlayers = players.filter(p => !lockedSet.has(p) && !activeSittingOut.includes(p));
 
+      const currentHistory = activeHistoryRef.current;
       const planned = planMultiCourtResult(
         {
           queue: queueRef.current,
@@ -1496,6 +1513,8 @@ function QueueSystemContent() {
           lockedPartners: (session.lockedPartners ?? []).map(([a, b]) => ({ a, b })),
           sittingOut: activeSittingOut,
           priorityPlayers: activePriorityPlayers,
+          history: currentHistory.slice(0, 25),
+          skillMap: numericSkillMap,
         },
         courtId,
         [...slot.onCourt],
@@ -1522,11 +1541,13 @@ function QueueSystemContent() {
       };
       const previousQueue = [...queueRef.current];
       const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
+      const previousHistory = [...currentHistory];
 
       setLocalCourtSlots(updatedSlots);
       courtSlotsRef.current = updatedSlots;
       setQueue(newQueue);
       queueRef.current = newQueue;
+      activeHistoryRef.current = [entry, ...currentHistory];
       setLocalHistory(prev => [entry, ...prev]);
 
       if (session.sessionId) {
@@ -1538,8 +1559,11 @@ function QueueSystemContent() {
           id: entry.id,
           timestamp: entry.timestamp,
           score,
+          history: currentHistory.slice(0, 25),
+          skillMap: numericSkillMap,
         });
         if (!result || result.status === 'failed') {
+          activeHistoryRef.current = previousHistory;
           setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
           setQueue(previousQueue);
           queueRef.current = previousQueue;
@@ -1556,6 +1580,7 @@ function QueueSystemContent() {
         setLocalCourtSlots(result.courtSlots);
         courtSlotsRef.current = result.courtSlots;
         if (result.status === 'stale') {
+          activeHistoryRef.current = previousHistory;
           setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
           showToast('This court already changed. Its latest assignment has been restored.');
           return false;

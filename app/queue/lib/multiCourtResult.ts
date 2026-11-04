@@ -1,5 +1,46 @@
 export const MULTI_COURT_SINGLES_MAX_STREAK = 3;
 
+/**
+ * Maps player performance and roster skill tags into a 0..100 skill rating map.
+ * Players with >= 1 game played use their winRate.
+ * Unplayed players with a skill bracket use 25 (beginner), 50 (intermediate), or 75 (advanced).
+ * Untagged unplayed players default to 50.
+ */
+export function buildNumericSkillMap(
+  statsList: Array<{ name: string; gamesPlayed?: number; played?: number; winRate: number }>,
+  rosterSkillMap?: Record<string, 'beginner' | 'intermediate' | 'advanced' | undefined>,
+): Record<string, number> {
+  const map: Record<string, number> = {};
+
+  const bracketDefaults: Record<'beginner' | 'intermediate' | 'advanced', number> = {
+    beginner: 25,
+    intermediate: 50,
+    advanced: 75,
+  };
+
+  for (const stat of statsList) {
+    const games = stat.gamesPlayed ?? stat.played ?? 0;
+    if (games >= 1) {
+      map[stat.name] = stat.winRate;
+    } else if (rosterSkillMap && rosterSkillMap[stat.name]) {
+      const bracket = rosterSkillMap[stat.name]!;
+      map[stat.name] = bracketDefaults[bracket];
+    } else {
+      map[stat.name] = 50;
+    }
+  }
+
+  if (rosterSkillMap) {
+    for (const [name, bracket] of Object.entries(rosterSkillMap)) {
+      if (bracket && map[name] === undefined) {
+        map[name] = bracketDefaults[bracket];
+      }
+    }
+  }
+
+  return map;
+}
+
 import { rotateMultiCourtDoubles, pairKey, teamPairKey, type LockedPartnerPair } from './doublesEngine';
 
 export interface MultiCourtSlot {

@@ -332,6 +332,8 @@ export interface CourtResultCommand {
   id: number;
   timestamp: string;
   score?: string;
+  history?: Array<{ id?: number; mode?: string; players: string; winner: string; timestamp?: string; score?: string }>;
+  skillMap?: Record<string, number>;
 }
 
 export type CourtResultCommit = {
@@ -422,6 +424,8 @@ export async function commitMultiCourtResult(
         lockedPartners: current.lockedPartners,
         sittingOut: current.sittingOut,
         priorityPlayers: current.priorityPlayers,
+        history: command.history,
+        skillMap: command.skillMap,
       },
       command.courtId,
       command.expectedPlayers,
