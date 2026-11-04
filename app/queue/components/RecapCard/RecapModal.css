@@ -280,7 +280,8 @@
   border: 1px solid rgba(99, 102, 241, 0.35);
   border-radius: 8px;
   padding: 6px 12px;
-  font-size: 0.85rem;
+  font-size: 1rem; /* 16px strictly stops iOS Safari auto-zoom */
+  min-height: var(--tap-min, 44px);
   font-weight: 600;
   outline: none;
   cursor: pointer;

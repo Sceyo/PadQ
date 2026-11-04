@@ -687,9 +687,29 @@ function QueueSystemContent() {
     activeHistoryRef.current = activeHistory;
   }, [activeHistory]);
 
-  const handleCorrectHistoryEntry = (entryId: number, updated: MatchHistoryEntry) => {
+  const handleCorrectHistoryEntry = async (entryId: number, updated: MatchHistoryEntry) => {
+    const prevEntry = activeHistory.find(e => e.id === entryId);
     setHistoryOverrides(prev => ({ ...prev, [entryId]: updated }));
-    setLocalHistory(prev => prev.map(entry => entry.id === entryId ? updated : entry));
+    setLocalHistory(prev => prev.map(entry => (entry.id === entryId ? updated : entry)));
+    activeHistoryRef.current = activeHistoryRef.current.map(entry => (entry.id === entryId ? updated : entry));
+
+    if (session.sessionId) {
+      const ok = await session.correctHistoryEntry(entryId, updated);
+      if (!ok) {
+        if (prevEntry) {
+          setHistoryOverrides(prev => {
+            const next = { ...prev };
+            delete next[entryId];
+            return next;
+          });
+          setLocalHistory(prev => prev.map(entry => (entry.id === entryId ? prevEntry : entry)));
+          activeHistoryRef.current = activeHistoryRef.current.map(entry => (entry.id === entryId ? prevEntry : entry));
+        }
+        showToast('Could not save match correction. Check connection and try again.');
+        return;
+      }
+    }
+
     showToast(`Corrected Match #${entryId}: Winner is now ${updated.winner}`);
   };
 
@@ -2254,6 +2274,7 @@ function QueueSystemContent() {
             history={activeHistory}
             roomCode={session.sessionId}
             mode={gameMode ?? 'doubles'}
+            onCorrectHistoryEntry={canControl ? handleCorrectHistoryEntry : undefined}
           />
         ) : (
           <div className="main-layout">
@@ -2664,6 +2685,7 @@ function QueueSystemContent() {
               careerStats={careerStats}
               roomCode={session.sessionId}
               mode={gameMode ?? 'doubles'}
+              onCorrectHistoryEntry={canControl ? handleCorrectHistoryEntry : undefined}
             />
           ) : isMultiCourt ? (
             <MultiCourtScreen
@@ -2759,6 +2781,7 @@ function QueueSystemContent() {
           history={activeHistory}
           roomCode={session.sessionId}
           mode={gameMode ?? 'doubles'}
+          onCorrectHistoryEntry={canControl ? handleCorrectHistoryEntry : undefined}
         />
       ) : (
         <div className="main-layout">

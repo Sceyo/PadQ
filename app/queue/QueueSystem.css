@@ -4799,14 +4799,15 @@ body.dark-mode .format-option-btn--active {
 .history-flip-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   background: rgba(99, 102, 241, 0.08);
   border: 1px solid rgba(99, 102, 241, 0.25);
-  border-radius: var(--r-sm, 6px);
+  border-radius: var(--r-sm, 8px);
   color: var(--primary, #818cf8);
-  font-size: 0.7rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-  padding: 2px 7px;
+  padding: 6px 12px;
+  min-height: var(--tap-min, 44px);
   cursor: pointer;
   transition: all 0.15s ease;
   margin-left: auto;
