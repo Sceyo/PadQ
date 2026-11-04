@@ -277,6 +277,25 @@ export function loadCheckInDraft(storageKey: string): PreSessionCheckInState | n
   return null;
 }
 
+export const CHECKIN_DRAFT_KEY = 'padq_checkin_draft';
+export const lateArrivalsStorageKey = (sessionId: string) => `padq_late_arrivals_${sessionId}`;
+
+/**
+ * Moves all checked-in players back into expected arrivals without duplicates.
+ */
+export function uncheckAllPlayers(state: PreSessionCheckInState): PreSessionCheckInState {
+  const expected = [...state.expected];
+  for (const name of state.checkedIn) {
+    if (!expected.some(p => p.toLowerCase() === name.toLowerCase())) {
+      expected.push(name);
+    }
+  }
+  return {
+    expected,
+    checkedIn: [],
+  };
+}
+
 /**
  * Safely clears the check-in draft from localStorage.
  */
@@ -288,4 +307,48 @@ export function clearCheckInDraft(storageKey: string): void {
   } catch {
     // Ignore storage errors
   }
+}
+
+/**
+ * Persists late arrival expected players under their official session room code key
+ * and cleans up pre-session drafts.
+ */
+export function persistSessionLateArrivals(sessionId: string, expected: string[]): string[] {
+  saveSessionLateArrivals(sessionId, expected);
+  clearCheckInDraft(CHECKIN_DRAFT_KEY);
+  return [...expected];
+}
+
+/**
+ * Saves late arrivals for a live session.
+ */
+export function saveSessionLateArrivals(sessionId: string, lateArrivals: string[]): void {
+  const storage = getStorage();
+  if (!storage) return;
+  const key = lateArrivalsStorageKey(sessionId);
+  try {
+    if (lateArrivals.length > 0) {
+      storage.setItem(key, JSON.stringify(lateArrivals));
+    } else {
+      storage.removeItem(key);
+    }
+  } catch {}
+}
+
+/**
+ * Loads late arrivals for a live session.
+ */
+export function loadSessionLateArrivals(sessionId: string): string[] {
+  const storage = getStorage();
+  if (!storage) return [];
+  const key = lateArrivalsStorageKey(sessionId);
+  try {
+    const raw = storage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((p: unknown): p is string => typeof p === 'string');
+    }
+  } catch {}
+  return [];
 }

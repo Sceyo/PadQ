@@ -48,6 +48,9 @@ export interface SetupViewProps {
   onUndoCheckInPlayer?: (name: string) => void;
   onCheckInAll?:       () => void;
   onRemoveExpectedPlayer?: (name: string) => void;
+  onAddExpectedFromPaste?: () => void;
+  onAddExpectedFromRoster?: () => void;
+  onUncheckAll?:       () => void;
 }
 
 export function SetupView({
@@ -68,6 +71,9 @@ export function SetupView({
   onUndoCheckInPlayer,
   onCheckInAll,
   onRemoveExpectedPlayer,
+  onAddExpectedFromPaste,
+  onAddExpectedFromRoster,
+  onUncheckAll,
 }: SetupViewProps) {
   const minPlayers = gameMode === 'doubles' && courtCount > 1
     ? courtCount * 4
@@ -213,7 +219,8 @@ export function SetupView({
             <div className="roster-panel">
               <div className="roster-list">
                 {roster.map((entry, i) => {
-                  const isAdded = tempPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase());
+                  const isAdded = tempPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase()) ||
+                    expectedPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase());
                   const pickerOpen = skillPickerFor === entry.name;
                   return (
                     <div key={`roster-${i}-${entry.name}`} className="roster-item roster-item--col">
@@ -284,6 +291,17 @@ export function SetupView({
                 >
                   Add Selected ({rosterSelected.size})
                 </button>
+                {onAddExpectedFromRoster && (
+                  <button
+                    type="button"
+                    className="roster-action-btn add-expected-btn"
+                    onClick={onAddExpectedFromRoster}
+                    suppressHydrationWarning
+                    disabled={rosterSelected.size === 0}
+                  >
+                    Add as Expected ({rosterSelected.size})
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -331,6 +349,18 @@ export function SetupView({
           >
             <Users size={15} />
           </button>
+          {onAddExpectedFromPaste && (
+            <button
+              type="button"
+              onClick={onAddExpectedFromPaste}
+              className="add-btn add-expected-btn"
+              disabled={!pasteInput.trim()}
+              suppressHydrationWarning
+              title="Add as Expected"
+            >
+              <Clock size={15} />
+            </button>
+          )}
         </div>
 
         {/* Expected Arrivals / Not Yet Here */}
@@ -389,7 +419,20 @@ export function SetupView({
           <div className="players-list">
             <div className="setup-players-header">
               <h3><Users size={13} /> Players ({tempPlayers.length})</h3>
-              <span className="setup-checked-in-pill">Checked In</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="setup-checked-in-pill">Checked In</span>
+                {onUncheckAll && (
+                  <button
+                    type="button"
+                    className="uncheck-all-btn"
+                    onClick={onUncheckAll}
+                    title="Move all players to Expected Arrivals"
+                    suppressHydrationWarning
+                  >
+                    Uncheck All
+                  </button>
+                )}
+              </div>
             </div>
             <ul>
               {tempPlayers.map((p, i) => (

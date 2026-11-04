@@ -1,7 +1,27 @@
-import { describe, expect, it } from 'vitest';
-import { resolvePastedPlayers } from '../app/queue/lib/checkInState';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import {
+  resolvePastedPlayers,
+  uncheckAllPlayers,
+  persistSessionLateArrivals,
+  loadSessionLateArrivals,
+  saveSessionLateArrivals,
+  CHECKIN_DRAFT_KEY,
+  saveCheckInDraft,
+  loadCheckInDraft,
+} from '../app/queue/lib/checkInState';
 
-describe('resolvePastedPlayers (Bug #1)', () => {
+describe('Pre-Session Check-In & Smart Paste Wiring', () => {
+  beforeEach(() => {
+    const store: Record<string, string> = {};
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store[k] ?? null,
+      setItem: (k: string, v: string) => { store[k] = v; },
+      removeItem: (k: string) => { delete store[k]; },
+      clear: () => { for (const k in store) delete store[k]; },
+    });
+  });
+
+  describe('resolvePastedPlayers (Bug #1)', () => {
   it('sanitizes numbered Reclub/WhatsApp lists and stops at Waitlist header', () => {
     const raw = 'Confirmed:\n1. Juan (PAID)\n2. Maria ✅ - Guest\nWaitlist:\n3. Sub Player';
     const res = resolvePastedPlayers(raw, { expected: [], checkedIn: [] }, 'checkedIn', 30);
@@ -26,4 +46,20 @@ describe('resolvePastedPlayers (Bug #1)', () => {
     expect(res.nextState.checkedIn).toHaveLength(30);
     expect(res.nextState.checkedIn[29]).toBe('NewOne');
   });
+});
+
+describe('Pre-Session Check-In handoff & batch uncheck (Bug #3)', () => {
+  it('moves all checked-in players into expected without duplicates on uncheckAllPlayers', () => {
+    const next = uncheckAllPlayers({ expected: ['Zed'], checkedIn: ['Ana', 'Ben'] });
+    expect(next).toEqual({ expected: ['Zed', 'Ana', 'Ben'], checkedIn: [] });
+  });
+
+  it('persists remaining expected players under padq_late_arrivals_<startResult.sessionId> and clears draft', () => {
+    saveCheckInDraft(CHECKIN_DRAFT_KEY, { expected: ['Late1', 'Late2'], checkedIn: ['P1', 'P2', 'P3', 'P4', 'P5'] });
+    const handedOff = persistSessionLateArrivals('ABC234', ['Late1', 'Late2']);
+    expect(handedOff).toEqual(['Late1', 'Late2']);
+    expect(loadSessionLateArrivals('ABC234')).toEqual(['Late1', 'Late2']);
+    expect(loadCheckInDraft(CHECKIN_DRAFT_KEY)).toBeNull();
+  });
+});
 });

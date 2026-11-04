@@ -73,7 +73,22 @@ import { V1_RELEASE } from './lib/releaseConfig';
 import { planMultiCourtResult, buildNumericSkillMap } from './lib/multiCourtResult';
 import { formatEtaLabel } from './lib/etaEngine';
 import { parsePlayerListPaste } from './lib/pasteParser';
-import { resolvePastedPlayers } from './lib/checkInState';
+import {
+  resolvePastedPlayers,
+  checkInPlayer,
+  undoCheckInPlayer,
+  checkInAllPlayers,
+  uncheckAllPlayers,
+  removePlayerFromCheckIn,
+  addPlayersToCheckIn,
+  saveCheckInDraft,
+  loadCheckInDraft,
+  clearCheckInDraft,
+  CHECKIN_DRAFT_KEY,
+  persistSessionLateArrivals,
+  loadSessionLateArrivals,
+  saveSessionLateArrivals,
+} from './lib/checkInState';
 import {
   toggleSitOutTransition,
   removeFromQueueTransition,
@@ -223,56 +238,74 @@ function QueueSystemContent() {
 
   useEffect(() => {
     if (typeof window === 'undefined' || !session.sessionId) return;
-    try {
-      const raw = localStorage.getItem(`padq_late_arrivals_${session.sessionId}`);
-      if (raw) setLateArrivals(JSON.parse(raw));
-    } catch {}
+    setLateArrivals(loadSessionLateArrivals(session.sessionId));
   }, [session.sessionId]);
 
+  // Pre-session check-in draft persistence & hydration
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem('padq_host_session_id') || players.length > 0) return;
+    const draft = loadCheckInDraft(CHECKIN_DRAFT_KEY);
+    if (draft) {
+      if (draft.checkedIn.length > 0) setTempPlayers(draft.checkedIn);
+      if (draft.expected.length > 0) setExpectedPlayers(draft.expected);
+    }
+  }, [players.length]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (players.length > 0 || session.sessionId) return;
+    if (tempPlayers.length === 0 && expectedPlayers.length === 0) return;
+    saveCheckInDraft(CHECKIN_DRAFT_KEY, { expected: expectedPlayers, checkedIn: tempPlayers });
+  }, [expectedPlayers, tempPlayers, players.length, session.sessionId]);
+
   const handleCheckInLateArrival = async (name: string) => {
-    await handleAddPlayerLive(name);
+    const success = await handleAddPlayerLive(name);
+    if (!success) return false;
     setLateArrivals(prev => {
-      const next = prev.filter(p => p !== name);
-      try {
-        if (session.sessionId) localStorage.setItem(`padq_late_arrivals_${session.sessionId}`, JSON.stringify(next));
-      } catch {}
+      const next = prev.filter(p => p.toLowerCase() !== name.toLowerCase());
+      if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
       return next;
     });
+    return true;
   };
 
   const handleDismissLateArrival = (name: string) => {
     setLateArrivals(prev => {
-      const next = prev.filter(p => p !== name);
-      try {
-        if (session.sessionId) localStorage.setItem(`padq_late_arrivals_${session.sessionId}`, JSON.stringify(next));
-      } catch {}
+      const next = prev.filter(p => p.toLowerCase() !== name.toLowerCase());
+      if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
       return next;
     });
   };
 
   const handleCheckInPlayer = (name: string) => {
-    setExpectedPlayers(prev => prev.filter(p => p !== name));
-    setTempPlayers(prev => (prev.includes(name) ? prev : [...prev, name]));
+    const next = checkInPlayer({ expected: expectedPlayers, checkedIn: tempPlayers }, name);
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
   };
 
   const handleUndoCheckInPlayer = (name: string) => {
-    setTempPlayers(prev => prev.filter(p => p !== name));
-    setExpectedPlayers(prev => (prev.includes(name) ? prev : [...prev, name]));
+    const next = undoCheckInPlayer({ expected: expectedPlayers, checkedIn: tempPlayers }, name);
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
   };
 
   const handleCheckInAll = () => {
-    setTempPlayers(prev => {
-      const combined = [...prev];
-      for (const p of expectedPlayers) {
-        if (!combined.includes(p)) combined.push(p);
-      }
-      return combined;
-    });
-    setExpectedPlayers([]);
+    const next = checkInAllPlayers({ expected: expectedPlayers, checkedIn: tempPlayers }, V1_RELEASE.maxPlayers);
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
+  };
+
+  const handleUncheckAll = () => {
+    const next = uncheckAllPlayers({ expected: expectedPlayers, checkedIn: tempPlayers });
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
   };
 
   const handleRemoveExpectedPlayer = (name: string) => {
-    setExpectedPlayers(prev => prev.filter(p => p !== name));
+    const next = removePlayerFromCheckIn({ expected: expectedPlayers, checkedIn: tempPlayers }, name);
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
   };
   const [currentName,  setCurrentName]  = useState('');
   const [pasteInput,   setPasteInput]   = useState('');
@@ -742,7 +775,10 @@ function QueueSystemContent() {
     if (!t) return;
     if (tempPlayers.length >= V1_RELEASE.maxPlayers) { setSetupErrorMsg(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
     if (t.length > 60) { setSetupErrorMsg('Player names must be 60 characters or fewer'); return; }
-    if (tempPlayers.some(name => name.toLowerCase() === t.toLowerCase())) {
+    if (
+      tempPlayers.some(name => name.toLowerCase() === t.toLowerCase()) ||
+      expectedPlayers.some(name => name.toLowerCase() === t.toLowerCase())
+    ) {
       setSetupErrorMsg(`"${t}" already exists. If two players share a name, add an initial (e.g. "${t} D.") to distinguish them.`);
       return;
     }
@@ -851,16 +887,9 @@ function QueueSystemContent() {
     resetSinglesState(orderedPlayers);
     resetPoolSinglesState();
     setPlayers(orderedPlayers);
-    if (expectedPlayers.length > 0) {
-      try {
-        localStorage.setItem(`padq_late_arrivals_${session.sessionId ?? 'draft'}`, JSON.stringify(expectedPlayers));
-      } catch {}
-    }
-    if (expectedPlayers.length > 0) {
-      try {
-        localStorage.setItem(`padq_late_arrivals_${session.sessionId ?? 'draft'}`, JSON.stringify(expectedPlayers));
-      } catch {}
-    }
+    const handedOffLate = persistSessionLateArrivals(startResult.sessionId, expectedPlayers);
+    setLateArrivals(handedOffLate);
+    setExpectedPlayers([]);
     setTempPlayers([]);
     setLocalHistory([]);
     setLocalTournamentActive(localQueueMode === 'tournament');
@@ -1902,6 +1931,9 @@ function QueueSystemContent() {
       setIsDeletingSession(true);
       try {
         await session.deleteHostedSession();
+        clearCheckInDraft(CHECKIN_DRAFT_KEY);
+        if (session.sessionId) saveSessionLateArrivals(session.sessionId, []);
+        setLateArrivals([]);
         clearCourtGroup();
         sessionStorage.clear();
         router.push('/');
@@ -1939,19 +1971,33 @@ function QueueSystemContent() {
   };
 
   const handleSelectAllRoster = () => {
+    const existing = new Set([...tempPlayers, ...expectedPlayers].map(p => p.toLowerCase()));
     setRosterSelected(new Set(
       roster
-        .filter(e => !tempPlayers.some(p => p.toLowerCase() === e.name.toLowerCase()))
+        .filter(e => !existing.has(e.name.toLowerCase()))
         .map(e => e.name)
     ));
   };
 
   const handleAddFromRoster = () => {
-    const available = V1_RELEASE.maxPlayers - tempPlayers.length;
-    const existing = new Set(tempPlayers.map(name => name.toLowerCase()));
-    const fresh = [...rosterSelected].filter(name => !existing.has(name.toLowerCase()) && name.length <= 60).slice(0, available);
-    if (fresh.length === 0) return;
-    setTempPlayers(prev => [...prev, ...fresh]);
+    const res = addPlayersToCheckIn(
+      { expected: expectedPlayers, checkedIn: tempPlayers },
+      Array.from(rosterSelected),
+      'checkedIn',
+      V1_RELEASE.maxPlayers,
+    );
+    setTempPlayers(res.checkedIn);
+    setRosterSelected(new Set());
+  };
+
+  const handleAddExpectedFromRoster = () => {
+    const res = addPlayersToCheckIn(
+      { expected: expectedPlayers, checkedIn: tempPlayers },
+      Array.from(rosterSelected),
+      'expected',
+      V1_RELEASE.maxPlayers,
+    );
+    setExpectedPlayers(res.expected);
     setRosterSelected(new Set());
   };
 
@@ -2155,7 +2201,10 @@ function QueueSystemContent() {
         onCheckInPlayer={handleCheckInPlayer}
         onUndoCheckInPlayer={handleUndoCheckInPlayer}
         onCheckInAll={handleCheckInAll}
+        onUncheckAll={handleUncheckAll}
         onRemoveExpectedPlayer={handleRemoveExpectedPlayer}
+        onAddExpectedFromPaste={() => addFromPaste('expected')}
+        onAddExpectedFromRoster={handleAddExpectedFromRoster}
       />
     );
   }
