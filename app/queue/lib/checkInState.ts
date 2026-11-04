@@ -336,6 +336,20 @@ export function saveSessionLateArrivals(sessionId: string, lateArrivals: string[
 }
 
 /**
+ * Safely updates the late arrivals list after an attempted check-in.
+ * Only removes the player case-insensitively when didAdd is true.
+ */
+export function applyLateArrivalCheckIn(
+  lateArrivals: string[],
+  name: string,
+  didAdd: boolean,
+): string[] {
+  if (!didAdd) return [...lateArrivals];
+  const lower = name.toLowerCase().trim();
+  return lateArrivals.filter(p => p.toLowerCase().trim() !== lower);
+}
+
+/**
  * Loads late arrivals for a live session.
  */
 export function loadSessionLateArrivals(sessionId: string): string[] {

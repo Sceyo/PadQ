@@ -88,6 +88,7 @@ import {
   persistSessionLateArrivals,
   loadSessionLateArrivals,
   saveSessionLateArrivals,
+  applyLateArrivalCheckIn,
 } from './lib/checkInState';
 import {
   toggleSitOutTransition,
@@ -259,11 +260,11 @@ function QueueSystemContent() {
     saveCheckInDraft(CHECKIN_DRAFT_KEY, { expected: expectedPlayers, checkedIn: tempPlayers });
   }, [expectedPlayers, tempPlayers, players.length, session.sessionId]);
 
-  const handleCheckInLateArrival = async (name: string) => {
-    const success = await handleAddPlayerLive(name);
+  const handleCheckInLateArrival = (name: string): boolean => {
+    const success = handleAddPlayerLive(name);
     if (!success) return false;
     setLateArrivals(prev => {
-      const next = prev.filter(p => p.toLowerCase() !== name.toLowerCase());
+      const next = applyLateArrivalCheckIn(prev, name, true);
       if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
       return next;
     });
@@ -272,7 +273,7 @@ function QueueSystemContent() {
 
   const handleDismissLateArrival = (name: string) => {
     setLateArrivals(prev => {
-      const next = prev.filter(p => p.toLowerCase() !== name.toLowerCase());
+      const next = applyLateArrivalCheckIn(prev, name, true);
       if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
       return next;
     });
@@ -1816,6 +1817,11 @@ function QueueSystemContent() {
       });
     }
     if (session.sessionId) session.syncField({ players: np, queue: nq, priorityPlayers: nextPriority });
+    setLateArrivals(prev => {
+      const next = applyLateArrivalCheckIn(prev, trimmedName, true);
+      if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
+      return next;
+    });
     return true;
   };
 
@@ -2573,6 +2579,9 @@ function QueueSystemContent() {
           isConnected={session.isConnected}
           isSaving={session.isSaving}
           isLive={isLiveLocal}
+          lateArrivals={lateArrivals}
+          onCheckInLateArrival={handleCheckInLateArrival}
+          onDismissLateArrival={handleDismissLateArrival}
           onAddPlayerLive={handleAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}
           onToggleScorePrompt={() => setScorePromptEnabled(p => !p)}

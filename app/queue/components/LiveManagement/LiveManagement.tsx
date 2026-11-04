@@ -47,7 +47,7 @@ export const AddPlayerPanel: React.FC<AddPlayerPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => onCheckInLateArrival(name)}
-                    style={{ background: 'var(--primary, #3b82f6)', color: '#fff', border: 'none', borderRadius: '4px', padding: '1px 6px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                    style={{ background: 'var(--primary, #3b82f6)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0 10px', minHeight: '44px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
                   >
                     Check In
                   </button>
@@ -57,7 +57,7 @@ export const AddPlayerPanel: React.FC<AddPlayerPanelProps> = ({
                     type="button"
                     onClick={() => onDismissLateArrival(name)}
                     title={`Dismiss ${name}`}
-                    style={{ background: 'none', border: 'none', color: 'var(--txt-3, #64748b)', cursor: 'pointer', fontSize: '0.9rem', padding: '0 2px' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--txt-3, #64748b)', cursor: 'pointer', fontSize: '1.25rem', minWidth: '44px', minHeight: '44px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                   >
                     ×
                   </button>
