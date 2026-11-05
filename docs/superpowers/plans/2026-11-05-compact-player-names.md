@@ -156,18 +156,18 @@ git commit -m "feat(ui): format compact player names in PlayerLabel and SingleCo
 - Modify: `app/queue/components/AnalyticsDashboard/AnalyticsDashboard.tsx`
 - Test: `tests/spectatorNameFormatting.test.tsx`
 
-- [ ] **Step 1: Write failing component tests for spectator and analytics compact names**
+- [x] **Step 1: Write failing component tests for spectator and analytics compact names**
 
 In `tests/spectatorNameFormatting.test.tsx`:
 1. `<WaitingQueueChips />` with `waitingQueue={['Quang Dong', 'Anna Leigh Waters']}` renders visible text `Q. Dong` and `A.L. Waters`, but `aria-label` retains `Turn alert: Quang Dong (off)` and `Turn alert: Anna Leigh Waters (off)`.
 2. `<AnalyticsDashboard />` renders `formatDisplayName(s.name)` in the table rows and cards while retaining `title={s.name}`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/spectatorNameFormatting.test.tsx`
 Expected: FAIL.
 
-- [ ] **Step 3: Update `LiveCourtStatus.tsx`, `/watch/[sessionId]/page.tsx`, and `AnalyticsDashboard.tsx`**
+- [x] **Step 3: Update `LiveCourtStatus.tsx`, `/watch/[sessionId]/page.tsx`, and `AnalyticsDashboard.tsx`**
 
 1. In `app/watch/[sessionId]/LiveCourtStatus.tsx`:
    - Import `formatDisplayName` from `@/app/queue/lib/nameFormatter`.
@@ -178,12 +178,12 @@ Expected: FAIL.
 3. In `app/queue/components/AnalyticsDashboard/AnalyticsDashboard.tsx`:
    - In table rows, player cards, and frequency bars, render `formatDisplayName(s.name)` with `title={s.name}`.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npm.cmd test -- tests/spectatorNameFormatting.test.tsx tests/analyticsDashboard.test.tsx tests/watchStandings.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/watch/[sessionId]/LiveCourtStatus.tsx app/watch/[sessionId]/page.tsx app/queue/components/AnalyticsDashboard/AnalyticsDashboard.tsx tests/spectatorNameFormatting.test.tsx

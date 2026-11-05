@@ -2,6 +2,7 @@ import React from 'react';
 import type { CourtSlot } from '@/lib/sessionService';
 import { accountPlayers } from '@/app/queue/lib/queueTransitions';
 import { formatEtaLabel } from '@/app/queue/lib/etaEngine';
+import { formatDisplayName } from '@/app/queue/lib/nameFormatter';
 
 type GameMode = 'singles' | 'doubles';
 
@@ -68,7 +69,7 @@ export function WaitingQueueChips({
 
         const innerContent = (
           <>
-            <span className="w-queue-num">#{index + 1}</span> {player}
+            <span className="w-queue-num">#{index + 1}</span> {formatDisplayName(player)}
             {partner && (
               <span className="w-partner-pill" title={`Paired with ${partner}`}>
                 🔗
@@ -224,7 +225,7 @@ export function LiveCourtStatus({
                   <React.Fragment key={`w-a-${idx}-${player}`}>
                     {idx > 0 && <span className="w-partner-and">{' & '}</span>}
                     <div className="w-player-chip w-player-chip--individual">
-                      <span className="w-player-name">{player}</span>
+                      <span className="w-player-name" title={player}>{formatDisplayName(player)}</span>
                       {partnerMap[player] && (
                         <span className="w-partner-badge" title={`Paired with ${partnerMap[player]}`} aria-label={`Paired with ${partnerMap[player]}`}>
                           🔗
@@ -245,7 +246,7 @@ export function LiveCourtStatus({
                   <React.Fragment key={`w-b-${idx}-${player}`}>
                     {idx > 0 && <span className="w-partner-and">{' & '}</span>}
                     <div className="w-player-chip w-player-chip--individual">
-                      <span className="w-player-name">{player}</span>
+                      <span className="w-player-name" title={player}>{formatDisplayName(player)}</span>
                       {partnerMap[player] && (
                         <span className="w-partner-badge" title={`Paired with ${partnerMap[player]}`} aria-label={`Paired with ${partnerMap[player]}`}>
                           🔗
