@@ -12,6 +12,7 @@ describe('Spectator & Analytics compact player names', () => {
       <WaitingQueueChips
         waitingQueue={['Quang Dong', 'Anna Leigh Waters']}
         playersPerMatch={4}
+        activeCourtCount={1}
         watchedPlayer={null}
         onToggleWatchPlayer={onToggle}
       />

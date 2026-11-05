@@ -197,26 +197,26 @@ git commit -m "feat(watch): apply compact display names to spectator view and an
 **Files:**
 - Test: Run full typecheck, Vitest, Firestore rules, and Playwright E2E suite.
 
-- [ ] **Step 1: Run TypeScript typecheck**
+- [x] **Step 1: Run TypeScript typecheck**
 
 Run: `npx.cmd tsc --noEmit`
 Expected: 0 errors.
 
-- [ ] **Step 2: Run Vitest unit & integration test suite**
+- [x] **Step 2: Run Vitest unit & integration test suite**
 
 Run: `npm.cmd test -- --run`
 Expected: 100% pass across all test files.
 
-- [ ] **Step 3: Run Firestore security rules emulator suite**
+- [x] **Step 3: Run Firestore security rules emulator suite**
 
 Run: `npx.cmd firebase --config firebase.e2e.json emulators:exec --only firestore "npx.cmd vitest run tests/firestore.rules.test.ts"`
 Expected: 39 passed / 39 tests.
 
-- [ ] **Step 4: Run Playwright E2E test suite**
+- [x] **Step 4: Run Playwright E2E test suite**
 
 Run: `npm.cmd run test:e2e`
 Expected: 39 passed / 39 tests across all 13 files.
 
-- [ ] **Step 5: Final plan sync and wrap-up**
+- [x] **Step 5: Final plan sync and wrap-up**
 
 Check off all task checkboxes in `docs/superpowers/plans/2026-11-05-compact-player-names.md`.

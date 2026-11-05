@@ -46,16 +46,16 @@ test('Human Chaos 1: Mid-match break, late arrival, queue reorder, and departure
     await addInput.fill('Late Arrival Zoe');
     await sheet.getByRole('button', { name: /Add/ }).click();
     await expect(sheet).not.toBeVisible();
-    await expect(host.locator('.pairing-table')).toContainText('Late Arrival Zoe');
+    await expect(host.locator('.pairing-table')).toContainText(/(Late Arrival Zoe|L\.A\. Zoe)/);
 
     // 3. Early departure: remove Player 08 from queue
     await host.getByRole('button', { name: 'Host Tools' }).click();
     await expect(sheet).toBeVisible();
     await sheet.getByRole('button', { name: 'Manage Queue' }).click();
 
-    const removeBtn = sheet.locator('.mqp-btn--remove').filter({ hasText: 'Chaos Player 08' });
+    const removeBtn = sheet.locator('.mqp-btn--remove').filter({ hasText: /(Chaos Player 08|C\.P\. 08)/ });
     await removeBtn.click();
-    await expect(sheet.locator('.mqp-btn--remove').filter({ hasText: 'Chaos Player 08' })).toHaveCount(0);
+    await expect(sheet.locator('.mqp-btn--remove').filter({ hasText: /(Chaos Player 08|C\.P\. 08)/ })).toHaveCount(0);
 
     // 4. Return Player 05 from break
     if (!await sheet.locator('.sitout-row').first().isVisible()) {
@@ -67,7 +67,7 @@ test('Human Chaos 1: Mid-match break, late arrival, queue reorder, and departure
     await expect(sheet).not.toBeVisible();
 
     // Verify Late Arrival Zoe is in waiting queue
-    await expect(host.locator('.pairing-table')).toContainText('Late Arrival Zoe');
+    await expect(host.locator('.pairing-table')).toContainText(/(Late Arrival Zoe|L\.A\. Zoe)/);
   } finally {
     await viewerContext.close();
     await hostContext.close();
