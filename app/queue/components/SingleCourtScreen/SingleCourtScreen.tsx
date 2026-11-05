@@ -10,6 +10,7 @@ import { ReplaceDialog } from '../ReplaceDialog/ReplaceDialog';
 import { EditTeamsDialog } from '../EditTeamsDialog/EditTeamsDialog';
 import { PlayerMenu } from '../PlayerMenu/PlayerMenu';
 import { useMatchFlow } from '../../hooks/useMatchFlow';
+import { formatDisplayName } from '../../lib/nameFormatter';
 import type { CourtViewModel, QueueViewModel } from '../../lib/viewModels';
 import type { PlayerStat } from '../../lib/types';
 import styles from './SingleCourtScreen.module.css';
@@ -101,8 +102,8 @@ export function SingleCourtScreen({
   ];
 
   const isSingles = teamA.players.length === 1 && teamB.players.length === 1;
-  const sideALabel = isSingles ? (teamA.players[0] ?? 'Player 1') : 'Team A';
-  const sideBLabel = isSingles ? (teamB.players[0] ?? 'Player 2') : 'Team B';
+  const sideALabel = isSingles ? (teamA.players[0] ? formatDisplayName(teamA.players[0]) : 'Player 1') : 'Team A';
+  const sideBLabel = isSingles ? (teamB.players[0] ? formatDisplayName(teamB.players[0]) : 'Player 2') : 'Team B';
 
   // Option 1: End match early state & auto-select winner when limit is reached
   const [isEndEarlyActive, setIsEndEarlyActive] = useState(false);
@@ -114,12 +115,12 @@ export function SingleCourtScreen({
   );
 
   const winnerLabel = effectiveWinner === 'A'
-    ? (isSingles ? (teamA.players[0] ?? 'Player 1') : teamA.players.join(' & '))
+    ? (isSingles ? (teamA.players[0] ? formatDisplayName(teamA.players[0]) : 'Player 1') : teamA.players.map(formatDisplayName).join(' & '))
     : effectiveWinner === 'B'
-    ? (isSingles ? (teamB.players[0] ?? 'Player 2') : teamB.players.join(' & '))
+    ? (isSingles ? (teamB.players[0] ? formatDisplayName(teamB.players[0]) : 'Player 2') : teamB.players.map(formatDisplayName).join(' & '))
     : '';
 
-  const nextUpLabel = queue.nextUp.map(p => p.name).join(', ');
+  const nextUpLabel = queue.nextUp.map(p => formatDisplayName(p.name)).join(', ');
 
   const currentScoreLabel = court.score.enabled && (court.score.scoreA > 0 || court.score.scoreB > 0)
     ? `${court.score.scoreA}–${court.score.scoreB}`
@@ -472,7 +473,7 @@ export function SingleCourtScreen({
               }}
             >
               <span>Game Over!</span>
-              <span>Game Over · {isWonA ? (isSingles ? teamA.players[0] : teamA.players.join(' & ')) : (isSingles ? teamB.players[0] : teamB.players.join(' & '))} reached limit ({scoreA}–{scoreB})!</span>
+              <span>Game Over · {isWonA ? (isSingles ? (teamA.players[0] ? formatDisplayName(teamA.players[0]) : 'Player 1') : teamA.players.map(formatDisplayName).join(' & ')) : (isSingles ? (teamB.players[0] ? formatDisplayName(teamB.players[0]) : 'Player 2') : teamB.players.map(formatDisplayName).join(' & '))} reached limit ({scoreA}–{scoreB})!</span>
             </div>
           )}
 

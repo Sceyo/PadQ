@@ -96,17 +96,17 @@ git commit -m "feat(name): add formatDisplayName utility with unit test suite"
 **Interfaces:**
 `PlayerLabel` continues to accept `name: string`, `statsMap?: Record<string, PlayerStat>`, `showRank?: boolean`.
 
-- [ ] **Step 1: Write failing component test for `PlayerLabel` display abbreviation**
+- [x] **Step 1: Write failing component test for `PlayerLabel` display abbreviation**
 
 In `tests/playerLabel.test.tsx`:
 Assert that `<PlayerLabel name="Anna Leigh Waters" />` renders `A.L. Waters` in visible text and contains `title="Anna Leigh Waters"`.
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `npm.cmd test -- tests/playerLabel.test.tsx`
 Expected: FAIL (renders "Anna Leigh Waters" instead of "A.L. Waters").
 
-- [ ] **Step 3: Update `PlayerLabel.tsx` to use `formatDisplayName`**
+- [x] **Step 3: Update `PlayerLabel.tsx` to use `formatDisplayName`**
 
 In `app/queue/components/atoms/PlayerLabel.tsx`:
 ```tsx
@@ -134,12 +134,12 @@ export const PlayerLabel: React.FC<{
 ```
 In `SingleCourtScreen.tsx`, ensure `ScoreRow` and `GameOver` banners format names with `formatDisplayName` while preserving raw names in action dispatches.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 Run: `npm.cmd test -- tests/playerLabel.test.tsx tests/singleCourtScreen.test.tsx tests/courtScoreModal.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add app/queue/components/atoms/PlayerLabel.tsx app/queue/components/SingleCourtScreen/SingleCourtScreen.tsx tests/playerLabel.test.tsx
