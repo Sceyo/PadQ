@@ -496,4 +496,37 @@ Implements the Singles Pool-Rotation format as the default singles engine for si
     4. Point Differential
   - **Implementation Branch:** Development and implementation are scheduled on branch `matchup-differential` per `DESIGN_MATCHUP_DIFFERENTIAL.md`.
 
+---
+
+## 2026-11-06 — UI-Overhaul Mobile-First Shell, Engine Parity & Whole-System Verification
+
+### 1. Completed Architectural & Feature Milestones
+- **Mobile-First Shell & Component Extraction:** Migrated the host interface into `AppShell` (`TopBar` + `BottomNav`) with dedicated `SingleCourtScreen`, `MultiCourtScreen`, `QueuePanel`, `HostToolsSheet`, `CourtScoreModal`, and `AnalyticsDashboard`.
+- **Pre-Session Check-In & Expected Late Arrivals (`checkInState.ts`, `SetupView.tsx`, `HostToolsSheet.tsx`):** Added two-tier arrival-order check-in on Setup, staging unchecked registered players into `localStorage` (`padq:lateArrivals:{sessionId}`) for 1-tap mid-session check-in into the live queue.
+- **Engine Parity & Fairness Upgrades (`doublesEngine.ts`, `singleEngine.ts`, `singlesPoolEngine.ts`, `multiCourtResult.ts`):**
+  - Added **Singles Pool Rotation** (`singlesFormat: 'pool'` default) alongside King of the Court (`'king'`).
+  - Enforced **3-win streak rotation caps** across single-court and multi-court singles so dominant winners rotate to the back of the queue after 3 consecutive wins while the challenger stays on court.
+  - Added **Global Asynchronous Partner Pairing (Option 2 Leapfrog)** so locked partners pull together across courts without blocking single-slot fills when separated.
+  - Unified multi-court skill balancing (`buildNumericSkillMap`) and team anti-repeat checks (`teamKey` against `recentTeamKeys`).
+- **Court Score Modal, Retroactive Flip Winner & Shareable Stat Cards:**
+  - Added `CourtScoreModal` with `Match Scores: ON/OFF` toggle and 1-tap score presets (`11–9` through `11–0`).
+  - Added retroactive **Flip Winner** in `AnalyticsDashboard` Match History with atomic Firestore history replacement and standings recalculation.
+  - Added shareable **Session Standings** and **Individual Player Spotlight** PNG stat cards (`statCardExport.ts`, `RecapModal.tsx`).
+- **Spectator Live Watch Upgrades (`LiveCourtStatus.tsx`, `etaEngine.ts`, `turnAlert.ts`):**
+  - Added deterministic Queue ETA badges (`Next Up`, `~10m`, etc.) and Tap-Your-Name Turn Alerts (Web Audio chime + vibration on advancing to On Deck or On Court).
+- **Compact Player Names (`nameFormatter.ts`):**
+  - Added `formatDisplayName` across all host and spectator display surfaces to compact 2+ word names into initialed prefixes + last word (e.g., `"Anna Leigh Waters"` → `"A.L. Waters"`, `"Quang Dong"` → `"Q. Dong"`) while preserving raw player strings in state and Firestore for zero-collision identity integrity.
+
+### 2. Full System Verification Gate Results (`2026-11-06`)
+
+| Gate | Command | Result |
+|---|---|---|
+| TypeScript (`tsc`) | `npx tsc --noEmit` | **PASS (exit 0)** — 0 errors |
+| ESLint (`--quiet`) | `npm run lint -- --quiet` | **PASS (exit 0)** — 0 errors |
+| Production Build | `npm run build` | **PASS (exit 0)** — Next.js 16.4.3 (Turbopack), all 8 routes compiled cleanly |
+| Unit / Component / Simulation | `npm test -- --run` | **PASS (exit 0)** — 63 passed files (513 passed, 4 expected fail) |
+| Firestore Security Rules | `npm run test:rules` | **PASS (exit 0)** — 39 / 39 passed in Firestore Emulator |
+| Playwright E2E Browser Suite | `npm run test:e2e` | **PASS (exit 0)** — 39 / 39 passed across 13 spec files |
+
+
 

@@ -23,11 +23,19 @@ This directory contains the operational, architectural, testing, and release doc
 - [PADQ-FREE-API-SECURITY-AUDIT.md](PADQ-FREE-API-SECURITY-AUDIT.md) — Security audit covering Spark zero-spend boundaries and authorization.
 - [firestore-security-audit.local.md](firestore-security-audit.local.md) — Local Firestore security rules audit and test evaluation.
 
-## 4. Design & Operations
+## 4. Design, ADRs & Feature Specifications
 - [V1-SUPERVISED-EVENT-RUNBOOK.md](V1-SUPERVISED-EVENT-RUNBOOK.md) — Host and coordinator step-by-step event runbook.
 - [DESIGN_MATCHUP_DIFFERENTIAL.md](DESIGN_MATCHUP_DIFFERENTIAL.md) — Matchup differential, Point Differential (+/-), and 4-tier tiebreaker specification (Implemented in V1).
 - [PADQ-RELEASE-ROADMAP.md](PADQ-RELEASE-ROADMAP.md) — Post-V1 roadmap and feature backlog.
 - [PADQ-PROMPT.md](PADQ-PROMPT.md) — System architectural reference and prompt specifications.
+- [adr/0001-dual-intent-sit-out.md](adr/0001-dual-intent-sit-out.md) — ADR 0001: Dual-intent sit-out and break handling.
+- [adr/0002-deterministic-queue-eta.md](adr/0002-deterministic-queue-eta.md) — ADR 0002: Deterministic waiting queue ETA calculation.
+- [adr/0003-priority-return.md](adr/0003-priority-return.md) — ADR 0003: Priority return from break vs back-of-queue return.
+- [adr/0004-single-session-court-slots.md](adr/0004-single-session-court-slots.md) — ADR 0004: Single-session `courtSlots` multi-court architecture.
+- [superpowers/specs/2026-11-05-compact-player-names-design.md](superpowers/specs/2026-11-05-compact-player-names-design.md) — Compact player display name specification (`formatDisplayName`).
+- [superpowers/plans/2026-11-01-pre-session-checkin-and-engine-parity.md](superpowers/plans/2026-11-01-pre-session-checkin-and-engine-parity.md) — Pre-session check-in, smart paste, turn alerts, and engine parity plan.
+- [superpowers/plans/2026-11-03-fix-six-live-wiring-bugs.md](superpowers/plans/2026-11-03-fix-six-live-wiring-bugs.md) — Live wiring parity and mobile touch target hardening plan.
+- [superpowers/plans/2026-11-05-compact-player-names.md](superpowers/plans/2026-11-05-compact-player-names.md) — Compact player names implementation and verification plan.
 
 ## 5. Engineering Standards & Operational Guidelines
 - [`.claude/guidelines/architecture.md`](../.claude/guidelines/architecture.md) — System design, boundary honesty, and one-way vs two-way doors.

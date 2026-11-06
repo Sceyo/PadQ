@@ -61,7 +61,7 @@ describe('multiCourtResult singles 3-win streak cap', () => {
     let currentState = {
       courtSlots: [{ id: 'c1', name: 'Court 1', onCourt: ['Alice', 'Bob'] }],
       queue: ['Charlie', 'Dave', 'Eve'],
-      history: [] as any[],
+      history: [] as Array<{ id: number; mode: string; players: string; winner: string }>,
     };
 
     // Win 1: Alice beats Bob

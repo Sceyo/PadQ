@@ -14,11 +14,11 @@ PAD-Q is an independently developed product in **active production**. The `main`
 
 - Production release: **`v1.0.0`**
 - Deployed on Vercel with Firebase Cloud Firestore and Firebase App Check enforcement
-- **278 automated unit, component, simulation, and scenario tests passing** across 25 test files (0 failures)
+- **513 automated unit, component, simulation, and scenario tests passing** across 63 test files (0 failures), plus **39 Firestore Emulator security/concurrency tests** and **39 Playwright E2E browser tests** across 13 spec files
 - Protected `main` branch with a required GitHub Actions quality gate
-- Designed for browser-based host and spectator experiences
+- Designed for mobile-first (`>= 44px` touch targets) and desktop browser-based host and spectator experiences
 
-V1.0 is production-ready, featuring multi-court doubles (1–3 courts, up to 30 players), Global Asynchronous Partner Pairing, toggleable multi-court match scoring with 1-tap presets, Point Differential and Opponent Win Percentage (OWP) tiebreakers, and real-time Live Watch spectator sync.
+V1.0 is production-ready, featuring multi-court singles and doubles (1–3 courts, up to 30 players), Two-Tier Pre-Session Check-In & Smart Roster Paste, Global Asynchronous Partner Pairing, toggleable multi-court match scoring with 1-tap presets, Compact Player Name Display (`A.L. Waters`, `Q. Dong`), Point Differential and Opponent Win Percentage (OWP) tiebreakers, retroactive Flip Winner correction, shareable Session & Player Spotlight stat cards, and real-time Live Watch spectator sync with ETA badges and Turn Alerts.
 
 ### V1 operating contract
 
@@ -45,30 +45,36 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 
 ### Session management
 
-- Singles and doubles session setup
+- Singles (Pool Rotation default or King of the Court) and doubles session setup
+- **Smart Roster Paste & Two-Tier Pre-Session Check-In:** Paste Reclub/numbered/bulleted registration lists directly into setup (automatically stripping ordinals and skill tags), check in arriving players in order, and stage remaining registrants into an **Expected Late Arrivals** tray for 1-tap mid-session check-in
 - Six-character room codes, direct watch links, and QR sharing
 - Explicit **Go Live** control before a session is shown to viewers
-- Automatic same-browser host recovery through Firebase Anonymous Authentication
-- Responsive light and dark interfaces
+- Automatic same-browser host recovery through Firebase Anonymous Authentication and global fatal-auth resilience recovery
+- Responsive light and dark interfaces with mobile-first `>= 44px` touch targets
 
 ### Match and court operations
 
-- Default singles and doubles queue rotation
-- Shared multi-court assignment for one to three courts (up to 30 players)
+- Default singles and doubles queue rotation with **Singles Pool Rotation** (`INIT → WINNERS → LOSERS`) and **3-win streak cap** across both single-court and multi-court singles
+- Shared multi-court assignment for one to three courts (up to 30 players) with team anti-repeat and skill balancing
+- **Compact Player Name Formatting:** Automatically abbreviates multi-word names on display (`Anna Leigh Waters` → `A.L. Waters`, `Quang Dong` → `Q. Dong`) across court cards, queue chips, spectator views, and leaderboards while strictly preserving full raw names in state, Firestore, and accessible `title` / `aria-label` attributes
 - **Global Asynchronous Partner Pairing (Option 2):** Pair any two players across courts or queue with real-time location tags (`[QUEUE]`, `[COURT 1]`, etc.); queued partners hold their spot without blocking others (non-blocking leapfrog) and unite on the very next open court
 - **Multi-Court Match Scoring:** Configurable `Match Scores: ON/OFF` toggle with 1-tap presets (`11–9`, `11–7`, etc.) and custom typing to record game scores directly
+- **Live Elapsed Match Timers & Voice Callouts:** Client-side elapsed match timer (`MM:SS`) and 1-tap Web Speech API voice announcements on court cards
 - Optional point-by-point live scoring for single-court sessions with deuce logic
 - Redesigned CourtCard UI with dedicated Team 1 (Indigo) and Team 2 (Cyan) containers, individual player chips, ampersand connectors, and elevated `VS` badges
-- Player sit-out, return, substitution, and “sit next” controls
-- Single-step undo for supported match flows
+- Player sit-out (priority return to front vs return to back), substitution, queue reordering, and “sit next” controls
+- Single-step undo for single-court and multi-court match flows
+- **Retroactive Match Winner Correction:** Flip a misrecorded match winner directly from Match History with atomic Firestore propagation and full standings recalculation
 - Score correction, duplicate-submit protection, failed-save rollback, and refresh persistence
 - Saved club roster for faster future setup
 
-### History and analytics
+### History, spectator alerts, and analytics
 
 - Timestamped match results with score badges and winner indicators
+- **Spectator Full Waiting Queue, Deterministic ETAs & Turn Alerts:** Live Watch displays the full waiting queue with deterministic ETA wait badges (`Next Up`, `~10m`, etc.) and **Tap-Your-Name Turn Alerts** (Web Audio chime + vibration when advancing to On Deck or On Court)
 - Session win/loss records, win rates, streaks, and rank tiers
 - **4-Tier Deterministic Standings:** Ranked by Wins → Win % → Point Differential (`+/-`) → Opponent Win % (Matchup Strength / OWP)
+- **Shareable Stat Cards:** Export or share **Session Standings** and **Individual Player Spotlight** stat cards via native share, clipboard, or PNG download
 - Device-local career statistics
 - Spectator match history and real-time live court sync
 
@@ -147,11 +153,11 @@ There is no separate REST or GraphQL backend in this repository. The browser use
 
 | Area | Technology | Use in PAD-Q |
 |---|---|---|
-| Framework | Next.js 16.3.1, App Router | Routing and application structure |
+| Framework | Next.js 16.4.3, App Router | Routing and application structure |
 | UI | React 19.2.4 | Interactive host and spectator experiences |
 | Language | TypeScript 5 | Typed application and matchmaking logic |
-| Data | Firebase 12.17.1 / Cloud Firestore | Persistence and real-time synchronization |
-| Testing | Vitest 4.1.9 | Unit and simulation tests |
+| Data | Firebase 12.19.0 / Cloud Firestore | Persistence and real-time synchronization |
+| Testing | Vitest 4.1.11, Playwright | Unit, component, simulation, rules, and E2E browser tests |
 | Styling | Custom CSS, CSS Modules, Tailwind CSS 4 | Responsive interface and theme styling |
 | Supporting UI | Lucide React, `qrcode.react` | Icons and session QR codes |
 | Deployment | Vercel | Hosted Next.js application |
@@ -160,9 +166,9 @@ There is no separate REST or GraphQL backend in this repository. The browser use
 
 ### Default
 
-- **Singles:** king-of-the-court rotation. A winner remains king until defeated or until reaching the three-win rotation limit.
-- **Doubles:** an `INIT → WINNERS → LOSERS` state machine seeds the player pool and alternates between winner and loser groups.
-- Candidate doubles teams are scored to reduce repeated partners, repeated matchups, immediate replay, and skill imbalance.
+- **Singles (Pool Rotation & King of the Court):** Single-court sessions default to Pool Rotation (`INIT → WINNERS → LOSERS`) with anti-repeat and skill balancing, or can select King of the Court. Both single-court and multi-court singles enforce a 3-win streak rotation cap (`SINGLES_MAX_WIN_STREAK = 3` / `MULTI_COURT_SINGLES_MAX_STREAK = 3`).
+- **Doubles:** An `INIT → WINNERS → LOSERS` state machine seeds the player pool and alternates between winner and loser groups across both single-court and multi-court rotations.
+- Candidate doubles teams are scored (`formTeams`) to minimize repeated partners, repeated matchups, immediate replay, and skill imbalance (`buildNumericSkillMap`).
 
 ### Deferred modes
 
@@ -181,16 +187,19 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 
 The V1 automated test suite includes:
 
-- **278 passing application unit, component, simulation, and scenario tests** across 25 test files (0 failures);
-- 20 passing Firestore Emulator security and concurrency tests; and
-- 16 passing browser end-to-end and stress scenarios.
+- **513 passing application unit, component, simulation, and scenario tests** across 63 test files (0 failures);
+- **39 passing Firestore Emulator security and concurrency tests**; and
+- **39 passing Playwright browser end-to-end and stress scenarios** across 13 spec files.
 
 The suite focuses on deterministic domain logic and verifies:
 
-- singles king, challenger, fatigue, and forced-rotation behavior;
-- doubles phase transitions, partner selection, pool limits, and serialization;
+- singles pool rotation, king, challenger, fatigue, and 3-win forced-rotation behavior across single and multi-court sessions;
+- doubles phase transitions, partner selection, pool limits, anti-repeat team splitting, and serialization;
+- **Pre-Session Check-In & Smart Paste**: Reclub/numbered list parsing, two-tier arrival check-in, and 1-tap Expected Late Arrivals tray in Host Tools;
+- **Compact Player Name Formatting**: pure display-layer abbreviation (`formatDisplayName`) across all host, spectator, and analytics views with zero mutation of underlying state or Firestore identities;
 - **Global Asynchronous Partner Pairing (Option 2)**: cross-court pairs, non-blocking queue holding, court starvation protection, and partner unification;
-- **Multi-Court Match Scoring & Point Differential**: 1-tap preset scores, custom score entry, auto-calculated winner scores, skip scores, and 4-tier tiebreaker sorting;
+- **Multi-Court Match Scoring, Flip Winner & Point Differential**: 1-tap preset scores, custom score entry, retroactive match winner flipping with atomic history replacement, and 4-tier tiebreaker sorting;
+- **Spectator ETAs, Turn Alerts & Shareable Stat Cards**: deterministic wait-time badges, Web Audio/vibration turn alerts, and Session/Player Spotlight recap cards;
 - skill-priority selection, rest cycles, starvation prevention, and idle-court filling;
 - player statistics and matchmaking suggestions; and
 - 25- and 30-player rush scenarios, three-court concurrent completion, queue
@@ -331,16 +340,14 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 ## Known limitations
 
 - **Single host:** V1 has one anonymous session owner. Multi-host management, delegated referees, and safe cross-device ownership transfer are deferred.
-- **No guaranteed 30-minute expiry:** activity timestamps exist, but an appropriate expiration timestamp and confirmed deployed TTL policy do not.
-- **Browser-local data:** saved rosters, skill assignments, court groups, recovery data, and career statistics are device-specific.
+- **No guaranteed 30-minute cloud deletion:** activity timestamps and 30-minute inactivity write locks are enforced at the Firestore rules boundary (`isSessionActive` with heartbeat recovery), while physical document TTL deletion remains planned.
+- **Browser-local data:** saved rosters, skill assignments, pre-session late arrivals, recovery data, and career statistics are device-specific.
 - **Online-first behavior:** a failed authoritative result safely restores the previous state and can be retried manually, but V1 has no durable automatic offline replay queue.
 - **Multi-court point-by-point tracking:** V1 provides direct match score entry (1-tap presets and custom scores) to power Point Differential and Opponent Win % tiebreakers, alongside an instant toggle to switch between score entry and rapid winner-only recording. Point-by-point live incrementation remains single-court only.
 - **Viewer and court ceiling:** the tested free-tier contract is 30 viewers and 3 courts. PAD-Q does not promise 300-viewer events or four or more courts in V1.
-- **No ETA or competitive rating:** Live Watch shows current courts and next players, but not an estimated wait. Bronze–Diamond tiers summarize session win rate and are not Elo, DUPR, or opponent-adjusted ratings.
+- **Deterministic ETA vs competitive ratings:** Live Watch provides deterministic wait estimates (`~10m`, `~20m` based on queue batching and active court capacity), while Bronze–Diamond tiers summarize session performance and are not external Elo or DUPR ratings.
 - **No permanent venue or player accounts:** V1 rooms are temporary, and PAD-Q does not claim certified GDPR compliance or provide cloud player-profile requests.
-- **Partial test boundary:** automated browser coverage includes core host, viewer, capacity, reconnect, score recovery, and scope-seal journeys; the supervised real event remains the final human-use gate.
-- **Open quality findings:** the test suite and build pass; linting still reports warnings.
-- **Large controllers:** the main host and spectator pages still contain substantial orchestration logic and would benefit from further decomposition.
+- **Open quality findings:** the test suite, typecheck, and build pass with 0 ESLint errors; experimental React Compiler warnings remain tracked as non-blocking development items.
 
 ## Planned improvements
 
@@ -349,10 +356,10 @@ The code updates a `lastActiveAt` server timestamp during host activity and dete
 3. Implement a durable offline result outbox with automatic replay and clearer synchronization status.
 4. Implement an explicit `expireAt` strategy and enable a verified Firestore TTL policy.
 5. Add persistent venues and optional player accounts with appropriate privacy and deletion controls.
-6. Add measured wait estimates only after PAD-Q can collect reliable match-duration data.
-7. Add opponent-aware competitive ratings and tournament rules as separately validated modes.
-8. Add CSV history export, roster import, stat-card sharing, and configurable rotation policies.
-9. Further decompose the host and spectator controllers and resolve remaining lint warnings.
+6. Add dynamic match-duration learning to refine deterministic wait estimates over the course of a session.
+7. Add opponent-aware Elo/DUPR ratings and tournament rules as separately validated modes.
+8. Add CSV history export and configurable win-streak rotation limits.
+9. Further decompose the host and spectator controllers and resolve remaining React Compiler lint warnings.
 
 ## Usage notice
 
