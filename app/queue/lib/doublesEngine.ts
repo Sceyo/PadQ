@@ -39,7 +39,7 @@ function toTeamArray(players: string[]): Team[] {
   return teams;
 }
 
-function pairKey(a: string, b: string): string {
+export function pairKey(a: string, b: string): string {
   return [a, b].sort().join('+');
 }
 
@@ -679,10 +679,49 @@ export function seedMultiCourtDoubles(
  * Rotate one independently finishing court through a shared FIFO bench.
  * Finishers go to the back; locked pairs remain one indivisible queue unit.
  */
+export interface MultiCourtRotateOptions {
+  recentPairs?: string[];
+  recentMatches?: string[];
+  lastMatchPlayers?: Set<string>;
+  skillMap?: Record<string, number>;
+}
+
+export function balanceSelectedMatch(
+  selectedPlayers: string[],
+  lockedPairs: LockedPartnerPair[],
+  recentPairs: string[] = [],
+  recentMatches: string[] = [],
+  lastMatchPlayers: Set<string> = new Set(),
+  skillMap: Record<string, number> = {},
+): string[] {
+  if (selectedPlayers.length !== 4) return [...selectedPlayers];
+
+  const playerSet = new Set(selectedPlayers);
+  const activeLocked = lockedPairs.filter(
+    ([a, b]) => playerSet.has(a) && playerSet.has(b)
+  );
+
+  if (activeLocked.length >= 2) {
+    return [...activeLocked[0], ...activeLocked[1]];
+  }
+
+  if (activeLocked.length === 1) {
+    const lockedTeam = activeLocked[0];
+    const lockedMembers = new Set(lockedTeam);
+    const otherPlayers = selectedPlayers.filter(p => !lockedMembers.has(p));
+    return [...lockedTeam, ...otherPlayers];
+  }
+
+  const [p0, p1, p2, p3] = selectedPlayers;
+  const best = formTeams(p0, p1, p2, p3, recentPairs, recentMatches, lastMatchPlayers, skillMap);
+  return [...best.teamA, ...best.teamB];
+}
+
 export function rotateMultiCourtDoubles(
   waitingPlayers: string[],
   finishedPlayers: string[],
   lockedPairs: LockedPartnerPair[],
+  options?: MultiCourtRotateOptions,
 ): PartnerAwareSelection {
   const finishedSet = new Set(finishedPlayers);
   // Court slots store Team A followed by Team B. Re-appending that order
@@ -697,5 +736,20 @@ export function rotateMultiCourtDoubles(
     ...waitingPlayers.filter(player => !finishedSet.has(player)),
     ...rotatedFinishers,
   ];
-  return selectPartnerAwareMatch(ranked, lockedPairs);
+  const selection = selectPartnerAwareMatch(ranked, lockedPairs);
+  if (options) {
+    const balancedOnCourt = balanceSelectedMatch(
+      selection.onCourt,
+      lockedPairs,
+      options.recentPairs ?? [],
+      options.recentMatches ?? [],
+      options.lastMatchPlayers ?? new Set(),
+      options.skillMap ?? {},
+    );
+    return {
+      onCourt: balancedOnCourt,
+      waiting: selection.waiting,
+    };
+  }
+  return selection;
 }

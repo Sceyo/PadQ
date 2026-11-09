@@ -472,6 +472,89 @@ suite('Firestore V1 production rules', () => {
     await assertFails(updateDoc(doc(host, 'sessions', 'H8MTCH', 'history', UUID_A), { winner: 'C & D' }));
   });
 
+  it('allows atomic replacement of history entry (delete + revision+1 + set new commandId) and supports double flip A -> B -> A', async () => {
+    const host = env.authenticatedContext('host-flip').firestore();
+    const attacker = env.authenticatedContext('attacker-flip').firestore();
+    const ref = doc(host, 'sessions', 'F7K9HP');
+    await assertSucceeds(setDoc(ref, sessionData('host-flip')));
+
+    const UUID_1 = '11111111-1111-4111-8111-111111111111';
+    const UUID_2 = '22222222-2222-4222-8222-222222222222';
+    const UUID_3 = '33333333-3333-4333-8333-333333333333';
+
+    // 1. Initial history entry (revision 1)
+    await assertSucceeds(runTransaction(host, async tx => {
+      const snap = await tx.get(ref);
+      expect(snap.data()?.revision).toBe(0);
+      tx.update(ref, {
+        queue: ['E', 'F', 'A', 'B', 'C', 'D'],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      });
+      tx.set(doc(host, 'sessions', 'F7K9HP', 'history', UUID_1), historyData(UUID_1, 1));
+    }));
+
+    // 2. Direct update is denied
+    await assertFails(updateDoc(doc(host, 'sessions', 'F7K9HP', 'history', UUID_1), { winner: 'C & D' }));
+
+    // 3. Attacker attempting atomic replacement is denied
+    await assertFails(runTransaction(attacker, async tx => {
+      await tx.get(doc(attacker, 'sessions', 'F7K9HP'));
+      await tx.get(doc(attacker, 'sessions', 'F7K9HP', 'history', UUID_1));
+      tx.delete(doc(attacker, 'sessions', 'F7K9HP', 'history', UUID_1));
+      tx.update(doc(attacker, 'sessions', 'F7K9HP'), { revision: 2, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp() });
+      tx.set(doc(attacker, 'sessions', 'F7K9HP', 'history', UUID_2), {
+        ...historyData(UUID_2, 2),
+        winner: 'C & D',
+      });
+    }));
+
+    // 4. Host atomic replacement (flip A -> B, revision 2) succeeds
+    await assertSucceeds(runTransaction(host, async tx => {
+      const sSnap = await tx.get(ref);
+      expect(sSnap.data()?.revision).toBe(1);
+      const hSnap = await tx.get(doc(host, 'sessions', 'F7K9HP', 'history', UUID_1));
+      expect(hSnap.exists()).toBe(true);
+      tx.delete(doc(host, 'sessions', 'F7K9HP', 'history', UUID_1));
+      tx.update(ref, {
+        revision: 2,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      });
+      tx.set(doc(host, 'sessions', 'F7K9HP', 'history', UUID_2), {
+        ...historyData(UUID_2, 2),
+        winner: 'C & D',
+      });
+    }));
+
+    const hSnap2 = await getDoc(doc(host, 'sessions', 'F7K9HP', 'history', UUID_2));
+    expect(hSnap2.exists()).toBe(true);
+    expect(hSnap2.data()?.winner).toBe('C & D');
+
+    // 5. Host second flip (B -> A, revision 3) succeeds
+    await assertSucceeds(runTransaction(host, async tx => {
+      const sSnap = await tx.get(ref);
+      expect(sSnap.data()?.revision).toBe(2);
+      const hSnap = await tx.get(doc(host, 'sessions', 'F7K9HP', 'history', UUID_2));
+      expect(hSnap.exists()).toBe(true);
+      tx.delete(doc(host, 'sessions', 'F7K9HP', 'history', UUID_2));
+      tx.update(ref, {
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      });
+      tx.set(doc(host, 'sessions', 'F7K9HP', 'history', UUID_3), {
+        ...historyData(UUID_3, 3),
+        winner: 'A & B',
+      });
+    }));
+
+    const hSnap3 = await getDoc(doc(host, 'sessions', 'F7K9HP', 'history', UUID_3));
+    expect(hSnap3.exists()).toBe(true);
+    expect(hSnap3.data()?.winner).toBe('A & B');
+  });
+
   it('denies orphan history access and non-host history writes', async () => {
     const host = env.authenticatedContext('host-9').firestore();
     const attacker = env.authenticatedContext('attacker-9').firestore();

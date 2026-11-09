@@ -12,7 +12,7 @@ All development, code reviews, debugging, architectural design, and operational 
 
 ## What This App Is
 
-PadQ is a **real-time match queue manager** for singles and doubles paddle/racket sports. A host creates a session, adds players, and the app handles fair rotation. Viewers join via a room code (4-char uppercase) to watch live.
+PadQ is a **real-time match queue and court manager** for singles and doubles paddle/racket sports (1–3 courts, up to 30 players). A host creates a session, imports or checks in players, and the app handles fair rotation across courts. Spectators join via a 6-character unambiguous room code or QR code to watch live court assignments, waiting queue ETAs, turn alerts, and session standings.
 
 ---
 
@@ -20,13 +20,14 @@ PadQ is a **real-time match queue manager** for singles and doubles paddle/racke
 
 | Layer | Version | Notes |
 |---|---|---|
-| Next.js | 16.2.1 | App Router, `'use client'` on all interactive pages |
-| React | 19.2.4 | Hooks only, no class components |
-| Firebase | 12.11.0 | Firestore only — no Auth, no Storage |
+| Next.js | 16.4.3 | App Router (Turbopack), `'use client'` on interactive pages |
+| React | 19.2.4 | Hooks only, functional components |
+| Firebase | 12.19.0 | Cloud Firestore + Anonymous Authentication + App Check (reCAPTCHA Enterprise) |
 | lucide-react | 1.7.0 | Icon library — import from `lucide-react` |
 | qrcode.react | 4.2.0 | `QRCodeSVG` named export |
-| Tailwind CSS | 4.2.2 | Rarely used — most styling is custom CSS |
-| TypeScript | 5.x | Strict mode |
+| Tailwind CSS | 4.2.2 | Minimal utility usage — primary styling is custom CSS & CSS Modules |
+| TypeScript | 5.x | Strict mode (`npx tsc --noEmit`) |
+| Testing | Vitest 4.1.11 + Playwright | 513 unit/component tests, 39 Firestore rules tests, 39 E2E browser tests |
 
 **Dev server**: `npm run dev` (with `--max-old-space-size=4096`)
 
@@ -36,60 +37,69 @@ PadQ is a **real-time match queue manager** for singles and doubles paddle/racke
 
 ```
 app/
-  page.tsx                    # Homepage — game mode selector, room code entry
-  layout.tsx
+  page.tsx                    # Homepage — game mode selector, room code / QR entry
+  layout.tsx                  # Root layout mounting AuthResilienceBanner
+  error.tsx                   # App Router error boundary
+  not-found.tsx               # Custom 404 page
   globals.css
   Homepage.css                # Landing page styling
-  privacy/                    # Privacy policy & data retention page
+  privacy/                    # Public Privacy & Data Retention policy page
   queue/
-    page.tsx                  # Main queue manager (host + viewer) — single large file
-    QueueSystem.css           # All queue page styles (gear menu, setup, layout)
+    page.tsx                  # Main queue orchestrator (setup + host active session + viewer)
+    QueueSystem.css           # Queue page styles
     lib/
-      types.ts                # Shared types (PlayerStat, QueueMode, etc.)
-      playerUtils.ts          # buildPlayerStats, generateSuggestions, shuffleArray
-      doublesEngine.ts        # Doubles rotation algorithm (INIT/WINNERS/LOSERS)
-      singleEngine.ts         # Singles king-of-court algorithm
+      types.ts                # Shared types (PlayerStat, QueueMode, HistoryItem, etc.)
+      releaseConfig.ts        # V1 release boundary config (max 30 players, 3 courts, mobileFirstShell)
+      nameFormatter.ts        # Pure display-layer compact name formatter (formatDisplayName)
+      pasteParser.ts          # Smart Reclub / numbered / bulleted roster paste parser
+      checkInState.ts         # Two-tier pre-session check-in & expected late arrivals state
+      playerUtils.ts          # buildPlayerStats (4-tier tiebreakers: Wins, Win%, Diff, OWP), flipHistoryEntryWinner
+      doublesEngine.ts        # Doubles rotation algorithm (INIT/WINNERS/LOSERS + formTeams)
+      singleEngine.ts         # Singles King-of-the-Court algorithm (3-win streak rotation cap)
+      singlesPoolEngine.ts    # Singles Pool-Rotation algorithm (single-court default: INIT/WINNERS/LOSERS)
+      multiCourtResult.ts     # Multi-court match completion planner (team anti-repeat, skill balance, singles 3-win cap, non-blocking partner leapfrog)
+      queueTransitions.ts     # Accounted player invariants (accountPlayers, replaceCalledPlayer, reorderWaitingPlayer)
+      etaEngine.ts            # Deterministic queue wait-time calculator (calculatePlayerEta, formatEtaLabel)
+      turnAlert.ts            # Spectator turn alert state transition detector (Web Audio chime + vibrate)
+      viewModels.ts           # View-model mappers for SingleCourtScreen, MultiCourtScreen, QueuePanel
     components/
       atoms/
-        PlayerLabel.tsx       # Player name chip with rank badge
+        PlayerLabel.tsx       # Compact player name chip (formatDisplayName + raw title tooltip + Streak/Rank badges)
         RankBadge.tsx         # Bronze/Silver/Gold/Platinum/Diamond badge
         StreakBadge.tsx       # Win streak flame indicator
-        AccessCodeModal.tsx   # Reusable PIN/code entry modal
-      AccessGate/             # Wraps viewer content; checks PIN via useSessionAccess
-      AnalyticsDashboard/     # Win rates, streaks, stats view
-      Bracket/                # Tournament bracket (single + double elimination)
-      CourtTabs/              # Multi-court tab switcher (host only)
-      CourtCard/              # Single-court card used in the coordinator overlay grid
-      DoublesMatch/           # Doubles team assignment + match control
-      LiveManagement/         # AddPlayerPanel + ManualQueuePanel (host live tools)
-      PaddleStatusPanel/      # Doubles pool visualizer (W1/L1 pools)
-      QueueTable/             # SinglesTable + DoublesTable upcoming matches
-      ScoreBoard/             # Live score tracking with deuce logic
-      SessionBar/             # Room code display + connection status
-      ShareButton/            # Session share popover (link, QR, native share)
-      SinglesStatusPanel/     # Singles king + queue visualizer
-      SmartSuggestions/       # AI-style hints (overuse, hot streak, imbalance)
-      UserGuideModal/         # In-app how-to guide
-      WinnerModal/            # Post-match winner celebration overlay
-    context/
-      CourtProvider.tsx
-      useCourt.ts
+      AppShell/               # Mobile-first application shell (Header, Queue/Stats tabs, HostTools trigger, GearMenu)
+      SingleCourtScreen/      # Single-court active match scoreboard, deuce controls, and QueuePanel
+      MultiCourtScreen/       # Multi-court grid (1–3 courts), Match Scores toggle, and QueuePanel
+      CourtCard/              # Doubles court card with Team 1/2 containers, MM:SS elapsed timer, and TTS voice callout
+      SinglesCourtCard/       # Singles court card for multi-court singles
+      CourtScoreModal/        # 1-tap score presets (11–9, 11–7, etc.) & custom score entry modal
+      QueuePanel/             # Accordion queue panel (UP NEXT, collapsible WAITING with ETAs, collapsible ON BREAK)
+      HostToolsSheet/         # Slide-up host sheet (Expected Late Arrivals 1-tap tray, Add Player, Manage Queue, Set Partners, On Break)
+      LiveManagement/         # AddPlayerPanel, ManualQueuePanel, PartnerPanel (Option 2 Global Pairing UI)
+      AnalyticsDashboard/     # 4-tier standings table, match history with Flip Winner, and RecapModal trigger
+      RecapCard/              # Shareable Session Standings & Individual Player Spotlight stat cards (RecapModal)
+      SetupView/              # Session setup: court count, Smart Paste, Two-Tier Check-In, Saved Roster
+      GearMenu/               # Settings dropdown: Go Live, Share/QR, Undo Last Match, End Session & Delete Data
+      ScoreRow/               # Score row atom for single-court scoreboard
+      PlayerMenu/             # Action sheet for on-court/waiting player actions (Replace, Move up/down, Break, Remove)
+      ReplaceDialog/          # Player substitution modal
+      EditTeamsDialog/        # On-court team swap modal
   watch/
     [sessionId]/
-      page.tsx                # Viewer-only page — read-only live session view
+      page.tsx                # Spectator live page (LiveCourtStatus, Turn Alerts, History, Standings, RecapModal)
+      LiveCourtStatus.tsx     # Court 1–3 tabs, live matchups, and WaitingQueueChips with ETAs & Turn Alert toggles
 components/
-  AuthResilience/             # Global auth/firestore failure banner
+  AuthResilience/             # Global fatal Auth/Firestore assertion recovery overlay
 hooks/
-  useSession.ts               # Firebase session lifecycle (create, join, sync, listen)
-  useQueue.ts                 # Local queue state + match suggestion logic
-  useSessionAccess.ts         # Viewer PIN gate (checking → granted | needs-pin | error)
+  useSession.ts               # Firebase session lifecycle (create, load, subscribe, transactional commits, heartbeat)
+  useQueue.ts                 # Local queue state helper
+  useMatchFlow.ts             # Single-court score & match confirmation state machine
 lib/
-  firebase.ts                 # Firebase app + Firestore `db` init
-  sessionService.ts           # ALL Firestore operations — UI never imports firebase directly
-docs/                         # Architecture, release gates, security audits, and runbooks
-tests/                        # Vitest unit/component/simulation tests and Playwright E2E
-legacy/                       # Archived obsolete prototypes and legacy stylesheets
-archives/                     # Tracked historical zip archives
+  firebase.ts                 # Firebase App, Anonymous Auth, Firestore, App Check, and emulator wiring
+  authResilience.ts           # Global unhandledrejection / fatal Firestore assertion detector & silent recovery
+  sessionService.ts           # ALL Firestore & localStorage operations — UI never imports firebase/firestore directly
+docs/                         # Architecture, ADRs, specs, implementation plans, release gates, and security audits
+tests/                        # 64 Vitest test files + 13 Playwright E2E spec files (`tests/e2e/*.pw.ts`)
 ```
 
 ---
@@ -97,156 +107,60 @@ archives/                     # Tracked historical zip archives
 ## Architecture: Data Flow
 
 ```
-Host action (e.g. record match result)
+Host action (e.g. record match result, flip winner, check in late arrival)
   → page.tsx handler
-    → useQueue.ts (local queue mutation, pure logic)
-    → useSession.commitMatchResult() (Firestore transaction)
-      → sessionService.updateQueueSafely()
-        → Firestore `sessions/{sessionId}`
-          → onSnapshot fires for ALL clients
-            → useSession updates state
-              → UI re-renders
+    → Domain engine transition (doublesEngine / singleEngine / singlesPoolEngine / multiCourtResult)
+    → useSession transactional write (commitMatchResult / commitCourtResult / replaceHistoryItem)
+      → sessionService.ts (Firestore runTransaction with revision +1 & commandId idempotency)
+        → Firestore `sessions/{sessionId}` + `sessions/{sessionId}/history/{commandId}`
+          → onSnapshot fires for host and all `/watch/[sessionId]` spectators
+            → useSession / watch page updates state
+              → UI re-renders with compact display names (formatDisplayName)
 ```
 
-Viewers subscribe to the same `onSnapshot` listener. They receive identical state but cannot write (no `hostToken` in memory).
-
 ---
 
-## Key Files: Responsibilities
+## Security & Integrity Model
 
-### `app/queue/page.tsx`
-The central orchestrator. Contains:
-- **Three render paths**: A (setup form), B (host active session), C (viewer joined)
-- **`GearMenu` component** (defined inline at top): Settings dropdown with Go Live toggle, share/QR panel, Hard Reset, User Guide
-- **`handleDoublesMatch`**: Records result, advances `paddleStateRef`, syncs to Firestore
-- **`handleSinglesMatch`**: Records result, advances `singlesStateRef`, syncs to Firestore
-- **`handleAddPlayerLive`**: Adds player to `w1` waiting in paddle engine, syncs players
-- Derived state (`statsList`, `statsMap`, `suggestions`, `playAllSuggestion`) via `useMemo`
-- Court group management via `addCourtToGroup`, `removeCourtFromGroup`, `loadCourtGroup`
-
-### `lib/sessionService.ts`
-Single source of truth for Firestore. Never import `firebase/firestore` directly in UI — always use this service.
-
-Key exports:
-- `createSession` / `loadSession` / `updateSession` / `deleteSession`
-- `updateQueueSafely` — Firestore transaction for race-condition-safe queue writes
-- `addHistoryEntry` — writes to `sessions/{id}/history` subcollection
-- `subscribeToSession` / `subscribeToHistory` — real-time `onSnapshot` wrappers
-- `saveHostToStorage` / `loadHostFromStorage` / `clearHostFromStorage` — localStorage helpers
-- `addCourtToGroup` / `removeCourtFromGroup` / `loadCourtGroup` — multi-court localStorage
-- `CourtEntry` interface — `{ sessionId, hostToken, gameMode, name }`
-
-### `hooks/useSession.ts`
-Manages session lifecycle. On mount, reads localStorage and resumes the host's session automatically. Exposes typed write actions (`startSession`, `commitMatchResult`, `syncField`).
-
-### `hooks/useSessionAccess.ts`
-Viewer PIN gate. Call at the top of any viewer component. States: `checking → granted | needs-pin | error`. Caches granted PINs in `sessionStorage`.
-
----
-
-## Security Model
-
-| Credential | Where stored | Purpose |
+| Mechanism | Implementation | Purpose |
 |---|---|---|
-| `hostToken` | localStorage + Firestore field | Proves host identity on every write |
-| `accessPin` | Firestore field (plain text) | Optional viewer gate (4-char uppercase) |
-| Room code (`sessionId`) | URL + localStorage | Locates the session |
-
-- Sessions auto-delete via **Firestore TTL policy** on `lastActiveAt` field (30-min idle).
-- PIN is client-validated intentionally — sessions are ephemeral and Firestore rate-limits brute force.
-- Viewers never receive `hostToken` — it's destructured out in `joinSession`.
-
----
-
-## Queue Algorithms
-
-### Singles — King of the Court (`singleEngine.ts`)
-- King plays every match vs the next challenger in queue.
-- King wins → stays on, streak increments, loser goes to back of queue.
-- King loses → becomes challenger (goes to back), winner becomes new king.
-- After **3 consecutive wins** (`SINGLES_MAX_WIN_STREAK = 3`), force rotation: king steps down, top two from queue play.
-- `shouldForceRotation` checks **only streak**, not fatigue (fatigue always triggers for king — intentionally removed).
-
-### Doubles — Paddle Engine (`doublesEngine.ts`)
-Three-phase cycle per match:
-
-| Phase | Who plays |
-|---|---|
-| `INIT` | Sequential groups of 4 from `allPlayers` until all seeded |
-| `WINNERS` | Best 4 from `w1` pool (winners stay in w1) |
-| `LOSERS` | Best 4 from `l1` pool (losers stay in l1) |
-
-After `LOSERS`, cycle restarts at `WINNERS`. The `playedThisCycle` set ensures everyone plays before anyone plays twice.
-
-**Scoring** (lower = better match): `PENALTY_REPEAT_PAIR=3`, `PENALTY_REPEAT_MATCH=5`, `PENALTY_FATIGUE=2`, `PENALTY_SKILL_IMBALANCE=1`.
-
-`skillMap` — passed from `page.tsx` as `{ [playerName]: winRate }` derived from `statsMap`. Activates `PENALTY_SKILL_IMBALANCE`. Always pass it; default `{}` disables skill balancing.
-
-`formTeams` — exhaustively evaluates all 3 splits of 4 players via `allPairings`, picks lowest penalty score. No shuffling needed.
-
-INIT scaling: `Math.max(1, Math.floor(allPlayers.length / 4))` matches — floor so only complete groups of 4 are scheduled; remainder players flow into `waitingQueue`.
+| **Host Identity (`hostUid`)** | Firebase Anonymous Auth (`request.auth.uid == resource.data.hostUid`) | Cryptographically binds session write/delete ownership to the creator's auth UID |
+| **Room Code (`sessionId`)** | 6-char unambiguous uppercase (`^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$`) | Collision-checked on creation; `allow list: if false` prevents room enumeration |
+| **Pre-Live Privacy (`isLive`)** | `allow get` requires `isDocOwner()` OR `resource.data.isLive == true` | Spectators cannot read a room or its history until the host explicitly clicks **Go Live** |
+| **Optimistic Concurrency (`revision`)** | Monotonic integer incremented (`revision + 1`) on every state/match transaction | Prevents lost updates and serializes simultaneous multi-court match completions |
+| **Idempotent History (`commandId`)** | UUID v4 document ID in `sessions/{id}/history/{commandId}` verified via `getAfter()` | Guarantees every history write is atomically paired with a parent revision increment |
+| **Partition & Roster Invariants** | `validPlayerRoster`, `validPlayerSubset`, `validCourts` in `firestore.rules` | Enforces max 30 unique players, max 3 courts, no duplicate players across courts, and sealed V1 modes |
+| **Inactivity Lock & Heartbeat** | `isSessionActive()` (30m window) + `isHeartbeatUpdate()` bypass | Locks stale rooms after 30m of inactivity while allowing the host's tab-focus heartbeat to un-stale the room |
+| **Display-Only Name Formatting** | `formatDisplayName` in `app/queue/lib/nameFormatter.ts` | Formats `"Anna Leigh Waters"` → `"A.L. Waters"` strictly at render time; raw names are never mutated in state or Firestore |
 
 ---
 
-## Multi-Court System
+## Queue & Matchmaking Algorithms
 
-In V1, multi-court operates inside a **single Firestore session** via the `courtSlots` array (`CourtSlot[]`, defined in `lib/sessionService.ts`).
-Each court slot has an `id` (e.g. `court-0`), a `name` (`Court 1`), and `onCourt` (2 players for singles, 4 players for doubles).
+### 1. Singles — Pool Rotation (`singlesPoolEngine.ts`) & King of the Court (`singleEngine.ts`)
+- **Single-Court Default (Pool Rotation):** Cycles `INIT → WINNERS → LOSERS` using `w1` and `l1` pools (capped at `MAX_POOL_SIZE = 8` with overflow into `waitingQueue`), scoring candidate pairs against repeat-match (`PENALTY_REPEAT_MATCH = 5`), fatigue (`PENALTY_FATIGUE = 2`), and skill imbalance (`PENALTY_SKILL_IMBALANCE = 1`).
+- **King of the Court (Single-Court Option & Multi-Court Singles):** Winner stays on court until defeated or reaching **3 consecutive wins** (`SINGLES_MAX_WIN_STREAK = 3` / `MULTI_COURT_SINGLES_MAX_STREAK = 3`), at which point both players rotate off so the waiting queue advances fairly.
 
-When a match concludes on any court, `planMultiCourtResult` rotates that court's players with the shared queue, updates that specific slot, and leaves other courts unaffected.
-All live clients (host and `/watch` spectators) receive slot updates in real-time through the single session listener.
+### 2. Doubles — Paddle Engine (`doublesEngine.ts`) & Multi-Court Planner (`multiCourtResult.ts`)
+- **Single-Court Doubles:** Cycles `INIT → WINNERS → LOSERS` across `w1` and `l1` pools. `formTeams` evaluates all 3 possible pairings of 4 players and picks the split with the lowest penalty (`PENALTY_REPEAT_PAIR = 3`, `PENALTY_REPEAT_MATCH = 5`, `PENALTY_FATIGUE = 2`, `PENALTY_SKILL_IMBALANCE = 1`).
+- **Multi-Court Doubles (`planMultiCourtResult`):**
+  - Interleaves finished court teams before returning them to the shared queue so unlocked partners rotate naturally.
+  - Evaluates candidate 4-player groups using live match history (`recentPartners`, `recentOpponents`) and `buildNumericSkillMap` (mapping unplayed bracket tags to `25/50/75` and played players to live `winRate`).
+  - **Global Asynchronous Partner Pairing (Option 2):** Locked partners can be paired across courts or queue. If one partner is still playing on another court, the waiting partner holds their spot in line while solo players leapfrog past to fill open courts (zero court starvation), uniting the pair on the next available court once both are free.
 
-*(Note: The `CourtTabs` / `padq_court_group` multi-session approach was an earlier prototype retained in legacy helpers, but V1 production standardizes strictly on single-session `courtSlots`.)*
-
----
-
-## Firestore Schema
-
-```
-sessions/{sessionId}           ← TTL field: lastActiveAt (30-min policy)
-  hostToken: string            ← UUID, required on every write
-  gameMode: 'singles'|'doubles'
-  queueMode: 'default'|'tournament'|'playall'
-  elimType: 'single'|'double'
-  players: string[]
-  queue: string[]
-  playAllRel: Record<string, number>
-  tournamentMatches: TournamentMatch[]
-  tournamentActive: boolean
-  tournamentWinner: string|null
-  liveScore: LiveScoreState|null
-  isLive: boolean              ← host must explicitly set true to allow viewers
-  accessPin: string|null       ← null = open, string = PIN required
-  courtName: string            ← display name for CourtTabs
-  doublesEngineState: object   ← serialized PaddleState (w1, l1, waitingQueue, phase, playedThisCycle as string[])
-  singlesEngineState: object   ← serialized SinglesState (king, queue, waitingQueue, streak)
-  courtSlots: CourtSlot[]      ← multi-court current matchups (doubles multi-court mode)
-  sittingOut: string[]         ← players temporarily excluded from queue and engine pools
-  createdAt, updatedAt, lastActiveAt: Timestamp
-
-sessions/{sessionId}/history/{auto-id}
-  id, mode, players, winner, score?, timestamp, hostToken
-```
-
----
-
-## Styling Conventions
-
-- **Global CSS variables**: `--accent`, `--btn`, `--btn-hover`, `--border`, `--txt-2`, `--txt-3`, `--r-sm`
-- **Dark mode**: toggled by adding `body.dark-mode` class. All dark overrides use `body.dark-mode .className { ... }`.
-- **CSS Modules** (`.module.css`) for all components under `components/`.
-- **`QueueSystem.css`** for all queue page-level styles (layout, gear menu, setup form, match section, etc.).
-- **No Tailwind in queue page** — only custom CSS.
+### 3. Standings & Tiebreakers (`playerUtils.ts`)
+4-tier deterministic sorting in `buildPlayerStats`:
+1. **Wins** (descending)
+2. **Win Rate %** (descending)
+3. **Point Differential (`+/-`)** (descending)
+4. **Matchup Strength / Opponent Win % (`OWP`)** (descending)
 
 ---
 
 ## Common Gotchas
 
-1. **Never call Firebase directly** — always go through `lib/sessionService.ts`.
-2. **`useSession` fields** come from Firestore snapshots — local-only UI state lives in `page.tsx` state, not `session.*`.
-3. **`paddleStateRef` / `singlesStateRef`** — engine state is in refs, not React state (avoids stale closures in match handlers). `setPaddleStateUI` / `setSinglesStateUI` are separate for display only.
-4. **`addDoc` rejects `undefined`** — always build clean objects before writing to Firestore history. `sessionService.addHistoryEntry` handles this.
-5. **`Set` is not JSON-serializable** — `playedThisCycle` in `PaddleState` is a `Set<string>`. Never try to store it directly in Firestore; it stays in the ref.
-6. **Court group is localStorage-only** — not in Firestore, not in session state. Load with `loadCourtGroup()` on mount.
-7. **`ShareButton` component is legacy** — it still exists but is not rendered. Share UI lives inside `GearMenu` in `page.tsx`.
-8. **Viewer PIN cache** — `sessionStorage`, not `localStorage`. Cleared when the browser tab closes, not on page reload.
+1. **Never import `firebase/firestore` in UI components** — all persistence goes through `lib/sessionService.ts`.
+2. **Never modify `firestore.rules` directly in the main agent** — always delegate rules changes to the `firestore-rules-author` subagent and verify with `npm run test:rules`.
+3. **Never mutate raw player names with `formatDisplayName`** — `formatDisplayName` is strictly for JSX text rendering (`PlayerLabel`, spectator chips, leaderboard cells). Keep raw names in state, Firestore, `title`, `aria-label`, and action callbacks.
+4. **Mobile touch target contract** — all interactive buttons on mobile viewports (`390px`) must maintain `>= 44px` height, and inputs/selects must maintain `>= 16px` font size to prevent iOS auto-zoom.
+5. **Firebase Emulator commands on Windows** — pass Playwright flags inside the quoted script string: `npx.cmd firebase --config firebase.e2e.json emulators:exec --only auth,firestore "npx.cmd playwright test"`.

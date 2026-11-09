@@ -14,6 +14,55 @@
 .header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.headerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.timerBadge {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--txt-3);
+  background: var(--surface-card, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border);
+  padding: 1px 6px;
+  border-radius: var(--r-pill, 9999px);
+  letter-spacing: 0.05em;
+}
+
+.calloutBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--txt-3);
+  padding: 3px 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.calloutBtn:hover {
+  color: var(--txt-1);
+  border-color: var(--primary, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+._oldHeader {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 

@@ -23,6 +23,7 @@ import {
   updateQueueSafely,
   batchMatchResult,
   commitMultiCourtResult,
+  replaceHistoryEntry,
   clearHistory,
   deleteSessionData,
   deleteLatestHistoryEntry,
@@ -89,6 +90,7 @@ export interface SessionActions {
   syncField:         (patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>) => Promise<void>;
   clearMatchHistory: () => Promise<void>;
   deleteHostedSession: () => Promise<void>;
+  correctHistoryEntry: (entryId: number, updated: MatchHistoryEntry) => Promise<boolean>;
 }
 
 type CourtResultFailureReason = 'permission' | 'unavailable' | 'unknown';
@@ -623,6 +625,53 @@ export function useSession(): SessionState & SessionActions {
     }
   }, [state.isHost]);
 
+  /**
+   * correctHistoryEntry
+   * Atomically replaces an existing match history entry in Firestore
+   * (e.g. flipping the winning side) and updates local state.
+   */
+  const correctHistoryEntry = useCallback(async (
+    entryId: number,
+    updated: MatchHistoryEntry,
+  ): Promise<boolean> => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !state.isHost) return false;
+
+    setState(prev => ({
+      ...prev,
+      matchHistory: prev.matchHistory.map(h => (h.id === entryId ? { ...h, ...updated } : h)),
+      isSaving: true,
+    }));
+
+    try {
+      let success = false;
+      const write = revisionWriteChainRef.current.then(async () => {
+        const outcome = await replaceHistoryEntry(sessionId, updated.commandId, updated);
+        if (outcome.status === 'committed') {
+          revisionRef.current = outcome.revision;
+          setState(prev => ({
+            ...prev,
+            revision: outcome.revision,
+            matchHistory: prev.matchHistory.map(h =>
+              h.id === entryId ? { ...h, ...updated, commandId: outcome.commandId, revision: outcome.revision } : h
+            ),
+          }));
+          success = true;
+        } else {
+          success = false;
+        }
+      });
+      revisionWriteChainRef.current = write.catch(() => undefined);
+      await write;
+      return success;
+    } catch (err) {
+      console.error('[useSession] correctHistoryEntry error:', err);
+      return false;
+    } finally {
+      setState(prev => ({ ...prev, isSaving: false }));
+    }
+  }, [state.isHost]);
+
   return {
     ...state,
     startSession,
@@ -634,5 +683,6 @@ export function useSession(): SessionState & SessionActions {
     syncField,
     clearMatchHistory,
     deleteHostedSession,
+    correctHistoryEntry,
   };
 }

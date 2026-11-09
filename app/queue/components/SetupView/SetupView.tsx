@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Image from 'next/image';
 import {
   Sun, Moon, ArrowLeft, Users, Swords, UserPlus,
-  Trash2, Star, BookOpen, Play, Wifi,
+  Trash2, Star, BookOpen, Play, Wifi, Check, Clock, UserCheck, RotateCcw,
 } from 'lucide-react';
 import type { RosterEntry, SkillBracket } from '@/lib/sessionService';
 
@@ -43,6 +43,14 @@ export interface SetupViewProps {
   errorMsg?:           string;
   singlesFormat?:      'pool' | 'king';
   onSinglesFormatChange?: (format: 'pool' | 'king') => void;
+  expectedPlayers?:    string[];
+  onCheckInPlayer?:    (name: string) => void;
+  onUndoCheckInPlayer?: (name: string) => void;
+  onCheckInAll?:       () => void;
+  onRemoveExpectedPlayer?: (name: string) => void;
+  onAddExpectedFromPaste?: () => void;
+  onAddExpectedFromRoster?: () => void;
+  onUncheckAll?:       () => void;
 }
 
 export function SetupView({
@@ -58,6 +66,14 @@ export function SetupView({
   onSetRosterSkill,
   singlesFormat = 'pool',
   onSinglesFormatChange,
+  expectedPlayers = [],
+  onCheckInPlayer,
+  onUndoCheckInPlayer,
+  onCheckInAll,
+  onRemoveExpectedPlayer,
+  onAddExpectedFromPaste,
+  onAddExpectedFromRoster,
+  onUncheckAll,
 }: SetupViewProps) {
   const minPlayers = gameMode === 'doubles' && courtCount > 1
     ? courtCount * 4
@@ -203,7 +219,8 @@ export function SetupView({
             <div className="roster-panel">
               <div className="roster-list">
                 {roster.map((entry, i) => {
-                  const isAdded = tempPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase());
+                  const isAdded = tempPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase()) ||
+                    expectedPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase());
                   const pickerOpen = skillPickerFor === entry.name;
                   return (
                     <div key={`roster-${i}-${entry.name}`} className="roster-item roster-item--col">
@@ -274,6 +291,17 @@ export function SetupView({
                 >
                   Add Selected ({rosterSelected.size})
                 </button>
+                {onAddExpectedFromRoster && (
+                  <button
+                    type="button"
+                    className="roster-action-btn add-expected-btn"
+                    onClick={onAddExpectedFromRoster}
+                    suppressHydrationWarning
+                    disabled={rosterSelected.size === 0}
+                  >
+                    Add as Expected ({rosterSelected.size})
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -295,12 +323,18 @@ export function SetupView({
         </div>
         {errorMsg && <p className="setup-error-msg">{errorMsg}</p>}
         <div className="input-group">
-          <input
-            type="text"
+          <textarea
+            rows={2}
+            className="paste-textarea"
             value={pasteInput}
             onChange={e => onPasteInputChange(e.target.value)}
-            placeholder="Paste names separated by commas…"
-            onKeyDown={e => e.key === 'Enter' && onAddFromPaste()}
+            placeholder="Paste names separated by commas or numbered list…"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                onAddFromPaste();
+              }
+            }}
             autoComplete="off"
             data-1p-ignore
             data-lpignore="true"
@@ -308,26 +342,119 @@ export function SetupView({
           />
           <button
             type="button"
-            onClick={onAddFromPaste}
+            onClick={() => onAddFromPaste()}
             className="add-btn add-btn--paste"
             suppressHydrationWarning
             title="Add all"
           >
             <Users size={15} />
           </button>
+          {onAddExpectedFromPaste && (
+            <button
+              type="button"
+              onClick={onAddExpectedFromPaste}
+              className="add-btn add-expected-btn"
+              disabled={!pasteInput.trim()}
+              suppressHydrationWarning
+              title="Add as Expected"
+            >
+              <Clock size={15} />
+            </button>
+          )}
         </div>
+
+        {/* Expected Arrivals / Not Yet Here */}
+        {expectedPlayers.length > 0 && (
+          <div className="expected-arrivals-panel">
+            <div className="expected-arrivals-header">
+              <h3>
+                <Clock size={13} /> Expected Arrivals ({expectedPlayers.length})
+              </h3>
+              {onCheckInAll && (
+                <button
+                  type="button"
+                  className="checkin-all-btn"
+                  onClick={onCheckInAll}
+                  suppressHydrationWarning
+                >
+                  <Check size={12} /> Check In All
+                </button>
+              )}
+            </div>
+            <div className="expected-chips-list">
+              {expectedPlayers.map((name) => (
+                <div key={`expected-${name}`} className="expected-player-chip">
+                  <span className="expected-name">{name}</span>
+                  <div className="expected-actions">
+                    {onCheckInPlayer && (
+                      <button
+                        type="button"
+                        className="checkin-btn"
+                        onClick={() => onCheckInPlayer(name)}
+                        title="Check in player"
+                        suppressHydrationWarning
+                      >
+                        <UserCheck size={12} /> Check In
+                      </button>
+                    )}
+                    {onRemoveExpectedPlayer && (
+                      <button
+                        type="button"
+                        className="remove-expected-btn"
+                        onClick={() => onRemoveExpectedPlayer(name)}
+                        title="Remove expected player"
+                        suppressHydrationWarning
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {tempPlayers.length > 0 && (
           <div className="players-list">
-            <h3><Users size={13} /> Players ({tempPlayers.length})</h3>
+            <div className="setup-players-header">
+              <h3><Users size={13} /> Players ({tempPlayers.length})</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="setup-checked-in-pill">Checked In</span>
+                {onUncheckAll && (
+                  <button
+                    type="button"
+                    className="uncheck-all-btn"
+                    onClick={onUncheckAll}
+                    title="Move all players to Expected Arrivals"
+                    suppressHydrationWarning
+                  >
+                    Uncheck All
+                  </button>
+                )}
+              </div>
+            </div>
             <ul>
               {tempPlayers.map((p, i) => (
                 <li key={i}>
                   <span className="setup-player-num">#{i + 1}</span>
                   <span>{p}</span>
-                  <button type="button" onClick={() => onRemoveTempPlayer(i)} className="remove-btn" suppressHydrationWarning>
-                    <Trash2 size={12} />
-                  </button>
+                  <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {onUndoCheckInPlayer && (
+                      <button
+                        type="button"
+                        onClick={() => onUndoCheckInPlayer(p)}
+                        className="remove-btn"
+                        title="Move back to Expected"
+                        suppressHydrationWarning
+                      >
+                        <RotateCcw size={12} />
+                      </button>
+                    )}
+                    <button type="button" onClick={() => onRemoveTempPlayer(i)} className="remove-btn" suppressHydrationWarning title="Remove player">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -172,12 +172,12 @@ test('player substitution at 0-0 updates live spectator view in real-time', asyn
     await expect(replaceDialog).toHaveCount(0);
 
     // Host court now shows Delete Player 5 on court
-    await expect(host.locator('.score-side--a')).toContainText('Delete Player 5');
+    await expect(host.locator('.score-side--a')).toContainText(/(Delete Player 5|D\.P\. 5)/);
 
     // Viewer observes Delete Player 5 on court without reloading, and Delete Player 2 removed from court
     const onCourtSection = viewer.locator('.w-vs-row, .w-live-score-board').first();
-    await expect(onCourtSection).toContainText('Delete Player 5', { timeout: 15_000 });
-    await expect(onCourtSection).not.toContainText('Delete Player 2');
+    await expect(onCourtSection).toContainText(/(Delete Player 5|D\.P\. 5)/, { timeout: 15_000 });
+    await expect(onCourtSection).not.toContainText(/(Delete Player 2|D\.P\. 2)/);
   } finally {
     await viewerContext.close();
     await hostContext.close();

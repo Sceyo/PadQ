@@ -45,7 +45,16 @@ import { StreakBadge } from '@/app/queue/components/atoms/StreakBadge';
 import { buildPlayerStats, comparePlayerStats, formatPointDiff, formatMatchupStrength } from '@/app/queue/lib/playerUtils';
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
 import { RecapModal } from '@/app/queue/components/RecapCard';
-import { LiveCourtStatus } from './LiveCourtStatus';
+import { LiveCourtStatus, WaitingQueueChips } from './LiveCourtStatus';
+import { resolveWatchTurnContext } from '@/app/queue/lib/watchTurnContext';
+import {
+  getPlayerTurnZone,
+  shouldTriggerTurnAlert,
+  fireBrowserTurnAlert,
+  getWatchedPlayer,
+  setWatchedPlayer,
+  type PlayerTurnZone,
+} from '@/app/queue/lib/turnAlert';
 import './watch.css';
 
 // ═══════════════════════════════════════════════════════════
@@ -181,6 +190,54 @@ function WatchPageContent() {
   const [announcement,   setAnnouncement]    = useState<{ label: string; text: string } | null>(null);
   const prevMatchKeyRef = useRef<string>('');
   const prevCourtSlotsRef = useRef<CourtSlot[] | null>(null);
+
+  // Spectator Turn Alert
+  const [watchedPlayer, setWatchedPlayerState] = useState<string | null>(() => getWatchedPlayer(sessionId));
+  const prevTurnZoneRef = useRef<PlayerTurnZone | null>(null);
+
+  const watchTurnCtx = useMemo(() => {
+    if (!session) return null;
+    return resolveWatchTurnContext({
+      gameMode: session.gameMode ?? 'doubles',
+      courtName: session.courtName,
+      courtSlots: session.courtSlots,
+      queue: session.queue,
+      sittingOut: session.sittingOut,
+      priorityPlayers: session.priorityPlayers,
+    });
+  }, [session]);
+
+  useEffect(() => {
+    if (!watchedPlayer || !watchTurnCtx) {
+      prevTurnZoneRef.current = null;
+      return;
+    }
+    const zoneResult = getPlayerTurnZone(
+      watchedPlayer,
+      watchTurnCtx.effectiveCourts,
+      watchTurnCtx.waitingQueue,
+      watchTurnCtx.playersPerMatch
+    );
+
+    if (prevTurnZoneRef.current && shouldTriggerTurnAlert(prevTurnZoneRef.current, zoneResult.zone)) {
+      const alertMsg = zoneResult.zone === 'on-court'
+        ? `You are on court${zoneResult.courtName ? ` (${zoneResult.courtName})` : ''}!`
+        : 'You are on deck! Get ready to play.';
+      fireBrowserTurnAlert(alertMsg);
+    }
+    prevTurnZoneRef.current = zoneResult.zone;
+  }, [watchedPlayer, watchTurnCtx]);
+
+  const toggleWatchPlayer = (playerName: string) => {
+    setWatchedPlayerState(current => {
+      const next = current === playerName ? null : playerName;
+      setWatchedPlayer(sessionId, next);
+      if (next) {
+        fireBrowserTurnAlert();
+      }
+      return next;
+    });
+  };
 
   // ── Guardrail: validate session exists before subscribing ──
 
@@ -732,6 +789,8 @@ function WatchPageContent() {
               players={session?.players ?? []}
               priorityPlayers={session?.priorityPlayers ?? []}
               lockedPartners={session?.lockedPartners ?? []}
+              watchedPlayer={watchedPlayer}
+              onToggleWatchPlayer={toggleWatchPlayer}
             />
           </div>
         )}
@@ -840,6 +899,23 @@ function WatchPageContent() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {watchTurnCtx && watchTurnCtx.waitingQueue.length > 0 && (
+              <div className="w-section">
+                <h2 className="w-section-title">
+                  <Users size={15} /> Next in Queue
+                </h2>
+                <WaitingQueueChips
+                  waitingQueue={watchTurnCtx.waitingQueue}
+                  playersPerMatch={watchTurnCtx.playersPerMatch}
+                  activeCourtCount={1}
+                  prioritySet={new Set(session?.priorityPlayers ?? [])}
+                  partnerMap={session?.lockedPartners ? new Map(session.lockedPartners.flatMap(p => [[p.a, p.b], [p.b, p.a]])) : undefined}
+                  watchedPlayer={watchedPlayer}
+                  onToggleWatchPlayer={toggleWatchPlayer}
+                />
               </div>
             )}
 

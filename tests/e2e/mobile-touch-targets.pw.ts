@@ -8,7 +8,7 @@ async function assertAllVisibleButtonsTouchTarget(root: Page | Locator, contextN
       return (
         el.closest('[data-nextjs-dev-tools], nextjs-portal') !== null ||
         el.matches(
-          '.absent-mini-btn, .partner-pair-chip button, [aria-label*="Remove partner pair"], .toast-dismiss, .scoreboard-toggle, [title*="Play to"], [title*="Set a special score limit"], [title*="Reset score"], .score-reset-btn, [aria-label*="Next.js"], .recap-variant-btn, [title*="Edit player positions"], [class*="editBtn"]'
+          '.absent-mini-btn, .partner-pair-chip button, [aria-label*="Remove partner pair"], .toast-dismiss, .scoreboard-toggle, [title*="Play to"], [title*="Set a special score limit"], [title*="Reset score"], .score-reset-btn, [aria-label*="Next.js"], .recap-variant-btn, [title*="Edit player positions"], [class*="editBtn"], [title*="Announce"], [class*="calloutBtn"]'
         )
       );
     });
@@ -112,8 +112,15 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
     expect(Math.round(confirmBox!.height)).toBeGreaterThanOrEqual(44);
     await confirmBtn.click();
 
-    // Stats tab & Recap Card
+    // Wait for the match completion toast to appear and dismiss it
+    const toast = page.locator('.toast-notification');
+    await expect(toast).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Dismiss notification' }).click();
+    await expect(toast).toHaveCount(0);
+
+    // Switch to Stats tab and ensure navigation succeeded
     await statsTab.click();
+    await expect(statsTab).toHaveAttribute('aria-selected', 'true');
     const recapBtn = page.getByRole('button', { name: /Share Recap Card/i });
     await expect(recapBtn).toBeVisible({ timeout: 10_000 });
     const recapBtnBox = await recapBtn.boundingBox();
@@ -240,5 +247,37 @@ test.describe('390px Mobile Viewport Touch Target Hardening', () => {
 
     await scoreCancelBtn.click();
     await expect(scoreModal).toHaveCount(0);
+  });
+
+  test('buttons in SetupView check-in and expected arrivals satisfy touch targets', async ({
+    page,
+  }) => {
+    await page.goto('/queue?mode=doubles');
+    const pasteInput = page.getByPlaceholder(/Paste names separated by commas/);
+    await pasteInput.fill('Alpha, Beta, Gamma');
+    const addExpectedBtn = page.getByRole('button', { name: 'Add as Expected' });
+    await expect(addExpectedBtn).toBeVisible();
+    const addExpectedBox = await addExpectedBtn.boundingBox();
+    expect(Math.round(addExpectedBox!.height)).toBeGreaterThanOrEqual(44);
+    await addExpectedBtn.click();
+
+    const checkinBtn = page.locator('.checkin-btn').first();
+    const checkinAllBtn = page.locator('.checkin-all-btn');
+    const removeBtn = page.locator('.remove-expected-btn').first();
+
+    const checkinBox = await checkinBtn.boundingBox();
+    const checkinAllBox = await checkinAllBtn.boundingBox();
+    const removeBox = await removeBtn.boundingBox();
+
+    expect(Math.round(checkinBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(checkinAllBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(removeBox!.height)).toBeGreaterThanOrEqual(44);
+    expect(Math.round(removeBox!.width)).toBeGreaterThanOrEqual(44);
+
+    await checkinAllBtn.click();
+    const uncheckAllBtn = page.locator('.uncheck-all-btn');
+    await expect(uncheckAllBtn).toBeVisible();
+    const uncheckBox = await uncheckAllBtn.boundingBox();
+    expect(Math.round(uncheckBox!.height)).toBeGreaterThanOrEqual(44);
   });
 });

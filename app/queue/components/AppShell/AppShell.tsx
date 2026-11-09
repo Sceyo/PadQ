@@ -37,6 +37,9 @@ interface Props {
   sitOutPanelNode?: React.ReactNode;
   activeSittingOutCount?: number;
   diagnosticsNode?: React.ReactNode;
+  lateArrivals?: string[];
+  onCheckInLateArrival?: (name: string) => boolean | Promise<boolean>;
+  onDismissLateArrival?: (name: string) => void;
 }
 
 export function AppShell({
@@ -60,6 +63,9 @@ export function AppShell({
   sitOutPanelNode,
   activeSittingOutCount = 0,
   diagnosticsNode,
+  lateArrivals,
+  onCheckInLateArrival,
+  onDismissLateArrival,
 }: Props) {
   const [isHostToolsOpen, setIsHostToolsOpen] = useState(false);
 
@@ -202,11 +208,13 @@ export function AppShell({
           onAddPlayer={onAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}
           onToggleScorePrompt={onToggleScorePrompt}
+          lateArrivals={lateArrivals}
+          onCheckInLateArrival={onCheckInLateArrival}
+          onDismissLateArrival={onDismissLateArrival}
           partnerPanelNode={partnerPanelNode}
           manualQueuePanelNode={manualQueuePanelNode}
           sitOutPanelNode={sitOutPanelNode}
           diagnosticsNode={diagnosticsNode}
-
         />
       </div>
     </OverlayHost>

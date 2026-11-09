@@ -57,10 +57,12 @@ describe('V1 Frontend Component & Interaction Release Stress Suite', () => {
       expect(getByText('Team 2')).toBeTruthy();
 
       // Teammate names
-      expect(getByText('Ben Johns')).toBeTruthy();
-      expect(getByText('Anna Leigh Waters')).toBeTruthy();
-      expect(getByText('Tyson McGuffin')).toBeTruthy();
-      expect(getByText('Catherine Parenteau')).toBeTruthy();
+      expect(getByText('B. Johns')).toBeTruthy();
+      expect(getByText('A.L. Waters')).toBeTruthy();
+      expect(getByText('T. McGuffin')).toBeTruthy();
+      expect(getByText('C. Parenteau')).toBeTruthy();
+      expect(container.querySelector('[title="Ben Johns"]')).toBeTruthy();
+      expect(container.querySelector('[title="Anna Leigh Waters"]')).toBeTruthy();
 
       // Partner connector "&"
       const connectors = container.querySelectorAll('[class*="partnerConnector"]');
@@ -101,8 +103,10 @@ describe('V1 Frontend Component & Interaction Release Stress Suite', () => {
       );
 
       // Player chips and teams still visible
-      expect(queryByText('Ben Johns')).toBeTruthy();
-      expect(queryByText('Anna Leigh Waters')).toBeTruthy();
+      expect(queryByText('B. Johns')).toBeTruthy();
+      expect(queryByText('A.L. Waters')).toBeTruthy();
+      expect(container.querySelector('[title="Ben Johns"]')).toBeTruthy();
+      expect(container.querySelector('[title="Anna Leigh Waters"]')).toBeTruthy();
 
       // Host win buttons and edit button MUST NOT exist
       expect(queryByText(/win$/i)).toBeNull();

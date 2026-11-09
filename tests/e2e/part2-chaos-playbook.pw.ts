@@ -45,16 +45,16 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       await expect(courts.nth(1)).toContainText('Court 2');
       await expect(courts.nth(2)).toContainText('Court 3');
 
-      await expect(courts.nth(0)).toContainText('Player 01');
-      await expect(courts.nth(0)).toContainText('Player 04');
-      await expect(courts.nth(1)).toContainText('Player 05');
-      await expect(courts.nth(1)).toContainText('Player 08');
-      await expect(courts.nth(2)).toContainText('Player 09');
-      await expect(courts.nth(2)).toContainText('Player 12');
+      await expect(courts.nth(0)).toContainText(/(Player 01|P\. 01)/);
+      await expect(courts.nth(0)).toContainText(/(Player 04|P\. 04)/);
+      await expect(courts.nth(1)).toContainText(/(Player 05|P\. 05)/);
+      await expect(courts.nth(1)).toContainText(/(Player 08|P\. 08)/);
+      await expect(courts.nth(2)).toContainText(/(Player 09|P\. 09)/);
+      await expect(courts.nth(2)).toContainText(/(Player 12|P\. 12)/);
 
       // Verify remaining 4 players in waiting queue (#13 to #16)
-      await expect(host.locator('.pairing-table')).toContainText('Player 13');
-      await expect(host.locator('.pairing-table')).toContainText('Player 16');
+      await expect(host.locator('.pairing-table')).toContainText(/(Player 13|P\. 13)/);
+      await expect(host.locator('.pairing-table')).toContainText(/(Player 16|P\. 16)/);
 
       // Rotate Court 1: Waiting players #1 and #2 take the court
       const courtOneBefore = await courts.nth(0).innerText();
@@ -69,8 +69,8 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
 
       // Waiting players #13 & #14 took Court 1
       await expect.poll(async () => courts.nth(0).innerText()).not.toBe(courtOneBefore);
-      await expect(courts.nth(0)).toContainText('Player 13');
-      await expect(courts.nth(0)).toContainText('Player 14');
+      await expect(courts.nth(0)).toContainText(/(Player 13|P\. 13)/);
+      await expect(courts.nth(0)).toContainText(/(Player 14|P\. 14)/);
     } finally {
       await hostContext.close();
     }
@@ -104,8 +104,8 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
 
       // Verify Court 1 restores the exact 4 players and state
       await expect.poll(async () => courtOne.innerText()).toBe(courtOneBefore);
-      await expect(courtOne).toContainText('Player 01');
-      await expect(courtOne).toContainText('Player 04');
+      await expect(courtOne).toContainText(/(Player 01|P\. 01)/);
+      await expect(courtOne).toContainText(/(Player 04|P\. 04)/);
     } finally {
       await hostContext.close();
     }
@@ -193,7 +193,7 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
 
       // Spectator view displays Player 09 in dedicated On Break section
       await expect(viewer.getByText(/On Break/i).first()).toBeVisible({ timeout: 10_000 });
-      await expect(viewer.getByText('Player 09')).toBeVisible();
+      await expect(viewer.getByText(/(Player 09|P\. 09)/)).toBeVisible();
 
       // Complete match on Court 1: Player 09 is skipped! Player 10 takes court instead
       const courtOne = host.locator('.courts-grid > div').filter({ hasText: 'Court 1' });
@@ -205,8 +205,8 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       await expect(host.locator('text=/won/i')).toBeVisible({ timeout: 5000 });
 
       // Court 1 has Player 10, but NOT Player 09!
-      await expect(courtOne).toContainText('Player 10');
-      await expect(courtOne).not.toContainText('Player 09');
+      await expect(courtOne).toContainText(/(Player 10|P\. 10)/);
+      await expect(courtOne).not.toContainText(/(Player 09|P\. 09)/);
 
       // Player returns: Host taps "Back in"
       await host.getByRole('button', { name: 'Host Tools' }).click();
@@ -217,7 +217,7 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       await sheet.getByRole('button', { name: 'Close sheet' }).click();
 
       // Player 09 returned to active queue
-      await expect(host.locator('.pairing-table')).toContainText('Player 09');
+      await expect(host.locator('.pairing-table')).toContainText(/(Player 09|P\. 09)/);
     } finally {
       await viewerContext.close();
       await hostContext.close();
@@ -261,8 +261,8 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       await expect(host.locator('text=/won/i')).toBeVisible({ timeout: 5000 });
 
       // Both players 09 and 10 are together on Court 1
-      await expect(courtOne).toContainText('Player 09');
-      await expect(courtOne).toContainText('Player 10');
+      await expect(courtOne).toContainText(/(Player 09|P\. 09)/);
+      await expect(courtOne).toContainText(/(Player 10|P\. 10)/);
     } finally {
       await viewerContext.close();
       await hostContext.close();
@@ -285,20 +285,20 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       await expect(sheet).not.toBeVisible();
 
       // Zoe appears in waiting queue
-      await expect(host.locator('.pairing-table')).toContainText('Late Arrival Zoe');
+      await expect(host.locator('.pairing-table')).toContainText(/(Late Arrival Zoe|L\.A\. Zoe)/);
 
       // Sudden Departure: Player 10 must leave early
       await host.getByRole('button', { name: 'Host Tools' }).click();
       await sheet.getByRole('button', { name: 'Manage Queue' }).click();
-      const removeBtn = sheet.locator('.mqp-btn--remove').filter({ hasText: 'Player 10' });
+      const removeBtn = sheet.locator('.mqp-btn--remove').filter({ hasText: /(Player 10|P\. 10)/ });
       await removeBtn.click();
       await sheet.getByRole('button', { name: 'Close sheet' }).click();
 
       // Player 10 is purged from queue; active courts remain unaffected
-      await expect(host.locator('.pairing-table')).not.toContainText('Player 10');
+      await expect(host.locator('.pairing-table')).not.toContainText(/(Player 10|P\. 10)/);
       const courtOne = host.locator('.courts-grid > div').filter({ hasText: 'Court 1' });
-      await expect(courtOne).toContainText('Player 01');
-      await expect(courtOne).toContainText('Player 04');
+      await expect(courtOne).toContainText(/(Player 01|P\. 01)/);
+      await expect(courtOne).toContainText(/(Player 04|P\. 04)/);
     } finally {
       await hostContext.close();
     }
@@ -333,7 +333,8 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       // Court 2 immediately re-loads with waiting players
       await expect.poll(async () => court2.innerText()).not.toBe(court2Before);
       // Court 1 stays actively running with its lineup intact
-      expect(await court1.innerText()).toBe(court1Before);
+      const normalizeCourtText = (text: string) => text.replace(/\d{2}:\d{2}/g, '').trim();
+      expect(normalizeCourtText(await court1.innerText())).toBe(normalizeCourtText(court1Before));
     } finally {
       await viewerContext.close();
       await hostContext.close();
@@ -418,8 +419,8 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       const roomCode = await startSession(host, { mode: 'doubles', players: SCENARIO_PLAYERS.slice(0, 10), courtCount: 2 });
 
       const courtOne = host.locator('.courts-grid > div').filter({ hasText: 'Court 1' });
-      await expect(courtOne).toContainText('Player 01');
-      await expect(courtOne).toContainText('Player 04');
+      await expect(courtOne).toContainText(/(Player 01|P\. 01)/);
+      await expect(courtOne).toContainText(/(Player 04|P\. 04)/);
 
       // Hard refresh the host browser mid-game
       await host.reload();
@@ -427,8 +428,8 @@ test.describe('Part 2: Real-World Human Chaos Stress Test Playbook', () => {
       expect((await host.locator('.session-code').textContent())?.trim()).toBe(roomCode);
 
       // Active scores and court state match pre-refresh state
-      await expect(courtOne).toContainText('Player 01');
-      await expect(courtOne).toContainText('Player 04');
+      await expect(courtOne).toContainText(/(Player 01|P\. 01)/);
+      await expect(courtOne).toContainText(/(Player 04|P\. 04)/);
     } finally {
       await hostContext.close();
     }

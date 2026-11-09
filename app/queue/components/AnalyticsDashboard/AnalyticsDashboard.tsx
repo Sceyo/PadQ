@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { BarChart2, TrendingUp, Activity, Clock, Flame, Layers, Share2, Trophy } from 'lucide-react';
+import { BarChart2, TrendingUp, Activity, Clock, Flame, Layers, Share2, Trophy, ArrowLeftRight } from 'lucide-react';
+import { flipHistoryEntryWinner } from '../../lib/historyCorrection';
+import { formatDisplayName } from '../../lib/nameFormatter';
 import type { PlayerStat, MatchHistoryEntry } from '../../lib/types';
 import { comparePlayerStats, formatPointDiff, formatMatchupStrength } from '../../lib/playerUtils';
 import type { CareerStatsMap } from '@/lib/sessionService';
@@ -32,7 +34,8 @@ export const AnalyticsDashboard: React.FC<{
   roomCode?: string | null;
   mode?: string;
   initialTab?: 'session' | 'history' | 'skilled';
-}> = ({ stats, careerStats: _careerStats, skilledBrackets, history = [], roomCode, mode = 'Doubles', initialTab }) => {
+  onCorrectHistoryEntry?: (entryId: number, updated: MatchHistoryEntry) => void;
+}> = ({ stats, careerStats: _careerStats, skilledBrackets, history = [], roomCode, mode = 'Doubles', initialTab, onCorrectHistoryEntry }) => {
   const hasSkilled = !!skilledBrackets && (
     skilledBrackets.beginner.length > 0 ||
     skilledBrackets.intermediate.length > 0 ||
@@ -145,7 +148,7 @@ export const AnalyticsDashboard: React.FC<{
                               return (
                                 <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
                                   <td className="col-rank-num">{i + 1}</td>
-                                  <td><strong>{s.name}</strong></td>
+                                  <td><strong title={s.name}>{formatDisplayName(s.name)}</strong></td>
                                   <td className="col-wins">{s.wins}</td>
                                   <td className="col-losses">{s.losses}</td>
                                   <td>{s.gamesPlayed}</td>
@@ -176,7 +179,7 @@ export const AnalyticsDashboard: React.FC<{
                               <div className="analytics-card-header">
                                 <div className="analytics-card-player">
                                   <span className="analytics-card-rank-num">#{i + 1}</span>
-                                  <strong className="analytics-card-name">{s.name}</strong>
+                                  <strong className="analytics-card-name" title={s.name}>{formatDisplayName(s.name)}</strong>
                                 </div>
                                 <span className={`skill-badge skill-badge--${level}`}>{meta.letter}</span>
                               </div>
@@ -250,7 +253,7 @@ export const AnalyticsDashboard: React.FC<{
                         return (
                           <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
                             <td className="col-rank-num">{i + 1}</td>
-                            <td><strong>{s.name}</strong></td>
+                            <td><strong title={s.name}>{formatDisplayName(s.name)}</strong></td>
                             <td><RankBadge rank={s.rank} /></td>
                             <td className="col-wins">{s.wins}</td>
                             <td className="col-losses">{s.losses}</td>
@@ -278,7 +281,7 @@ export const AnalyticsDashboard: React.FC<{
                         <div className="analytics-card-header">
                           <div className="analytics-card-player">
                             <span className="analytics-card-rank-num">#{i + 1}</span>
-                            <strong className="analytics-card-name">{s.name}</strong>
+                            <strong className="analytics-card-name" title={s.name}>{formatDisplayName(s.name)}</strong>
                           </div>
                           <div className="analytics-card-badges">
                             <RankBadge rank={s.rank} />
@@ -334,7 +337,7 @@ export const AnalyticsDashboard: React.FC<{
                 <div className="frequency-chart">
                   {sorted.map(s => (
                     <div key={s.name} className="freq-row">
-                      <span className="freq-name" title={s.name}>{s.name}</span>
+                      <span className="freq-name" title={s.name}>{formatDisplayName(s.name)}</span>
                       <StatBar value={s.gamesPlayed} max={maxGP} color="#818cf8" />
                       <span className="freq-count">{s.gamesPlayed} <span className="freq-unit">GP</span></span>
                     </div>
@@ -370,6 +373,17 @@ export const AnalyticsDashboard: React.FC<{
                     {e.winner}
                   </div>
                   {e.score && <div className="history-score">{e.score}</div>}
+                  {onCorrectHistoryEntry && (
+                    <button
+                      type="button"
+                      className="history-flip-btn"
+                      onClick={() => onCorrectHistoryEntry(e.id, flipHistoryEntryWinner(e))}
+                      title="Retroactively flip match winner"
+                      aria-label={`Flip winner for match ${e.id}`}
+                    >
+                      <ArrowLeftRight size={11} /> Flip Winner
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

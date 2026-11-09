@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { formatDisplayName } from '../../lib/nameFormatter';
 
 interface Props {
   side: 'A' | 'B';
@@ -63,13 +64,14 @@ export function ScoreRow({
         {players.map((p, idx) => (
           <span
             key={`${p}-${idx}`}
+            title={p}
             style={{
               overflow: 'hidden',
               textOverflow: 'ellipsis',
               whiteSpace: 'nowrap',
             }}
           >
-            {p}
+            {formatDisplayName(p)}
           </span>
         ))}
       </div>

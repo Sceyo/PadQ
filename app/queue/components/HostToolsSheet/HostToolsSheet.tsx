@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import {
   UserPlus,
+  UserCheck,
   Trophy,
   Users,
   ListOrdered,
@@ -19,6 +20,9 @@ interface Props {
   onAddPlayer: (name: string) => boolean | void;
   scorePromptEnabled: boolean;
   onToggleScorePrompt: () => void;
+  lateArrivals?: string[];
+  onCheckInLateArrival?: (name: string) => boolean | Promise<boolean>;
+  onDismissLateArrival?: (name: string) => void;
   partnerPanelNode?: React.ReactNode;
   manualQueuePanelNode?: React.ReactNode;
   sitOutPanelNode?: React.ReactNode;
@@ -32,6 +36,9 @@ export function HostToolsSheet({
   onAddPlayer,
   scorePromptEnabled,
   onToggleScorePrompt,
+  lateArrivals = [],
+  onCheckInLateArrival,
+  onDismissLateArrival,
   partnerPanelNode,
   manualQueuePanelNode,
   sitOutPanelNode,
@@ -81,6 +88,108 @@ export function HostToolsSheet({
       description="Session management, late additions, and engine settings"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4, 16px)' }}>
+        {/* Expected Late Arrivals Tray */}
+        {lateArrivals && lateArrivals.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2, 8px)' }}>
+            <div
+              style={{
+                fontSize: 'var(--fs-xs, 0.8125rem)',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                color: 'var(--text-muted, #94a3b8)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <UserCheck size={14} />
+              <span>Expected Late Arrivals ({lateArrivals.length})</span>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {lateArrivals.map(name => (
+                <div
+                  key={`host-late-${name}`}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '4px 6px 4px 12px',
+                    borderRadius: 'var(--r-sm, 10px)',
+                    background: 'var(--surface-bg, #0b0d17)',
+                    border: '1.5px solid var(--line-subtle, #252d47)',
+                    minHeight: 'var(--tap-min, 44px)',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 'var(--fs-sm, 0.9375rem)',
+                      fontWeight: 600,
+                      color: 'var(--text-primary, #f8fafc)',
+                    }}
+                  >
+                    {name}
+                  </span>
+                  {onCheckInLateArrival && (
+                    <button
+                      type="button"
+                      aria-label={`Check in ${name}`}
+                      onClick={async () => {
+                        const ok = await onCheckInLateArrival(name);
+                        if (ok === false) {
+                          setErrorMsg(`"${name}" could not be checked in (session full or duplicate)`);
+                        }
+                      }}
+                      style={{
+                        minHeight: 'var(--tap-min, 44px)',
+                        padding: '0 14px',
+                        borderRadius: 'var(--r-sm, 8px)',
+                        border: 'none',
+                        background: 'var(--accent-primary, #5457e0)',
+                        color: '#ffffff',
+                        fontSize: 'var(--fs-xs, 0.8125rem)',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      Check In
+                    </button>
+                  )}
+                  {onDismissLateArrival && (
+                    <button
+                      type="button"
+                      aria-label={`Dismiss ${name}`}
+                      onClick={() => onDismissLateArrival(name)}
+                      style={{
+                        minWidth: 'var(--tap-min, 44px)',
+                        minHeight: 'var(--tap-min, 44px)',
+                        padding: 0,
+                        borderRadius: 'var(--r-sm, 8px)',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-muted, #94a3b8)',
+                        fontSize: '1.25rem',
+                        lineHeight: 1,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{ height: '1px', background: 'var(--line-subtle, #252d47)' }} />
+          </div>
+        )}
+
         {/* 1. Add Late Player (16px input to stop iOS zoom) */}
         <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2, 8px)' }}>
           <label

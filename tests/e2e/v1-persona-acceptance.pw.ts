@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { formatDisplayName } from '../../app/queue/lib/nameFormatter';
 
 const RUSH_PLAYERS = Array.from({ length: 25 }, (_, index) =>
   `Rush Player ${String(index + 1).padStart(2, '0')}`,
@@ -33,7 +34,7 @@ test('25-player rush preserves registration order and a middle departure', async
     }
 
     const initialWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
-    expect(initialWaiting.map(text => text.trim())).toEqual(RUSH_PLAYERS.slice(12));
+    expect(initialWaiting.map(text => text.trim())).toEqual(RUSH_PLAYERS.slice(12).map(formatDisplayName));
 
     await host.getByTitle('Settings').click();
     const startLive = host.getByRole('button', { name: 'Start', exact: true });
@@ -45,22 +46,22 @@ test('25-player rush preserves registration order and a middle departure', async
     await viewer.goto(`/watch/${roomCode}`);
     await expect(viewer.getByText('You are watching live. Only the host can make changes.'))
       .toBeVisible({ timeout: 30_000 });
-    await expect(viewer.locator('.w-next-up')).toContainText(RUSH_PLAYERS[12]);
-    await expect(viewer.locator('.w-next-up')).toContainText(RUSH_PLAYERS[15]);
+    await expect(viewer.locator('.w-next-up')).toContainText(formatDisplayName(RUSH_PLAYERS[12]));
+    await expect(viewer.locator('.w-next-up')).toContainText(formatDisplayName(RUSH_PLAYERS[15]));
     await expect(viewer.locator('.w-next-up')).toContainText('+9 waiting');
 
     await host.getByRole('button', { name: 'Host Tools' }).click();
     const sheet = host.getByRole('dialog', { name: 'Host Tools' });
     await sheet.getByRole('button', { name: 'Manage Queue' }).click();
     const departingPlayer = RUSH_PLAYERS[18];
-    await sheet.locator('.mqp-btn--remove').filter({ hasText: departingPlayer }).click();
+    await sheet.locator('.mqp-btn--remove').filter({ hasText: formatDisplayName(departingPlayer) }).click();
     await sheet.getByRole('button', { name: 'Close sheet' }).click();
 
     const remainingWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
     expect(remainingWaiting.map(text => text.trim())).toEqual([
       ...RUSH_PLAYERS.slice(12, 18),
       ...RUSH_PLAYERS.slice(19),
-    ]);
+    ].map(formatDisplayName));
     await expect(viewer.locator('.w-next-up')).toContainText('+8 waiting', { timeout: 30_000 });
   } finally {
     await viewerContext.close();

@@ -70,8 +70,26 @@ import {
   deserializePoolSinglesState,
 } from './lib/singlesPoolEngine';
 import { V1_RELEASE } from './lib/releaseConfig';
-import { planMultiCourtResult } from './lib/multiCourtResult';
+import { planMultiCourtResult, buildNumericSkillMap } from './lib/multiCourtResult';
 import { formatEtaLabel } from './lib/etaEngine';
+import { parsePlayerListPaste } from './lib/pasteParser';
+import {
+  resolvePastedPlayers,
+  checkInPlayer,
+  undoCheckInPlayer,
+  checkInAllPlayers,
+  uncheckAllPlayers,
+  removePlayerFromCheckIn,
+  addPlayersToCheckIn,
+  saveCheckInDraft,
+  loadCheckInDraft,
+  clearCheckInDraft,
+  CHECKIN_DRAFT_KEY,
+  persistSessionLateArrivals,
+  loadSessionLateArrivals,
+  saveSessionLateArrivals,
+  applyLateArrivalCheckIn,
+} from './lib/checkInState';
 import {
   toggleSitOutTransition,
   removeFromQueueTransition,
@@ -216,6 +234,80 @@ function QueueSystemContent() {
   // UI-only state
   
   const [tempPlayers,  setTempPlayers]  = useState<string[]>([]);
+  const [expectedPlayers, setExpectedPlayers] = useState<string[]>([]);
+  const [lateArrivals, setLateArrivals] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !session.sessionId) return;
+    setLateArrivals(loadSessionLateArrivals(session.sessionId));
+  }, [session.sessionId]);
+
+  // Pre-session check-in draft persistence & hydration
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (localStorage.getItem('padq_host_session_id') || players.length > 0) return;
+    const draft = loadCheckInDraft(CHECKIN_DRAFT_KEY);
+    if (draft) {
+      if (draft.checkedIn.length > 0) setTempPlayers(draft.checkedIn);
+      if (draft.expected.length > 0) setExpectedPlayers(draft.expected);
+    }
+  }, [players.length]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (players.length > 0 || session.sessionId) return;
+    if (tempPlayers.length === 0 && expectedPlayers.length === 0) return;
+    saveCheckInDraft(CHECKIN_DRAFT_KEY, { expected: expectedPlayers, checkedIn: tempPlayers });
+  }, [expectedPlayers, tempPlayers, players.length, session.sessionId]);
+
+  const handleCheckInLateArrival = (name: string): boolean => {
+    const success = handleAddPlayerLive(name);
+    if (!success) return false;
+    setLateArrivals(prev => {
+      const next = applyLateArrivalCheckIn(prev, name, true);
+      if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
+      return next;
+    });
+    return true;
+  };
+
+  const handleDismissLateArrival = (name: string) => {
+    setLateArrivals(prev => {
+      const next = applyLateArrivalCheckIn(prev, name, true);
+      if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
+      return next;
+    });
+  };
+
+  const handleCheckInPlayer = (name: string) => {
+    const next = checkInPlayer({ expected: expectedPlayers, checkedIn: tempPlayers }, name);
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
+  };
+
+  const handleUndoCheckInPlayer = (name: string) => {
+    const next = undoCheckInPlayer({ expected: expectedPlayers, checkedIn: tempPlayers }, name);
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
+  };
+
+  const handleCheckInAll = () => {
+    const next = checkInAllPlayers({ expected: expectedPlayers, checkedIn: tempPlayers }, V1_RELEASE.maxPlayers);
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
+  };
+
+  const handleUncheckAll = () => {
+    const next = uncheckAllPlayers({ expected: expectedPlayers, checkedIn: tempPlayers });
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
+  };
+
+  const handleRemoveExpectedPlayer = (name: string) => {
+    const next = removePlayerFromCheckIn({ expected: expectedPlayers, checkedIn: tempPlayers }, name);
+    setExpectedPlayers(next.expected);
+    setTempPlayers(next.checkedIn);
+  };
   const [currentName,  setCurrentName]  = useState('');
   const [pasteInput,   setPasteInput]   = useState('');
   const [modalOpen,    setModalOpen]    = useState(false);
@@ -585,7 +677,41 @@ function QueueSystemContent() {
   const activeTournamentM      = session.isConnected && session.tournamentMatches?.length > 0 ? session.tournamentMatches : localTournamentM;
   const activeTournamentActive = localTournamentActive || (session.isConnected ? session.tournamentActive : false);
   const activeTournamentWinner = session.isConnected ? session.tournamentWinner  : localTournamentWinner;
-  const activeHistory          = session.isConnected ? (session.matchHistory as unknown as MatchHistoryEntry[]) : localHistory;
+  const rawActiveHistory       = session.isConnected ? (session.matchHistory as unknown as MatchHistoryEntry[]) : localHistory;
+  const [historyOverrides, setHistoryOverrides] = useState<Record<number, MatchHistoryEntry>>({});
+  const activeHistory          = useMemo(() => {
+    return rawActiveHistory.map(entry => historyOverrides[entry.id] ?? entry);
+  }, [rawActiveHistory, historyOverrides]);
+  const activeHistoryRef       = useRef<MatchHistoryEntry[]>([]);
+  useEffect(() => {
+    activeHistoryRef.current = activeHistory;
+  }, [activeHistory]);
+
+  const handleCorrectHistoryEntry = async (entryId: number, updated: MatchHistoryEntry) => {
+    const prevEntry = activeHistory.find(e => e.id === entryId);
+    setHistoryOverrides(prev => ({ ...prev, [entryId]: updated }));
+    setLocalHistory(prev => prev.map(entry => (entry.id === entryId ? updated : entry)));
+    activeHistoryRef.current = activeHistoryRef.current.map(entry => (entry.id === entryId ? updated : entry));
+
+    if (session.sessionId) {
+      const ok = await session.correctHistoryEntry(entryId, updated);
+      if (!ok) {
+        if (prevEntry) {
+          setHistoryOverrides(prev => {
+            const next = { ...prev };
+            delete next[entryId];
+            return next;
+          });
+          setLocalHistory(prev => prev.map(entry => (entry.id === entryId ? prevEntry : entry)));
+          activeHistoryRef.current = activeHistoryRef.current.map(entry => (entry.id === entryId ? prevEntry : entry));
+        }
+        showToast('Could not save match correction. Check connection and try again.');
+        return;
+      }
+    }
+
+    showToast(`Corrected Match #${entryId}: Winner is now ${updated.winner}`);
+  };
 
   // Derived
   const statsList      = useMemo(() => buildPlayerStats(players, activeHistory), [players, activeHistory]);
@@ -622,6 +748,7 @@ function QueueSystemContent() {
     });
     return base;
   }, [roster, skilledBrackets]);
+  const numericSkillMap = useMemo(() => buildNumericSkillMap(statsList, rosterSkillMap), [statsList, rosterSkillMap]);
   const suggestions = useMemo(() => activeTab === 'queue' ? generateSuggestions(statsList, queue) : [], [statsList, queue, activeTab]);
   const playAllSuggestion = useMemo<PlayAllSuggestion | null>(() => {
     if (activeQueueMode !== 'playall' || gameMode !== 'doubles') return null;
@@ -669,7 +796,10 @@ function QueueSystemContent() {
     if (!t) return;
     if (tempPlayers.length >= V1_RELEASE.maxPlayers) { setSetupErrorMsg(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
     if (t.length > 60) { setSetupErrorMsg('Player names must be 60 characters or fewer'); return; }
-    if (tempPlayers.some(name => name.toLowerCase() === t.toLowerCase())) {
+    if (
+      tempPlayers.some(name => name.toLowerCase() === t.toLowerCase()) ||
+      expectedPlayers.some(name => name.toLowerCase() === t.toLowerCase())
+    ) {
       setSetupErrorMsg(`"${t}" already exists. If two players share a name, add an initial (e.g. "${t} D.") to distinguish them.`);
       return;
     }
@@ -678,31 +808,26 @@ function QueueSystemContent() {
   };
   const removeTempPlayer = (i: number) => setTempPlayers(prev => prev.filter((_, j) => j !== i));
 
-  const addFromPaste = () => {
-    const names = pasteInput.split(/[,\n]+/).map(n => n.trim()).filter(n => n.length > 0 && n.length <= 60);
-    const available = V1_RELEASE.maxPlayers - tempPlayers.length;
-    const seen = new Set(tempPlayers.map(name => name.toLowerCase()));
-    let duplicateCount = 0;
-    const fresh = names.filter(name => {
-      const key = name.toLowerCase();
-      if (seen.has(key)) {
-        duplicateCount++;
-        return false;
-      }
-      seen.add(key);
-      return true;
-    }).slice(0, available);
-    if (fresh.length === 0) {
-      if (duplicateCount > 0) {
+  const addFromPaste = (target: 'checkedIn' | 'expected' | unknown = 'checkedIn') => {
+    const resolvedTarget: 'checkedIn' | 'expected' = target === 'expected' ? 'expected' : 'checkedIn';
+    const res = resolvePastedPlayers(
+      pasteInput,
+      { expected: expectedPlayers, checkedIn: tempPlayers },
+      resolvedTarget,
+      V1_RELEASE.maxPlayers,
+    );
+    if (res.addedCount === 0) {
+      if (res.duplicateCount > 0) {
         showToast('Duplicate names were skipped. Add initials (e.g. "Mike D.") to distinguish players with the same name.');
       }
       setPasteInput('');
       return;
     }
-    if (duplicateCount > 0) {
-      showToast(`${duplicateCount} duplicate name${duplicateCount > 1 ? 's were' : ' was'} skipped. Use initials (e.g. "Ben J.") to distinguish identical names.`);
+    if (res.duplicateCount > 0) {
+      showToast(`${res.duplicateCount} duplicate name${res.duplicateCount > 1 ? 's were' : ' was'} skipped. Use initials (e.g. "Ben J.") to distinguish identical names.`);
     }
-    setTempPlayers(prev => [...prev, ...fresh]);
+    setTempPlayers(res.nextState.checkedIn);
+    setExpectedPlayers(res.nextState.expected);
     setPasteInput('');
   };
 
@@ -717,10 +842,14 @@ function QueueSystemContent() {
     const orderedPlayers = [...tempPlayers];
 
     // Build initial court slots for multi-court doubles mode
+    const activeLockedPairs: [string, string][] = (lockedPartners ?? []).filter(
+      ([a, b]) => orderedPlayers.includes(a) && orderedPlayers.includes(b),
+    );
+
     let initialCourtSlots: CourtSlot[] | undefined;
     let initialQueue: string[];
     if (gameMode === 'doubles' && courtCount > 1) {
-      const seeded = seedMultiCourtDoubles(orderedPlayers, courtCount, []);
+      const seeded = seedMultiCourtDoubles(orderedPlayers, courtCount, activeLockedPairs);
 
       initialCourtSlots = Array.from({ length: courtCount }, (_, i) => ({
         id: `court-${i}`,
@@ -761,7 +890,7 @@ function QueueSystemContent() {
       tournamentWinner: null, isLive: true,
       accessPin: pin,
       courtName,
-      lockedPartners: [],
+      lockedPartners: activeLockedPairs.map(([a, b]) => ({ a, b })),
       ...(initialCourtSlots ? { courtSlots: initialCourtSlots } : {}),
       ...(gameMode === 'singles' && courtCount === 1 ? {
         singlesEngineState: singlesFormat === 'pool'
@@ -780,13 +909,16 @@ function QueueSystemContent() {
     resetSinglesState(orderedPlayers);
     resetPoolSinglesState();
     setPlayers(orderedPlayers);
+    const handedOffLate = persistSessionLateArrivals(startResult.sessionId, expectedPlayers);
+    setLateArrivals(handedOffLate);
+    setExpectedPlayers([]);
     setTempPlayers([]);
     setLocalHistory([]);
     setLocalTournamentActive(localQueueMode === 'tournament');
     setLocalTournamentWinner(null);
     setLocalTournamentM(initialBracket);
-    setLockedPartners([]);
-    lockedPartnersRef.current = [];
+    setLockedPartners(activeLockedPairs);
+    lockedPartnersRef.current = activeLockedPairs;
     setLocalCourtSlots(initialCourtSlots ?? []);
     courtSlotsRef.current = initialCourtSlots ?? [];
     setQueue(initialQueue);
@@ -1084,8 +1216,15 @@ function QueueSystemContent() {
           score,
           timestamp: new Date().toLocaleTimeString(),
         };
+        const currentHistory = activeHistoryRef.current;
         const planned = planMultiCourtResult(
-          { queue: queueRef.current, courtSlots: currentSlots, sittingOut: activeSittingOut, priorityPlayers: activePriorityPlayers },
+          {
+            queue: queueRef.current,
+            courtSlots: currentSlots,
+            sittingOut: activeSittingOut,
+            priorityPlayers: activePriorityPlayers,
+            history: currentHistory.slice(0, 25),
+          },
           courtId,
           [...slot.onCourt],
           winningSide,
@@ -1096,6 +1235,7 @@ function QueueSystemContent() {
         }
         const previousQueue = [...queueRef.current];
         const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
+        const previousHistory = [...currentHistory];
 
         setQueue(planned.queue);
         queueRef.current = planned.queue;
@@ -1104,6 +1244,7 @@ function QueueSystemContent() {
         if (planned.priorityPlayers !== undefined) {
           setLocalPriorityPlayers(planned.priorityPlayers);
         }
+        activeHistoryRef.current = [entry, ...currentHistory];
         setLocalHistory(previous => [entry, ...previous]);
 
         if (session.sessionId) {
@@ -1115,8 +1256,10 @@ function QueueSystemContent() {
             id: entry.id,
             timestamp: entry.timestamp,
             score,
+            history: currentHistory.slice(0, 25),
           });
           if (!result || result.status === 'failed') {
+            activeHistoryRef.current = previousHistory;
             setLocalHistory(previous => previous.filter(item => item.id !== entry.id));
             setQueue(previousQueue);
             queueRef.current = previousQueue;
@@ -1413,6 +1556,7 @@ function QueueSystemContent() {
       );
       const activePlayers = players.filter(p => !lockedSet.has(p) && !activeSittingOut.includes(p));
 
+      const currentHistory = activeHistoryRef.current;
       const planned = planMultiCourtResult(
         {
           queue: queueRef.current,
@@ -1420,6 +1564,8 @@ function QueueSystemContent() {
           lockedPartners: (session.lockedPartners ?? []).map(([a, b]) => ({ a, b })),
           sittingOut: activeSittingOut,
           priorityPlayers: activePriorityPlayers,
+          history: currentHistory.slice(0, 25),
+          skillMap: numericSkillMap,
         },
         courtId,
         [...slot.onCourt],
@@ -1446,11 +1592,13 @@ function QueueSystemContent() {
       };
       const previousQueue = [...queueRef.current];
       const previousSlots = currentSlots.map(court => ({ ...court, onCourt: [...court.onCourt] }));
+      const previousHistory = [...currentHistory];
 
       setLocalCourtSlots(updatedSlots);
       courtSlotsRef.current = updatedSlots;
       setQueue(newQueue);
       queueRef.current = newQueue;
+      activeHistoryRef.current = [entry, ...currentHistory];
       setLocalHistory(prev => [entry, ...prev]);
 
       if (session.sessionId) {
@@ -1462,8 +1610,11 @@ function QueueSystemContent() {
           id: entry.id,
           timestamp: entry.timestamp,
           score,
+          history: currentHistory.slice(0, 25),
+          skillMap: numericSkillMap,
         });
         if (!result || result.status === 'failed') {
+          activeHistoryRef.current = previousHistory;
           setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
           setQueue(previousQueue);
           queueRef.current = previousQueue;
@@ -1480,6 +1631,7 @@ function QueueSystemContent() {
         setLocalCourtSlots(result.courtSlots);
         courtSlotsRef.current = result.courtSlots;
         if (result.status === 'stale') {
+          activeHistoryRef.current = previousHistory;
           setLocalHistory(prev => prev.filter(item => item.id !== entry.id));
           showToast('This court already changed. Its latest assignment has been restored.');
           return false;
@@ -1686,6 +1838,11 @@ function QueueSystemContent() {
       });
     }
     if (session.sessionId) session.syncField({ players: np, queue: nq, priorityPlayers: nextPriority });
+    setLateArrivals(prev => {
+      const next = applyLateArrivalCheckIn(prev, trimmedName, true);
+      if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
+      return next;
+    });
     return true;
   };
 
@@ -1801,6 +1958,9 @@ function QueueSystemContent() {
       setIsDeletingSession(true);
       try {
         await session.deleteHostedSession();
+        clearCheckInDraft(CHECKIN_DRAFT_KEY);
+        if (session.sessionId) saveSessionLateArrivals(session.sessionId, []);
+        setLateArrivals([]);
         clearCourtGroup();
         sessionStorage.clear();
         router.push('/');
@@ -1838,19 +1998,33 @@ function QueueSystemContent() {
   };
 
   const handleSelectAllRoster = () => {
+    const existing = new Set([...tempPlayers, ...expectedPlayers].map(p => p.toLowerCase()));
     setRosterSelected(new Set(
       roster
-        .filter(e => !tempPlayers.some(p => p.toLowerCase() === e.name.toLowerCase()))
+        .filter(e => !existing.has(e.name.toLowerCase()))
         .map(e => e.name)
     ));
   };
 
   const handleAddFromRoster = () => {
-    const available = V1_RELEASE.maxPlayers - tempPlayers.length;
-    const existing = new Set(tempPlayers.map(name => name.toLowerCase()));
-    const fresh = [...rosterSelected].filter(name => !existing.has(name.toLowerCase()) && name.length <= 60).slice(0, available);
-    if (fresh.length === 0) return;
-    setTempPlayers(prev => [...prev, ...fresh]);
+    const res = addPlayersToCheckIn(
+      { expected: expectedPlayers, checkedIn: tempPlayers },
+      Array.from(rosterSelected),
+      'checkedIn',
+      V1_RELEASE.maxPlayers,
+    );
+    setTempPlayers(res.checkedIn);
+    setRosterSelected(new Set());
+  };
+
+  const handleAddExpectedFromRoster = () => {
+    const res = addPlayersToCheckIn(
+      { expected: expectedPlayers, checkedIn: tempPlayers },
+      Array.from(rosterSelected),
+      'expected',
+      V1_RELEASE.maxPlayers,
+    );
+    setExpectedPlayers(res.expected);
     setRosterSelected(new Set());
   };
 
@@ -2050,6 +2224,14 @@ function QueueSystemContent() {
         errorMsg={setupErrorMsg ?? undefined}
         singlesFormat={singlesFormat}
         onSinglesFormatChange={setSinglesFormat}
+        expectedPlayers={expectedPlayers}
+        onCheckInPlayer={handleCheckInPlayer}
+        onUndoCheckInPlayer={handleUndoCheckInPlayer}
+        onCheckInAll={handleCheckInAll}
+        onUncheckAll={handleUncheckAll}
+        onRemoveExpectedPlayer={handleRemoveExpectedPlayer}
+        onAddExpectedFromPaste={() => addFromPaste('expected')}
+        onAddExpectedFromRoster={handleAddExpectedFromRoster}
       />
     );
   }
@@ -2093,6 +2275,7 @@ function QueueSystemContent() {
             history={activeHistory}
             roomCode={session.sessionId}
             mode={gameMode ?? 'doubles'}
+            onCorrectHistoryEntry={canControl ? handleCorrectHistoryEntry : undefined}
           />
         ) : (
           <div className="main-layout">
@@ -2418,6 +2601,9 @@ function QueueSystemContent() {
           isConnected={session.isConnected}
           isSaving={session.isSaving}
           isLive={isLiveLocal}
+          lateArrivals={lateArrivals}
+          onCheckInLateArrival={handleCheckInLateArrival}
+          onDismissLateArrival={handleDismissLateArrival}
           onAddPlayerLive={handleAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}
           onToggleScorePrompt={() => setScorePromptEnabled(p => !p)}
@@ -2500,6 +2686,7 @@ function QueueSystemContent() {
               careerStats={careerStats}
               roomCode={session.sessionId}
               mode={gameMode ?? 'doubles'}
+              onCorrectHistoryEntry={canControl ? handleCorrectHistoryEntry : undefined}
             />
           ) : isMultiCourt ? (
             <MultiCourtScreen
@@ -2595,6 +2782,7 @@ function QueueSystemContent() {
           history={activeHistory}
           roomCode={session.sessionId}
           mode={gameMode ?? 'doubles'}
+          onCorrectHistoryEntry={canControl ? handleCorrectHistoryEntry : undefined}
         />
       ) : (
         <div className="main-layout">
@@ -2658,7 +2846,12 @@ function QueueSystemContent() {
             {canControl && showHostTools && (
               <div className="host-tools-drawer">
                 <div className="live-tools-row">
-                  <AddPlayerPanel onAdd={handleAddPlayerLive} />
+                  <AddPlayerPanel
+                    onAdd={handleAddPlayerLive}
+                    lateArrivals={lateArrivals}
+                    onCheckInLateArrival={handleCheckInLateArrival}
+                    onDismissLateArrival={handleDismissLateArrival}
+                  />
                   {!isSkilled && (
                     <ManualQueuePanel allPlayers={players} queue={queue} statsMap={statsMap}
                       onAdd={p => { const nq = [...queue, p]; setQueue(nq); if (session.sessionId) session.syncField({ queue: nq }); }}

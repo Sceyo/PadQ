@@ -1,4 +1,47 @@
-import { rotateMultiCourtDoubles, type LockedPartnerPair } from './doublesEngine';
+export const MULTI_COURT_SINGLES_MAX_STREAK = 3;
+
+/**
+ * Maps player performance and roster skill tags into a 0..100 skill rating map.
+ * Players with >= 1 game played use their winRate.
+ * Unplayed players with a skill bracket use 25 (beginner), 50 (intermediate), or 75 (advanced).
+ * Untagged unplayed players default to 50.
+ */
+export function buildNumericSkillMap(
+  statsList: Array<{ name: string; gamesPlayed?: number; played?: number; winRate: number }>,
+  rosterSkillMap?: Record<string, 'beginner' | 'intermediate' | 'advanced' | undefined>,
+): Record<string, number> {
+  const map: Record<string, number> = {};
+
+  const bracketDefaults: Record<'beginner' | 'intermediate' | 'advanced', number> = {
+    beginner: 25,
+    intermediate: 50,
+    advanced: 75,
+  };
+
+  for (const stat of statsList) {
+    const games = stat.gamesPlayed ?? stat.played ?? 0;
+    if (games >= 1) {
+      map[stat.name] = stat.winRate;
+    } else if (rosterSkillMap && rosterSkillMap[stat.name]) {
+      const bracket = rosterSkillMap[stat.name]!;
+      map[stat.name] = bracketDefaults[bracket];
+    } else {
+      map[stat.name] = 50;
+    }
+  }
+
+  if (rosterSkillMap) {
+    for (const [name, bracket] of Object.entries(rosterSkillMap)) {
+      if (bracket && map[name] === undefined) {
+        map[name] = bracketDefaults[bracket];
+      }
+    }
+  }
+
+  return map;
+}
+
+import { rotateMultiCourtDoubles, pairKey, teamPairKey, type LockedPartnerPair } from './doublesEngine';
 
 export interface MultiCourtSlot {
   id: string;
@@ -12,6 +55,8 @@ export interface MultiCourtResultState {
   lockedPartners?: Array<{ a: string; b: string }>;
   sittingOut?: string[];
   priorityPlayers?: string[];
+  history?: Array<{ id?: number; mode?: string; players: string; winner: string; timestamp?: string; score?: string }>;
+  skillMap?: Record<string, number>;
 }
 
 export interface PlannedCourtResult {
@@ -21,6 +66,28 @@ export interface PlannedCourtResult {
   players: string;
   winner: string;
   priorityPlayers?: string[];
+}
+
+function getCourtSinglesStreak(
+  courtName: string,
+  winner: string,
+  history?: Array<{ id?: number; mode?: string; courtName?: string; players?: string; winner?: string }>,
+): number {
+  if (!history || history.length === 0) return 0;
+  let streak = 0;
+  for (const h of history) {
+    const isThisCourt =
+      (h.courtName && h.courtName === courtName) ||
+      (h.mode && (h.mode.includes(`(${courtName})`) || h.mode.includes(courtName)));
+    if (isThisCourt) {
+      if (h.winner === winner) {
+        streak++;
+      } else {
+        break;
+      }
+    }
+  }
+  return streak;
 }
 
 export function planMultiCourtResult(
@@ -64,7 +131,11 @@ export function planMultiCourtResult(
     let nextOnCourt: string[];
     let consumedWaitingCount: number;
 
-    if (isWinnerAvailable) {
+    const priorWins = getCourtSinglesStreak(slot.name, winner, state.history);
+    const isStreakMaxed = (priorWins + 1) >= MULTI_COURT_SINGLES_MAX_STREAK;
+    const canRotateKing = isStreakMaxed && (orderedWaiting.length >= 2 || (orderedWaiting.length >= 1 && isLoserAvailable));
+
+    if (isWinnerAvailable && !canRotateKing) {
       const nextChallenger = orderedWaiting[0];
       if (nextChallenger) {
         nextOnCourt = [winner, nextChallenger];
@@ -77,7 +148,7 @@ export function planMultiCourtResult(
         consumedWaitingCount = 0;
       }
     } else {
-      // Winner is sitting out -> steps down to break
+      // Winner is sitting out or max streak reached -> king steps down to queue/break
       const challengerA = orderedWaiting[0] ?? '';
       const challengerB = orderedWaiting[1] ?? (isLoserAvailable ? loser : '');
       nextOnCourt = [challengerA, challengerB];
@@ -88,9 +159,11 @@ export function planMultiCourtResult(
     const remainingWaiting = state.queue.filter(
       player => !consumedChallengers.has(player) && !unavailable.has(player),
     );
-    const queue = isLoserAvailable && !nextOnCourt.includes(loser)
-      ? [...remainingWaiting, loser]
-      : remainingWaiting;
+    const queue = [
+      ...remainingWaiting,
+      ...(isLoserAvailable && !nextOnCourt.includes(loser) ? [loser] : []),
+      ...(isWinnerAvailable && !nextOnCourt.includes(winner) ? [winner] : []),
+    ];
 
     const courtSlots = state.courtSlots.map(court =>
       court.id === courtId ? { ...court, onCourt: nextOnCourt } : court,
@@ -120,7 +193,29 @@ export function planMultiCourtResult(
 
   // Defensively exclude any finisher who is sittingOut so they do not re-enter queue or court
   const availableFinishers = slot.onCourt.filter(player => !unavailable.has(player));
-  const next = rotateMultiCourtDoubles(orderedWaiting, availableFinishers, lockedPartners);
+  const recentPairs: string[] = [];
+  const recentMatches: string[] = [];
+  if (state.history && state.history.length > 0) {
+    for (const h of state.history) {
+      if (h.players && h.players.includes('&') && h.players.includes(' vs ')) {
+        const [left, right] = h.players.split(' vs ').map(s => s.trim());
+        const t1 = left.split('&').map(s => s.trim()) as [string, string];
+        const t2 = right.split('&').map(s => s.trim()) as [string, string];
+        if (t1.length === 2 && t2.length === 2) {
+          recentPairs.push(pairKey(t1[0], t1[1]));
+          recentPairs.push(pairKey(t2[0], t2[1]));
+          recentMatches.push(teamPairKey(t1, t2));
+          if (recentPairs.length >= 8) break;
+        }
+      }
+    }
+  }
+
+  const next = rotateMultiCourtDoubles(orderedWaiting, availableFinishers, lockedPartners, {
+    recentPairs,
+    recentMatches,
+    skillMap: state.skillMap,
+  });
   const courtSlots = state.courtSlots.map(court =>
     court.id === courtId ? { ...court, onCourt: next.onCourt } : court,
   );

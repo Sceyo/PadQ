@@ -155,11 +155,14 @@ describe('Mobile-First Shell Integration & Release Config', () => {
     // Multi-court cards
     expect(screen.getByText('Court 1')).toBeDefined();
     expect(screen.getByText('Court 2')).toBeDefined();
-    expect(screen.getByText('Player 1')).toBeDefined();
-    expect(screen.getByText('Player 5')).toBeDefined();
+    expect(screen.getByText('P. 1')).toBeDefined();
+    expect(screen.getByText('P. 5')).toBeDefined();
+    expect(document.querySelector('[title="Player 1"]')).toBeDefined();
+    expect(document.querySelector('[title="Player 5"]')).toBeDefined();
 
     // Waiting queue
-    expect(screen.getAllByText('Wait 1').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('W. 1').length).toBeGreaterThan(0);
+    expect(document.querySelector('[title="Wait 1"]')).toBeDefined();
   });
 
   it('triggers onMoveWaitingPlayer when tapping a waiting player and choosing move up', () => {
