@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { UserPlus, PlusCircle, ListOrdered, UserCheck, Link2, X } from 'lucide-react';
 import type { PlayerStat } from '../../lib/types';
 import { PlayerLabel } from '../atoms/PlayerLabel';
+import { matchesPlayerFilter, SMART_FILTER_THRESHOLD } from '../../lib/nameFormatter';
 
 export interface AddPlayerPanelProps {
   onAdd?: (name: string) => void;
@@ -193,6 +194,7 @@ export const PartnerPanel: React.FC<{
   const [selected, setSelected] = useState<string | null>(null);
   const [draftPairs, setDraftPairs] = useState<LockedPartnerPair[]>(pairs);
   const [justSaved, setJustSaved] = useState(false);
+  const [partnerFilter, setPartnerFilter] = useState('');
 
   React.useEffect(() => {
     setDraftPairs(pairs);
@@ -202,6 +204,10 @@ export const PartnerPanel: React.FC<{
   const availablePlayers = getAvailablePartnerPlayers(players, draftPairs);
   const compatiblePlayers = getCompatiblePartnerPlayers(availablePlayers, playerGroups, selected);
   const limitReached = draftPairs.length >= maxPairs;
+  const showFilter = compatiblePlayers.length > SMART_FILTER_THRESHOLD;
+  const filteredCompatiblePlayers = showFilter
+    ? compatiblePlayers.filter(player => matchesPlayerFilter(player, partnerFilter))
+    : compatiblePlayers;
 
   const choosePlayer = (player: string) => {
     if (!selected) {
@@ -279,23 +285,71 @@ export const PartnerPanel: React.FC<{
           )}
 
           {!limitReached && availablePlayers.length >= 2 ? (
-            <div className="partner-player-grid">
-              {compatiblePlayers.map(player => {
-                const loc = getPlayerLocationLabel(player, playerGroups);
-                return (
-                  <button
-                    key={player}
-                    type="button"
-                    aria-pressed={selected === player}
-                    className={`partner-player-btn${selected === player ? ' partner-player-btn--selected' : ''}`}
-                    onClick={() => choosePlayer(player)}
-                  >
-                    <span className="partner-player-name">{player}</span>
-                    {loc && <span className="partner-player-loc">{loc}</span>}
-                  </button>
-                );
-              })}
-            </div>
+            <>
+              {showFilter && (
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Filter available players…"
+                    aria-label="Filter available partners"
+                    value={partnerFilter}
+                    onChange={e => setPartnerFilter(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '38px',
+                      padding: '0 32px 0 10px',
+                      borderRadius: 'var(--r-sm, 8px)',
+                      border: '1px solid var(--line-subtle, #252d47)',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      color: 'var(--text-primary, #f8fafc)',
+                      fontSize: '16px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {partnerFilter && (
+                    <button
+                      type="button"
+                      aria-label="Clear partner filter"
+                      onClick={() => setPartnerFilter('')}
+                      style={{
+                        position: 'absolute',
+                        right: '4px',
+                        width: '28px',
+                        height: '28px',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-muted, #94a3b8)',
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="partner-player-grid">
+                {filteredCompatiblePlayers.map(player => {
+                  const loc = getPlayerLocationLabel(player, playerGroups);
+                  return (
+                    <button
+                      key={player}
+                      type="button"
+                      aria-pressed={selected === player}
+                      className={`partner-player-btn${selected === player ? ' partner-player-btn--selected' : ''}`}
+                      onClick={() => choosePlayer(player)}
+                    >
+                      <span className="partner-player-name">{player}</span>
+                      {loc && <span className="partner-player-loc">{loc}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           ) : (
             <p className="partner-panel-limit">
               {draftPairs.length === 0 ? 'At least two players are required.' : 'All available partner pairs are set.'}

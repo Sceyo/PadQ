@@ -7,6 +7,7 @@ import {
   Trash2, Star, BookOpen, Play, Wifi, Check, Clock, UserCheck, RotateCcw,
 } from 'lucide-react';
 import type { RosterEntry, SkillBracket } from '@/lib/sessionService';
+import { matchesPlayerFilter, SMART_FILTER_THRESHOLD } from '../../lib/nameFormatter';
 
 export interface SetupViewProps {
   gameMode:            'singles' | 'doubles' | null;
@@ -81,6 +82,11 @@ export function SetupView({
       ? Math.max(5, courtCount * 2 + 1)
       : 5;
   const [skillPickerFor, setSkillPickerFor] = useState<string | null>(null);
+  const [expectedFilter, setExpectedFilter] = useState('');
+  const showExpectedFilter = expectedPlayers.length > SMART_FILTER_THRESHOLD;
+  const filteredExpectedPlayers = showExpectedFilter
+    ? expectedPlayers.filter(name => matchesPlayerFilter(name, expectedFilter))
+    : expectedPlayers;
 
   const SKILL_BRACKETS: SkillBracket[] = ['beginner', 'intermediate', 'advanced'];
   const SKILL_LABEL: Record<SkillBracket, string> = { beginner: 'B', intermediate: 'I', advanced: 'A' };
@@ -381,8 +387,56 @@ export function SetupView({
                 </button>
               )}
             </div>
+            {showExpectedFilter && (
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="Filter expected arrivals…"
+                  aria-label="Filter expected arrivals"
+                  value={expectedFilter}
+                  onChange={e => setExpectedFilter(e.target.value)}
+                  suppressHydrationWarning
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    padding: '0 32px 0 10px',
+                    borderRadius: 'var(--r-sm, 8px)',
+                    border: '1px solid var(--line-subtle, #252d47)',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    color: 'var(--text-primary, #f8fafc)',
+                    fontSize: '16px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {expectedFilter && (
+                  <button
+                    type="button"
+                    aria-label="Clear expected arrivals filter"
+                    onClick={() => setExpectedFilter('')}
+                    suppressHydrationWarning
+                    style={{
+                      position: 'absolute',
+                      right: '4px',
+                      width: '28px',
+                      height: '28px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-muted, #94a3b8)',
+                      fontSize: '1rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )}
             <div className="expected-chips-list">
-              {expectedPlayers.map((name) => (
+              {filteredExpectedPlayers.map((name) => (
                 <div key={`expected-${name}`} className="expected-player-chip">
                   <span className="expected-name">{name}</span>
                   <div className="expected-actions">

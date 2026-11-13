@@ -350,6 +350,38 @@ export function applyLateArrivalCheckIn(
 }
 
 /**
+ * Batch-checks in all eligible late arrivals up to maxPlayers capacity,
+ * deduplicating case-insensitively against currentPlayers and within lateArrivals.
+ */
+export function applyLateArrivalCheckInAll(
+  lateArrivals: string[],
+  currentPlayers: string[],
+  maxPlayers = 30,
+): { checkedInNames: string[]; remainingLateArrivals: string[] } {
+  const seen = new Set(currentPlayers.map(p => p.toLowerCase().trim()));
+  const checkedInNames: string[] = [];
+  const remainingLateArrivals: string[] = [];
+
+  for (const raw of lateArrivals) {
+    const trimmed = raw.trim();
+    if (!trimmed) continue;
+    const lower = trimmed.toLowerCase();
+    if (seen.has(lower)) {
+      // Already in session or already checked in during this batch — drop duplicate
+      continue;
+    }
+    if (currentPlayers.length + checkedInNames.length < maxPlayers) {
+      checkedInNames.push(raw);
+      seen.add(lower);
+    } else {
+      remainingLateArrivals.push(raw);
+    }
+  }
+
+  return { checkedInNames, remainingLateArrivals };
+}
+
+/**
  * Loads late arrivals for a live session.
  */
 export function loadSessionLateArrivals(sessionId: string): string[] {

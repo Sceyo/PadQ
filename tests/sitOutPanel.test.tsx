@@ -67,6 +67,9 @@ describe('SitOutPanel (Phase 2 Visibility & Return)', () => {
     const toggleBtn = screen.getByRole('button', { name: /sit out/i });
     fireEvent.click(toggleBtn);
 
+    // Smart filter is hidden when <= 6 players
+    expect(screen.queryByPlaceholderText(/Filter players/i)).toBeNull();
+
     // Alice is active, button says "Sit Out"
     const sitOutAlice = screen.getByRole('button', { name: /sit out alice/i });
     expect(sitOutAlice).toBeDefined();
@@ -78,6 +81,59 @@ describe('SitOutPanel (Phase 2 Visibility & Return)', () => {
     expect(returnBob).toBeDefined();
     fireEvent.click(returnBob);
     expect(handleToggle).toHaveBeenCalledWith('Bob');
+  });
+
+  it('formats multi-word names into compact initials (e.g. Lee Chong -> L. Chong) while preserving full name in title and aria-label', () => {
+    const handleToggle = vi.fn();
+    render(
+      <SitOutPanel
+        players={['Lee Chong', 'Anna Leigh Waters']}
+        sittingOut={['Anna Leigh Waters']}
+        onToggle={handleToggle}
+        hideToggle={true}
+      />,
+    );
+
+    const leeName = screen.getByText('L. Chong');
+    expect(leeName.getAttribute('title')).toBe('Lee Chong');
+    const sitOutLee = screen.getByRole('button', { name: 'Sit out Lee Chong' });
+    expect(sitOutLee).toBeDefined();
+
+    const watersNames = screen.getAllByText('A.L. Waters');
+    expect(watersNames.length).toBeGreaterThanOrEqual(1);
+    expect(watersNames[0].getAttribute('title')).toBe('Anna Leigh Waters');
+    const returnWaters = screen.getByRole('button', { name: 'Return Anna Leigh Waters to queue' });
+    expect(returnWaters).toBeDefined();
+  });
+
+  it('renders smart search filter when more than 6 players are in the session and filters by raw or formatted name', () => {
+    const handleToggle = vi.fn();
+    render(
+      <SitOutPanel
+        players={['Ben', 'Quang Dong', 'Lee Chong', 'Jordan', 'Luke', 'Jebidiah', 'Bravo']}
+        sittingOut={[]}
+        onToggle={handleToggle}
+        hideToggle={true}
+      />,
+    );
+
+    const filterInput = screen.getByPlaceholderText(/Filter players/i) as HTMLInputElement;
+    expect(filterInput).toBeDefined();
+
+    // Search by raw first name "Lee" -> matches "Lee Chong" ("L. Chong")
+    fireEvent.change(filterInput, { target: { value: 'Lee' } });
+    expect(screen.getByText('L. Chong')).toBeDefined();
+    expect(screen.queryByText('Jebidiah')).toBeNull();
+
+    // Search by formatted initials "q. d" -> matches "Quang Dong" ("Q. Dong")
+    fireEvent.change(filterInput, { target: { value: 'q. d' } });
+    expect(screen.getByText('Q. Dong')).toBeDefined();
+    expect(screen.queryByText('L. Chong')).toBeNull();
+
+    // Clear filter restores all players
+    const clearBtn = screen.getByRole('button', { name: /Clear player filter/i });
+    fireEvent.click(clearBtn);
+    expect(screen.getByText('Jebidiah')).toBeDefined();
   });
 
   it('disables replace button on single-court DoublesMatch when scoring has started (F5 guard)', () => {

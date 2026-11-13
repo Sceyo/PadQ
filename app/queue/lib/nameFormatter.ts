@@ -1,3 +1,5 @@
+export const SMART_FILTER_THRESHOLD = 6;
+
 /**
  * Formats multi-word player names into a compact display format:
  * - 1 word: "Ben" -> "Ben"
@@ -19,4 +21,17 @@ export function formatDisplayName(fullName: string): string {
   const surname = tokens[tokens.length - 1];
   const givenInitials = tokens.slice(0, -1).map(t => `${t[0].toUpperCase()}.`).join('');
   return `${givenInitials} ${surname}`;
+}
+
+/**
+ * Case-insensitively matches a player against a search filter query,
+ * checking both the raw full name ("Lee Chong") and the compact display name ("L. Chong").
+ */
+export function matchesPlayerFilter(fullName: string, query: string): boolean {
+  if (!query || typeof query !== 'string') return true;
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  if (!fullName || typeof fullName !== 'string') return false;
+  if (fullName.toLowerCase().includes(q)) return true;
+  return formatDisplayName(fullName).toLowerCase().includes(q);
 }

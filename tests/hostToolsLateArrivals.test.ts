@@ -1,11 +1,11 @@
 import React from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { HostToolsSheet } from '../app/queue/components/HostToolsSheet/HostToolsSheet';
 import { applyLateArrivalCheckIn } from '../app/queue/lib/checkInState';
 
 describe('HostToolsSheet & Late Arrivals Tray (Bug #4)', () => {
-  it('renders Expected Late Arrivals tray with accessible 44px check-in and dismiss buttons', () => {
+  it('renders Expected Late Arrivals tab and when initialSection="late" shows accessible 44px check-in and dismiss buttons with sanitized names', () => {
     const html = renderToStaticMarkup(
       React.createElement(HostToolsSheet, {
         isOpen: true,
@@ -13,15 +13,18 @@ describe('HostToolsSheet & Late Arrivals Tray (Bug #4)', () => {
         onAddPlayer: () => true,
         scorePromptEnabled: true,
         onToggleScorePrompt: () => {},
-        lateArrivals: ['Carlos', 'Diana'],
+        lateArrivals: ['Lee Chong', 'Diana'],
         onCheckInLateArrival: () => true,
         onDismissLateArrival: () => {},
+        initialSection: 'late',
       })
     );
 
     expect(html).toContain('Expected Late Arrivals (2)');
-    expect(html).toContain('aria-label="Check in Carlos"');
-    expect(html).toContain('aria-label="Dismiss Carlos"');
+    expect(html).toContain('L. Chong');
+    expect(html).toContain('title="Lee Chong"');
+    expect(html).toContain('aria-label="Check in Lee Chong"');
+    expect(html).toContain('aria-label="Dismiss Lee Chong"');
     expect(html).toContain('aria-label="Check in Diana"');
     expect(html).toContain('aria-label="Dismiss Diana"');
     // Ensure 44px tap min height is enforced in inline style or CSS variable

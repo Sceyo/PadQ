@@ -39,6 +39,7 @@ interface Props {
   diagnosticsNode?: React.ReactNode;
   lateArrivals?: string[];
   onCheckInLateArrival?: (name: string) => boolean | Promise<boolean>;
+  onCheckInAllLateArrivals?: () => boolean | number | void | Promise<boolean | number | void>;
   onDismissLateArrival?: (name: string) => void;
 }
 
@@ -65,6 +66,7 @@ export function AppShell({
   diagnosticsNode,
   lateArrivals,
   onCheckInLateArrival,
+  onCheckInAllLateArrivals,
   onDismissLateArrival,
 }: Props) {
   const [isHostToolsOpen, setIsHostToolsOpen] = useState(false);
@@ -210,6 +212,7 @@ export function AppShell({
           onToggleScorePrompt={onToggleScorePrompt}
           lateArrivals={lateArrivals}
           onCheckInLateArrival={onCheckInLateArrival}
+          onCheckInAllLateArrivals={onCheckInAllLateArrivals}
           onDismissLateArrival={onDismissLateArrival}
           partnerPanelNode={partnerPanelNode}
           manualQueuePanelNode={manualQueuePanelNode}

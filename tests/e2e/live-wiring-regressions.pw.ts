@@ -53,7 +53,9 @@ test.describe('Live Wiring Regressions & Parity (Bugs #1 - #6)', () => {
 
     // Open Host Tools bottom sheet
     await page.getByRole('button', { name: 'Host Tools' }).click();
-    await expect(page.getByText(/Expected Late Arrivals \(1\)/i)).toBeVisible({ timeout: 5000 });
+    const lateTab = page.getByRole('button', { name: /Expected Late Arrivals \(1\)/i });
+    await expect(lateTab).toBeVisible({ timeout: 5000 });
+    await lateTab.click();
 
     const checkInFayBtn = page.getByRole('button', { name: 'Check in Fay' });
     await expect(checkInFayBtn).toBeVisible();

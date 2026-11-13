@@ -197,7 +197,7 @@ describe('V1 Frontend Component & Interaction Release Stress Suite', () => {
       expect(getPlayerLocationLabel('Collin Johns', playerGroups)).toBe('Court 2');
       expect(getCompatiblePartnerPlayers(players, playerGroups, 'Ben Johns')).toEqual(players);
 
-      const { getByText, container } = render(
+      const { getByText, queryByPlaceholderText, container } = render(
         <PartnerPanel
           players={players}
           playerGroups={playerGroups}
@@ -208,6 +208,9 @@ describe('V1 Frontend Component & Interaction Release Stress Suite', () => {
 
       // Open panel
       fireEvent.click(getByText(/Set Partners/i));
+
+      // Smart filter is hidden when <= 6 players
+      expect(queryByPlaceholderText(/Filter available players/i)).toBeNull();
 
       // Verify updated Option 2 copy
       expect(getByText(/Pair any two players across courts or queue/i)).toBeTruthy();
@@ -232,6 +235,26 @@ describe('V1 Frontend Component & Interaction Release Stress Suite', () => {
       // Save pairs
       fireEvent.click(getByText(/Save 1 pair/i));
       expect(onChange).toHaveBeenCalledWith([['Ben Johns', 'Dylan Frazier']]);
+    });
+
+    it('renders smart search filter when more than 6 available players exist in PartnerPanel', () => {
+      const players = ['Ben Johns', 'Anna Leigh Waters', 'Dylan Frazier', 'Collin Johns', 'Lee Chong', 'Quang Dong', 'Jebidiah'];
+      const { getByPlaceholderText, getByText, queryByText } = render(
+        <PartnerPanel
+          players={players}
+          playerGroups={[players]}
+          pairs={[]}
+          onChange={vi.fn()}
+          hideToggle={true}
+        />
+      );
+
+      const filterInput = getByPlaceholderText(/Filter available players/i);
+      expect(filterInput).toBeTruthy();
+
+      fireEvent.change(filterInput, { target: { value: 'l. chong' } });
+      expect(getByText('Lee Chong')).toBeTruthy();
+      expect(queryByText('Jebidiah')).toBeNull();
     });
   });
 

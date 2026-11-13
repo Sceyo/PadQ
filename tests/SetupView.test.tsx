@@ -41,25 +41,58 @@ const defaultProps: SetupViewProps = {
 };
 
 describe('SetupView — Check-in & Expected Arrivals', () => {
-  it('renders Expected Arrivals section with Check In and Check In All buttons', () => {
+  it('renders Expected Arrivals section with Check In and Check In All buttons and hides filter at <= 6 players', () => {
     const onCheckInPlayer = vi.fn();
     const onCheckInAll = vi.fn();
 
-    const { getByText } = render(
+    const { getByText, queryByLabelText } = render(
       <SetupView
         {...defaultProps}
-        expectedPlayers={['Late Arrival 1', 'Late Arrival 2']}
+        expectedPlayers={['Late Arrival 1', 'Late Arrival 2', 'Late 3', 'Late 4', 'Late 5', 'Late 6']}
         onCheckInPlayer={onCheckInPlayer}
         onCheckInAll={onCheckInAll}
       />
     );
 
-    expect(getByText(/Expected Arrivals \(2\)/i)).toBeTruthy();
+    expect(getByText(/Expected Arrivals \(6\)/i)).toBeTruthy();
     expect(getByText('Late Arrival 1')).toBeTruthy();
+    expect(queryByLabelText('Filter expected arrivals')).toBeNull();
 
     const checkInBtn = getByText('Check In All');
     fireEvent.click(checkInBtn);
     expect(onCheckInAll).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows smart search filter when > 6 expected players exist and filters by raw or compact name', () => {
+    const expectedPlayers = [
+      'Lee Chong',
+      'Diana',
+      'Quang Dong',
+      'Ben Johns',
+      'Dylan Frazier',
+      'Anna Leigh Waters',
+      'Jebidiah',
+    ];
+
+    const { getByLabelText, queryByText, getByText } = render(
+      <SetupView
+        {...defaultProps}
+        expectedPlayers={expectedPlayers}
+        onCheckInPlayer={vi.fn()}
+      />
+    );
+
+    const filterInput = getByLabelText('Filter expected arrivals') as HTMLInputElement;
+    expect(filterInput.style.fontSize).toBe('16px');
+
+    fireEvent.change(filterInput, { target: { value: 'l. chong' } });
+    expect(getByText('Lee Chong')).toBeTruthy();
+    expect(queryByText('Diana')).toBeNull();
+
+    const clearBtn = getByLabelText('Clear expected arrivals filter');
+    fireEvent.click(clearBtn);
+    expect(getByText('Diana')).toBeTruthy();
+    expect(getByText('Jebidiah')).toBeTruthy();
   });
 
   it('keeps Start Queue disabled when checked-in count is below minPlayers regardless of expected count', () => {

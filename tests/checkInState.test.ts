@@ -9,6 +9,7 @@ import {
   saveCheckInDraft,
   loadCheckInDraft,
   clearCheckInDraft,
+  applyLateArrivalCheckInAll,
 } from '../app/queue/lib/checkInState';
 
 describe('checkInState', () => {
@@ -86,5 +87,15 @@ describe('checkInState', () => {
 
     clearCheckInDraft('test_key');
     expect(loadCheckInDraft('test_key')).toBeNull();
+  });
+
+  it('applyLateArrivalCheckInAll checks in late arrivals up to maxPlayers and drops duplicates', () => {
+    const currentPlayers = ['Alice', 'Bob'];
+    const lateArrivals = ['bob', 'Carlos', 'Diana', 'Evan'];
+
+    // With maxPlayers = 4, only 2 slots remain ('Carlos', 'Diana' checked in; 'bob' dropped as duplicate; 'Evan' remains)
+    const res = applyLateArrivalCheckInAll(lateArrivals, currentPlayers, 4);
+    expect(res.checkedInNames).toEqual(['Carlos', 'Diana']);
+    expect(res.remainingLateArrivals).toEqual(['Evan']);
   });
 });

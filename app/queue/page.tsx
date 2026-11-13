@@ -89,6 +89,7 @@ import {
   loadSessionLateArrivals,
   saveSessionLateArrivals,
   applyLateArrivalCheckIn,
+  applyLateArrivalCheckInAll,
 } from './lib/checkInState';
 import {
   toggleSitOutTransition,
@@ -268,6 +269,76 @@ function QueueSystemContent() {
       if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
       return next;
     });
+    return true;
+  };
+
+  const handleCheckInAllLateArrivals = (): boolean => {
+    const { checkedInNames, remainingLateArrivals } = applyLateArrivalCheckInAll(
+      lateArrivals,
+      players,
+      V1_RELEASE.maxPlayers,
+    );
+    if (checkedInNames.length === 0) {
+      if (remainingLateArrivals.length === 0 && lateArrivals.length > 0) {
+        setLateArrivals([]);
+        if (session.sessionId) saveSessionLateArrivals(session.sessionId, []);
+        return true;
+      }
+      showToast(`V1 supports up to ${V1_RELEASE.maxPlayers} players`);
+      return false;
+    }
+
+    const np = [...players, ...checkedInNames];
+    const nq = [...queue, ...checkedInNames];
+    const nextPriority = [...activePriorityPlayers, ...checkedInNames];
+    setPlayers(np);
+    setQueue(nq);
+    queueRef.current = nq;
+    setLocalPriorityPlayers(nextPriority);
+
+    if (activeQueueMode === 'default' && gameMode === 'doubles') {
+      let nextPaddle = paddleStateRef.current;
+      for (const name of checkedInNames) {
+        nextPaddle = addPlayerToWaiting(nextPaddle, name);
+      }
+      paddleStateRef.current = nextPaddle;
+      setPaddleStateUI(nextPaddle);
+    } else if (activeQueueMode === 'default' && gameMode === 'singles') {
+      if (singlesFormat === 'pool') {
+        let nextPool = poolSinglesStateRef.current;
+        for (const name of checkedInNames) {
+          nextPool = addPlayerToPoolSinglesWaiting(nextPool, name, true);
+        }
+        poolSinglesStateRef.current = nextPool;
+        setPoolSinglesStateUI(nextPool);
+      } else {
+        let nextSingles = singlesStateRef.current;
+        for (const name of checkedInNames) {
+          nextSingles = addPlayerToSinglesWaiting(nextSingles, name, true);
+        }
+        singlesStateRef.current = nextSingles;
+        setSinglesStateUI(nextSingles);
+      }
+    } else if (activeQueueMode === 'skilled' && skilledState) {
+      const activeCount = np.filter(p => !activeSittingOut.includes(p)).length;
+      setSkilledState(prev => {
+        if (!prev) return prev;
+        let s = prev;
+        for (const name of checkedInNames) {
+          s = addPlayerToSkilledStateEngine(name, s, skilledBrackets);
+        }
+        return recalculateRestEngine(s, activeCount);
+      });
+    }
+
+    if (session.sessionId) {
+      session.syncField({ players: np, queue: nq, priorityPlayers: nextPriority });
+      saveSessionLateArrivals(session.sessionId, remainingLateArrivals);
+    }
+    setLateArrivals(remainingLateArrivals);
+    showToast(
+      `Checked in ${checkedInNames.length} late arrival${checkedInNames.length === 1 ? '' : 's'}`
+    );
     return true;
   };
 
@@ -2603,6 +2674,7 @@ function QueueSystemContent() {
           isLive={isLiveLocal}
           lateArrivals={lateArrivals}
           onCheckInLateArrival={handleCheckInLateArrival}
+          onCheckInAllLateArrivals={handleCheckInAllLateArrivals}
           onDismissLateArrival={handleDismissLateArrival}
           onAddPlayerLive={handleAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}

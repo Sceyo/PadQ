@@ -14,7 +14,7 @@ PAD-Q is an independently developed product in **active production**. The `main`
 
 - Production release: **`v1.0.0`**
 - Deployed on Vercel with Firebase Cloud Firestore and Firebase App Check enforcement
-- **513 automated unit, component, simulation, and scenario tests passing** across 63 test files (0 failures), plus **39 Firestore Emulator security/concurrency tests** and **39 Playwright E2E browser tests** across 13 spec files
+- **522 automated unit, component, simulation, and scenario tests passing** across 63 test files (0 failures), plus **39 Firestore Emulator security/concurrency tests** and **39 Playwright E2E browser tests** across 13 spec files
 - Protected `main` branch with a required GitHub Actions quality gate
 - Designed for mobile-first (`>= 44px` touch targets) and desktop browser-based host and spectator experiences
 
@@ -46,7 +46,7 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 ### Session management
 
 - Singles (Pool Rotation default or King of the Court) and doubles session setup
-- **Smart Roster Paste & Two-Tier Pre-Session Check-In:** Paste Reclub/numbered/bulleted registration lists directly into setup (automatically stripping ordinals and skill tags), check in arriving players in order, and stage remaining registrants into an **Expected Late Arrivals** tray for 1-tap mid-session check-in
+- **Smart Roster Paste & Two-Tier Pre-Session Check-In:** Paste Reclub/numbered/bulleted registration lists directly into setup (automatically stripping ordinals and skill tags), check in arriving players in order, and stage remaining registrants into a collapsible **Expected Late Arrivals** accordion in Host Tools with both individual 1-tap `Check In` and batch `Check In All` support
 - Six-character room codes, direct watch links, and QR sharing
 - Explicit **Go Live** control before a session is shown to viewers
 - Automatic same-browser host recovery through Firebase Anonymous Authentication and global fatal-auth resilience recovery
@@ -56,7 +56,8 @@ PAD-Q turns those decisions into a shared, real-time workflow. The host manages 
 
 - Default singles and doubles queue rotation with **Singles Pool Rotation** (`INIT → WINNERS → LOSERS`) and **3-win streak cap** across both single-court and multi-court singles
 - Shared multi-court assignment for one to three courts (up to 30 players) with team anti-repeat and skill balancing
-- **Compact Player Name Formatting:** Automatically abbreviates multi-word names on display (`Anna Leigh Waters` → `A.L. Waters`, `Quang Dong` → `Q. Dong`) across court cards, queue chips, spectator views, and leaderboards while strictly preserving full raw names in state, Firestore, and accessible `title` / `aria-label` attributes
+- **Compact Player Name Formatting & Unified Host Drawer Grids:** Automatically abbreviates multi-word names on display (`Anna Leigh Waters` → `A.L. Waters`, `Lee Chong` → `L. Chong`) across court cards, queue chips, break drawers, late arrival trays, spectator views, and leaderboards while strictly preserving full raw names in state, Firestore, and accessible `title` / `aria-label` attributes
+- **Smart Search / Filter in Host Drawers (`> 6` Players):** Automatically reveals a compact search filter (matching both raw full names and abbreviated display names) inside pre-session **Expected Arrivals** (`SetupView`) and live **Host Tools** drawers (**Manage Players On Break**, **Expected Late Arrivals**, and **Set Partners**) whenever more than 6 players are listed
 - **Global Asynchronous Partner Pairing (Option 2):** Pair any two players across courts or queue with real-time location tags (`[QUEUE]`, `[COURT 1]`, etc.); queued partners hold their spot without blocking others (non-blocking leapfrog) and unite on the very next open court
 - **Multi-Court Match Scoring:** Configurable `Match Scores: ON/OFF` toggle with 1-tap presets (`11–9`, `11–7`, etc.) and custom typing to record game scores directly
 - **Live Elapsed Match Timers & Voice Callouts:** Client-side elapsed match timer (`MM:SS`) and 1-tap Web Speech API voice announcements on court cards
@@ -187,7 +188,7 @@ Wait-cycle counters provide a starvation override so a smaller skill group is no
 
 The V1 automated test suite includes:
 
-- **513 passing application unit, component, simulation, and scenario tests** across 63 test files (0 failures);
+- **522 passing application unit, component, simulation, and scenario tests** across 63 test files (0 failures);
 - **39 passing Firestore Emulator security and concurrency tests**; and
 - **39 passing Playwright browser end-to-end and stress scenarios** across 13 spec files.
 
@@ -195,8 +196,8 @@ The suite focuses on deterministic domain logic and verifies:
 
 - singles pool rotation, king, challenger, fatigue, and 3-win forced-rotation behavior across single and multi-court sessions;
 - doubles phase transitions, partner selection, pool limits, anti-repeat team splitting, and serialization;
-- **Pre-Session Check-In & Smart Paste**: Reclub/numbered list parsing, two-tier arrival check-in, and 1-tap Expected Late Arrivals tray in Host Tools;
-- **Compact Player Name Formatting**: pure display-layer abbreviation (`formatDisplayName`) across all host, spectator, and analytics views with zero mutation of underlying state or Firestore identities;
+- **Pre-Session Check-In, Smart Paste & Batch Late Check-In**: Reclub/numbered list parsing, two-tier arrival check-in, collapsible Expected Late Arrivals tab in Host Tools, and atomic `Check In All` capacity-aware batching;
+- **Compact Player Name Formatting & Smart Host Drawer Filtering**: pure display-layer abbreviation (`formatDisplayName`) and dual-mode search filtering (`matchesPlayerFilter` above the `> 6` player threshold) across host drawers, spectator views, and analytics with zero mutation of underlying state or Firestore identities;
 - **Global Asynchronous Partner Pairing (Option 2)**: cross-court pairs, non-blocking queue holding, court starvation protection, and partner unification;
 - **Multi-Court Match Scoring, Flip Winner & Point Differential**: 1-tap preset scores, custom score entry, retroactive match winner flipping with atomic history replacement, and 4-tier tiebreaker sorting;
 - **Spectator ETAs, Turn Alerts & Shareable Stat Cards**: deterministic wait-time badges, Web Audio/vibration turn alerts, and Session/Player Spotlight recap cards;

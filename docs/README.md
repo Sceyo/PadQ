@@ -32,7 +32,7 @@ This directory contains the operational, architectural, testing, and release doc
 - [adr/0002-deterministic-queue-eta.md](adr/0002-deterministic-queue-eta.md) — ADR 0002: Deterministic waiting queue ETA calculation.
 - [adr/0003-priority-return.md](adr/0003-priority-return.md) — ADR 0003: Priority return from break vs back-of-queue return.
 - [adr/0004-single-session-court-slots.md](adr/0004-single-session-court-slots.md) — ADR 0004: Single-session `courtSlots` multi-court architecture.
-- [superpowers/specs/2026-11-05-compact-player-names-design.md](superpowers/specs/2026-11-05-compact-player-names-design.md) — Compact player display name specification (`formatDisplayName`).
+- [superpowers/specs/2026-11-05-compact-player-names-design.md](superpowers/specs/2026-11-05-compact-player-names-design.md) — Compact player display name (`formatDisplayName`) and smart host-drawer filter (`matchesPlayerFilter`) specification.
 - [superpowers/plans/2026-11-01-pre-session-checkin-and-engine-parity.md](superpowers/plans/2026-11-01-pre-session-checkin-and-engine-parity.md) — Pre-session check-in, smart paste, turn alerts, and engine parity plan.
 - [superpowers/plans/2026-11-03-fix-six-live-wiring-bugs.md](superpowers/plans/2026-11-03-fix-six-live-wiring-bugs.md) — Live wiring parity and mobile touch target hardening plan.
 - [superpowers/plans/2026-11-05-compact-player-names.md](superpowers/plans/2026-11-05-compact-player-names.md) — Compact player names implementation and verification plan.

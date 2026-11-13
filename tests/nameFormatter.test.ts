@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatDisplayName } from '../app/queue/lib/nameFormatter';
+import { formatDisplayName, matchesPlayerFilter } from '../app/queue/lib/nameFormatter';
 
 describe('formatDisplayName', () => {
   it('returns single-word names unchanged', () => {
@@ -34,5 +34,21 @@ describe('formatDisplayName', () => {
     expect(formatDisplayName('   ')).toBe('');
     expect(formatDisplayName(null as unknown as string)).toBe('');
     expect(formatDisplayName(undefined as unknown as string)).toBe('');
+  });
+});
+
+describe('matchesPlayerFilter', () => {
+  it('matches empty or whitespace query for any player', () => {
+    expect(matchesPlayerFilter('Lee Chong', '')).toBe(true);
+    expect(matchesPlayerFilter('Lee Chong', '   ')).toBe(true);
+  });
+
+  it('matches case-insensitively against raw full name and compact display name', () => {
+    expect(matchesPlayerFilter('Lee Chong', 'lee')).toBe(true);
+    expect(matchesPlayerFilter('Lee Chong', 'CHONG')).toBe(true);
+    expect(matchesPlayerFilter('Lee Chong', 'l. chong')).toBe(true);
+    expect(matchesPlayerFilter('Anna Leigh Waters', 'a.l.')).toBe(true);
+    expect(matchesPlayerFilter('Anna Leigh Waters', 'leigh')).toBe(true);
+    expect(matchesPlayerFilter('Lee Chong', 'jordan')).toBe(false);
   });
 });

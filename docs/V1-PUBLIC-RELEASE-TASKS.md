@@ -502,7 +502,7 @@ Implements the Singles Pool-Rotation format as the default singles engine for si
 
 ### 1. Completed Architectural & Feature Milestones
 - **Mobile-First Shell & Component Extraction:** Migrated the host interface into `AppShell` (`TopBar` + `BottomNav`) with dedicated `SingleCourtScreen`, `MultiCourtScreen`, `QueuePanel`, `HostToolsSheet`, `CourtScoreModal`, and `AnalyticsDashboard`.
-- **Pre-Session Check-In & Expected Late Arrivals (`checkInState.ts`, `SetupView.tsx`, `HostToolsSheet.tsx`):** Added two-tier arrival-order check-in on Setup, staging unchecked registered players into `localStorage` (`padq:lateArrivals:{sessionId}`) for 1-tap mid-session check-in into the live queue.
+- **Pre-Session Check-In & Collapsible Expected Late Arrivals (`checkInState.ts`, `SetupView.tsx`, `HostToolsSheet.tsx`):** Added two-tier arrival-order check-in on Setup, staging unchecked registered players into `localStorage` (`padq_late_arrivals_{sessionId}`) inside a collapsible `Expected Late Arrivals (N)` accordion in Host Tools with both individual `Check In` and batch `Check In All` support.
 - **Engine Parity & Fairness Upgrades (`doublesEngine.ts`, `singleEngine.ts`, `singlesPoolEngine.ts`, `multiCourtResult.ts`):**
   - Added **Singles Pool Rotation** (`singlesFormat: 'pool'` default) alongside King of the Court (`'king'`).
   - Enforced **3-win streak rotation caps** across single-court and multi-court singles so dominant winners rotate to the back of the queue after 3 consecutive wins while the challenger stays on court.
@@ -515,7 +515,8 @@ Implements the Singles Pool-Rotation format as the default singles engine for si
 - **Spectator Live Watch Upgrades (`LiveCourtStatus.tsx`, `etaEngine.ts`, `turnAlert.ts`):**
   - Added deterministic Queue ETA badges (`Next Up`, `~10m`, etc.) and Tap-Your-Name Turn Alerts (Web Audio chime + vibration on advancing to On Deck or On Court).
 - **Compact Player Names (`nameFormatter.ts`):**
-  - Added `formatDisplayName` across all host and spectator display surfaces to compact 2+ word names into initialed prefixes + last word (e.g., `"Anna Leigh Waters"` → `"A.L. Waters"`, `"Quang Dong"` → `"Q. Dong"`) while preserving raw player strings in state and Firestore for zero-collision identity integrity.
+  - Added `formatDisplayName` across all host and spectator display surfaces (including `SitOutPanel` and `HostToolsSheet` unified grids) to compact 2+ word names into initialed prefixes + last word (e.g., `"Anna Leigh Waters"` → `"A.L. Waters"`, `"Lee Chong"` → `"L. Chong"`) while preserving raw player strings in state and Firestore for zero-collision identity integrity.
+  - Added `matchesPlayerFilter` (`SMART_FILTER_THRESHOLD = 6`) so Host Tools drawers (`SetupView` Expected Arrivals, `Manage Players On Break`, `Expected Late Arrivals`, and `Set Partners`) automatically show a search filter matching both raw and abbreviated names when more than 6 players are listed.
 
 ### 2. Full System Verification Gate Results (`2026-11-06`)
 
@@ -524,7 +525,7 @@ Implements the Singles Pool-Rotation format as the default singles engine for si
 | TypeScript (`tsc`) | `npx tsc --noEmit` | **PASS (exit 0)** — 0 errors |
 | ESLint (`--quiet`) | `npm run lint -- --quiet` | **PASS (exit 0)** — 0 errors |
 | Production Build | `npm run build` | **PASS (exit 0)** — Next.js 16.4.3 (Turbopack), all 8 routes compiled cleanly |
-| Unit / Component / Simulation | `npm test -- --run` | **PASS (exit 0)** — 63 passed files (513 passed, 4 expected fail) |
+| Unit / Component / Simulation | `npm test -- --run` | **PASS (exit 0)** — 63 passed files (522 passed, 4 expected fail) |
 | Firestore Security Rules | `npm run test:rules` | **PASS (exit 0)** — 39 / 39 passed in Firestore Emulator |
 | Playwright E2E Browser Suite | `npm run test:e2e` | **PASS (exit 0)** — 39 / 39 passed across 13 spec files |
 

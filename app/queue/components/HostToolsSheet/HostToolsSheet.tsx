@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import {
   UserPlus,
   UserCheck,
+  Check,
   Trophy,
   Users,
   ListOrdered,
@@ -13,6 +14,11 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { BottomSheet } from '../OverlayHost/BottomSheet';
+import {
+  formatDisplayName,
+  matchesPlayerFilter,
+  SMART_FILTER_THRESHOLD,
+} from '../../lib/nameFormatter';
 
 interface Props {
   isOpen: boolean;
@@ -22,12 +28,13 @@ interface Props {
   onToggleScorePrompt: () => void;
   lateArrivals?: string[];
   onCheckInLateArrival?: (name: string) => boolean | Promise<boolean>;
+  onCheckInAllLateArrivals?: () => boolean | number | void | Promise<boolean | number | void>;
   onDismissLateArrival?: (name: string) => void;
   partnerPanelNode?: React.ReactNode;
   manualQueuePanelNode?: React.ReactNode;
   sitOutPanelNode?: React.ReactNode;
   diagnosticsNode?: React.ReactNode;
-  initialSection?: 'partners' | 'queue' | 'sitout';
+  initialSection?: 'late' | 'partners' | 'queue' | 'sitout';
 }
 
 export function HostToolsSheet({
@@ -38,6 +45,7 @@ export function HostToolsSheet({
   onToggleScorePrompt,
   lateArrivals = [],
   onCheckInLateArrival,
+  onCheckInAllLateArrivals,
   onDismissLateArrival,
   partnerPanelNode,
   manualQueuePanelNode,
@@ -47,6 +55,8 @@ export function HostToolsSheet({
 }: Props) {
   const [playerName, setPlayerName] = useState('');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [openLateArrivals, setOpenLateArrivals] = useState(initialSection === 'late');
+  const [lateFilter, setLateFilter] = useState('');
   const [openPartners, setOpenPartners] = useState(initialSection === 'partners');
   const [openManualQueue, setOpenManualQueue] = useState(initialSection === 'queue');
   const [openSitOut, setOpenSitOut] = useState(initialSection === 'sitout');
@@ -54,6 +64,7 @@ export function HostToolsSheet({
 
   React.useEffect(() => {
     if (isOpen) {
+      if (initialSection === 'late') setOpenLateArrivals(true);
       if (initialSection === 'queue') setOpenManualQueue(true);
       if (initialSection === 'partners') setOpenPartners(true);
       if (initialSection === 'sitout') setOpenSitOut(true);
@@ -80,6 +91,11 @@ export function HostToolsSheet({
     onClose();
   };
 
+  const showLateFilter = lateArrivals.length > SMART_FILTER_THRESHOLD;
+  const filteredLateArrivals = showLateFilter
+    ? lateArrivals.filter(name => matchesPlayerFilter(name, lateFilter))
+    : lateArrivals;
+
   return (
     <BottomSheet
       isOpen={isOpen}
@@ -88,108 +104,6 @@ export function HostToolsSheet({
       description="Session management, late additions, and engine settings"
     >
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-4, 16px)' }}>
-        {/* Expected Late Arrivals Tray */}
-        {lateArrivals && lateArrivals.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2, 8px)' }}>
-            <div
-              style={{
-                fontSize: 'var(--fs-xs, 0.8125rem)',
-                fontWeight: 700,
-                textTransform: 'uppercase',
-                letterSpacing: '0.06em',
-                color: 'var(--text-muted, #94a3b8)',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <UserCheck size={14} />
-              <span>Expected Late Arrivals ({lateArrivals.length})</span>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-              {lateArrivals.map(name => (
-                <div
-                  key={`host-late-${name}`}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '4px 6px 4px 12px',
-                    borderRadius: 'var(--r-sm, 10px)',
-                    background: 'var(--surface-bg, #0b0d17)',
-                    border: '1.5px solid var(--line-subtle, #252d47)',
-                    minHeight: 'var(--tap-min, 44px)',
-                    boxSizing: 'border-box',
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 'var(--fs-sm, 0.9375rem)',
-                      fontWeight: 600,
-                      color: 'var(--text-primary, #f8fafc)',
-                    }}
-                  >
-                    {name}
-                  </span>
-                  {onCheckInLateArrival && (
-                    <button
-                      type="button"
-                      aria-label={`Check in ${name}`}
-                      onClick={async () => {
-                        const ok = await onCheckInLateArrival(name);
-                        if (ok === false) {
-                          setErrorMsg(`"${name}" could not be checked in (session full or duplicate)`);
-                        }
-                      }}
-                      style={{
-                        minHeight: 'var(--tap-min, 44px)',
-                        padding: '0 14px',
-                        borderRadius: 'var(--r-sm, 8px)',
-                        border: 'none',
-                        background: 'var(--accent-primary, #5457e0)',
-                        color: '#ffffff',
-                        fontSize: 'var(--fs-xs, 0.8125rem)',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      Check In
-                    </button>
-                  )}
-                  {onDismissLateArrival && (
-                    <button
-                      type="button"
-                      aria-label={`Dismiss ${name}`}
-                      onClick={() => onDismissLateArrival(name)}
-                      style={{
-                        minWidth: 'var(--tap-min, 44px)',
-                        minHeight: 'var(--tap-min, 44px)',
-                        padding: 0,
-                        borderRadius: 'var(--r-sm, 8px)',
-                        border: 'none',
-                        background: 'transparent',
-                        color: 'var(--text-muted, #94a3b8)',
-                        fontSize: '1.25rem',
-                        lineHeight: 1,
-                        cursor: 'pointer',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div style={{ height: '1px', background: 'var(--line-subtle, #252d47)' }} />
-          </div>
-        )}
-
         {/* 1. Add Late Player (16px input to stop iOS zoom) */}
         <form onSubmit={handleAdd} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2, 8px)' }}>
           <label
@@ -341,7 +255,243 @@ export function HostToolsSheet({
           </button>
         </div>
 
-        {/* 3. Lock Doubles Partners Panel */}
+        {/* 3. Expected Late Arrivals Collapsible Tab */}
+        {lateArrivals && lateArrivals.length > 0 && (
+          <div>
+            <button
+              type="button"
+              aria-expanded={openLateArrivals}
+              onClick={() => setOpenLateArrivals(l => !l)}
+              style={{
+                width: '100%',
+                minHeight: 'var(--tap-min, 44px)',
+                padding: '10px var(--sp-3, 12px)',
+                borderRadius: 'var(--r-md, 14px)',
+                border: '1px solid var(--line-subtle, #252d47)',
+                background: 'var(--surface-bg, #0b0d17)',
+                color: 'var(--text-primary, #f8fafc)',
+                fontSize: 'var(--fs-sm, 0.9375rem)',
+                fontWeight: 600,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <UserCheck size={16} style={{ color: 'var(--accent-primary, #5457e0)' }} />
+                <span>Expected Late Arrivals ({lateArrivals.length})</span>
+              </div>
+              {openLateArrivals ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {openLateArrivals && (
+              <div
+                style={{
+                  marginTop: '8px',
+                  padding: '10px',
+                  background: 'var(--surface-bg, #0b0d17)',
+                  border: '1px solid var(--line-subtle, #252d47)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px',
+                }}
+              >
+                {(showLateFilter || onCheckInAllLateArrivals) && (
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: showLateFilter ? 'space-between' : 'flex-end',
+                      gap: '8px',
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    {showLateFilter && (
+                      <div style={{ position: 'relative', flex: 1, minWidth: '170px', display: 'flex', alignItems: 'center' }}>
+                        <input
+                          type="text"
+                          placeholder="Filter late arrivals…"
+                          aria-label="Filter late arrivals"
+                          value={lateFilter}
+                          onChange={e => setLateFilter(e.target.value)}
+                          style={{
+                            width: '100%',
+                            height: '38px',
+                            padding: '0 32px 0 10px',
+                            borderRadius: 'var(--r-sm, 8px)',
+                            border: '1px solid var(--line-subtle, #252d47)',
+                            background: 'rgba(255, 255, 255, 0.04)',
+                            color: 'var(--text-primary, #f8fafc)',
+                            fontSize: '16px',
+                            outline: 'none',
+                            boxSizing: 'border-box',
+                          }}
+                        />
+                        {lateFilter && (
+                          <button
+                            type="button"
+                            aria-label="Clear late arrival filter"
+                            onClick={() => setLateFilter('')}
+                            style={{
+                              position: 'absolute',
+                              right: '4px',
+                              width: '28px',
+                              height: '28px',
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--text-muted, #94a3b8)',
+                              fontSize: '1rem',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {onCheckInAllLateArrivals && (
+                      <button
+                        type="button"
+                        aria-label="Check in all late arrivals"
+                        onClick={async () => {
+                          const ok = await onCheckInAllLateArrivals();
+                          if (ok === false) {
+                            setErrorMsg('Could not check in late arrivals (session full)');
+                          }
+                        }}
+                        style={{
+                          minHeight: '38px',
+                          padding: '0 12px',
+                          borderRadius: 'var(--r-sm, 8px)',
+                          border: '1px solid rgba(129, 140, 248, 0.35)',
+                          background: 'rgba(99, 102, 241, 0.16)',
+                          color: '#a5b4fc',
+                          fontSize: 'var(--fs-xs, 0.8125rem)',
+                          fontWeight: 700,
+                          whiteSpace: 'nowrap',
+                          flexShrink: 0,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <Check size={13} /> Check In All
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(185px, 1fr))',
+                    gap: '8px',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {filteredLateArrivals.map(name => (
+                    <div
+                      key={`host-late-${name}`}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '8px',
+                        padding: '4px 6px 4px 12px',
+                        borderRadius: 'var(--r-sm, 10px)',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid var(--line-subtle, #252d47)',
+                        minHeight: 'var(--tap-min, 44px)',
+                        boxSizing: 'border-box',
+                      }}
+                    >
+                      <span
+                        title={name}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          fontSize: 'var(--fs-sm, 0.9375rem)',
+                          fontWeight: 600,
+                          color: 'var(--text-primary, #f8fafc)',
+                        }}
+                      >
+                        {formatDisplayName(name)}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexShrink: 0 }}>
+                        {onCheckInLateArrival && (
+                          <button
+                            type="button"
+                            aria-label={`Check in ${name}`}
+                            onClick={async () => {
+                              const ok = await onCheckInLateArrival(name);
+                              if (ok === false) {
+                                setErrorMsg(`"${name}" could not be checked in (session full or duplicate)`);
+                              }
+                            }}
+                            style={{
+                              minHeight: 'var(--tap-min, 44px)',
+                              padding: '0 12px',
+                              borderRadius: 'var(--r-sm, 8px)',
+                              border: 'none',
+                              background: 'var(--accent-primary, #5457e0)',
+                              color: '#ffffff',
+                              fontSize: 'var(--fs-xs, 0.8125rem)',
+                              fontWeight: 700,
+                              whiteSpace: 'nowrap',
+                              flexShrink: 0,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            Check In
+                          </button>
+                        )}
+                        {onDismissLateArrival && (
+                          <button
+                            type="button"
+                            aria-label={`Dismiss ${name}`}
+                            onClick={() => onDismissLateArrival(name)}
+                            style={{
+                              minWidth: 'var(--tap-min, 44px)',
+                              minHeight: 'var(--tap-min, 44px)',
+                              padding: 0,
+                              borderRadius: 'var(--r-sm, 8px)',
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--text-muted, #94a3b8)',
+                              fontSize: '1.25rem',
+                              lineHeight: 1,
+                              flexShrink: 0,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* 4. Lock Doubles Partners Panel */}
         {partnerPanelNode && (
           <div>
             <button
@@ -377,7 +527,7 @@ export function HostToolsSheet({
           </div>
         )}
 
-        {/* 4. Manual Queue Management Panel */}
+        {/* 5. Manual Queue Management Panel */}
         {manualQueuePanelNode && (
           <div>
             <button
@@ -413,7 +563,7 @@ export function HostToolsSheet({
           </div>
         )}
 
-        {/* 5. Sit-Out / On Break Panel */}
+        {/* 6. Sit-Out / On Break Panel */}
         {sitOutPanelNode && (
           <div>
             <button
@@ -449,7 +599,7 @@ export function HostToolsSheet({
           </div>
         )}
 
-        {/* 6. Engine Diagnostics */}
+        {/* 7. Engine Diagnostics */}
         {diagnosticsNode && (
           <div>
             <button
