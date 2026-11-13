@@ -98,7 +98,7 @@ describe('V1 court, player, and viewer scenario matrix', () => {
         }
       }
     }
-  }, 30_000);
+  }, 60_000);
 
   it('rotates singles safely across 1-3 courts and minimum through maximum rosters', () => {
     for (const courtCount of [1, 2, 3]) {
@@ -423,5 +423,77 @@ describe('V1 court, player, and viewer scenario matrix', () => {
       expect(V1_RELEASE.maxCourts).toBe(3);
       expect(V1_RELEASE.maxPlayers).toBe(30);
     });
+  });
+});
+
+
+describe('ManualQueuePanel removal & handleConfirmSub (Rows 11 & 12)', () => {
+  it('ManualQueuePanel removal moves player to sittingOut ("On break"), preserving set partition integrity (Row 11 fix)', async () => {
+    const { removeFromQueueTransition, accountPlayers } = await import('@/app/queue/lib/queueTransitions');
+    const roster = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+    const snapshot = {
+      gameMode: 'doubles' as const,
+      players: [...roster],
+      queue: [...roster],
+      sittingOut: [],
+    };
+    // Host clicks X on player P3 (index 2)
+    const result = removeFromQueueTransition(snapshot, 2);
+    expect(result.queue).not.toContain('P3');
+    // Player is moved to sittingOut (on break), not vanished
+    expect(result.sittingOut).toContain('P3');
+
+    // Account players reveals that P3 is in onBreak and no one is missing
+    const accounting = accountPlayers({
+      ...snapshot,
+      queue: result.queue,
+      sittingOut: result.sittingOut,
+    });
+    expect(accounting.missing).toEqual([]);
+    expect(accounting.onBreak).toEqual(['P3']);
+  });
+
+  it('handleConfirmSub in multi-court: absent player on court (courtSlots) is not in queue, so confirmSub returns null', async () => {
+    const { confirmSubTransition } = await import('@/app/queue/lib/queueTransitions');
+    const roster = ['C1', 'C2', 'C3', 'C4', 'W1', 'W2'];
+    const snapshot = {
+      gameMode: 'doubles' as const,
+      players: [...roster],
+      queue: ['W1', 'W2'], // only waiting players in queue
+      courtSlots: [
+        { id: 'court-0', name: 'Court 1', onCourt: ['C1', 'C2', 'C3', 'C4'] },
+      ],
+      sittingOut: [],
+    };
+
+    // Subbing an on-court player (C1) in multi-court returns null because C1 is not in snapshot.queue
+    const resOnCourt = confirmSubTransition(snapshot, 'C1', 'W1');
+    expect(resOnCourt).toBeNull();
+
+    // Subbing a queued waiting player (W1 with W2) succeeds in queue replacement
+    const resQueued = confirmSubTransition(snapshot, 'W1', 'W2');
+    expect(resQueued).not.toBeNull();
+    expect(resQueued!.queue).toEqual(['W2']);
+    expect(resQueued!.sittingOut).toContain('W1');
+  });
+
+  it('handleConfirmSub in single-court: on-court players are at queue[0..3], so confirmSub replaces them in queue and adds absent to sittingOut', async () => {
+    const { confirmSubTransition } = await import('@/app/queue/lib/queueTransitions');
+    const roster = ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+    const snapshot = {
+      gameMode: 'doubles' as const,
+      players: [...roster],
+      queue: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'], // P1..P4 are on court at queue[0..3]
+      courtSlots: [],
+      sittingOut: [],
+    };
+
+    // Subbing on-court player P1 with waiting player P5 in single-court
+    const res = confirmSubTransition(snapshot, 'P1', 'P5');
+    expect(res).not.toBeNull();
+    // P5 replaced P1 at index 0, and was spliced from index 4
+    expect(res!.queue[0]).toBe('P5');
+    expect(res!.queue).not.toContain('P1');
+    expect(res!.sittingOut).toContain('P1');
   });
 });

@@ -26,8 +26,10 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
     await host.getByRole('button', { name: /Start Queue/ }).click();
     await expect(host.locator('.session-bar--host')).toContainText('Connected', { timeout: 20_000 });
     await expect(host.locator('.session-role-badge')).toHaveText('HOST');
+    await host.getByRole('button', { name: 'Host Tools' }).click();
     await expect(host.getByRole('button', { name: 'Add Player' })).toBeVisible();
     await expect(host.getByRole('button', { name: /Set Partners/ })).toBeVisible();
+    await host.getByRole('button', { name: 'Close sheet' }).click();
 
     await host.getByTitle('Settings').click();
     const startLiveButton = host.getByRole('button', { name: 'Start', exact: true });
@@ -48,14 +50,14 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
     await expect(viewer.getByText('You are watching live. Only the host can make changes.')).toBeVisible();
     await expect(viewer.getByRole('tab')).toHaveCount(3);
     await expect(viewer.getByRole('button', { name: 'Add Player' })).toHaveCount(0);
-    await expect(viewer.getByRole('button', { name: /win$/ })).toHaveCount(0);
+    await expect(viewer.getByRole('button', { name: /wins?$/i })).toHaveCount(0);
 
     const courtThreeTab = viewer.getByRole('tab', { name: /Court 3/ });
     await courtThreeTab.click();
     await expect(courtThreeTab).toHaveAttribute('aria-selected', 'true');
     await expect(viewer.getByRole('tabpanel')).toContainText('Court 3');
-    await expect(viewer.getByRole('tabpanel')).toContainText('Player 09 & Player 10');
-    await expect(viewer.getByText('Player 13')).toBeVisible();
+    await expect(viewer.getByRole('tabpanel')).toContainText(/(Player 09 & Player 10|P\. 09 & P\. 10)/);
+    await expect(viewer.getByText(/(Player 13|P\. 13)/)).toBeVisible();
 
     await viewer.reload();
     await expect(viewer.getByText('You are watching live. Only the host can make changes.')).toBeVisible();
@@ -63,7 +65,11 @@ test('host and viewer share three live courts with refresh-safe selection', asyn
 
     const beforeResult = await viewer.getByRole('tabpanel').innerText();
     const courtThreeCard = host.locator('.courts-grid > div').filter({ hasText: 'Court 3' });
-    await courtThreeCard.getByRole('button', { name: /win$/ }).first().click();
+    await courtThreeCard.getByRole('button', { name: /wins?$/i }).first().click();
+    const skipBtn1 = host.getByRole('button', { name: /Skip Score/i });
+    if (await skipBtn1.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await skipBtn1.click();
+    }
 
     await expect.poll(
       async () => viewer.getByRole('tabpanel').innerText(),
@@ -102,10 +108,10 @@ test('multi-court mode reveals Undo Last Match in settings and restores court an
     // Court 2 has Player 05 & 06 vs Player 07 & 08.
     // Waiting queue has Player 09, Player 10.
     const courtOneCard = host.locator('.courts-grid > div').filter({ hasText: 'Court 1' });
-    await expect(courtOneCard).toContainText('Player 01 & Player 02');
-    await expect(courtOneCard).toContainText('Player 03 & Player 04');
-    await expect(host.locator('.waiting-players-list')).toContainText('Player 09');
-    await expect(host.locator('.waiting-players-list')).toContainText('Player 10');
+    await expect(courtOneCard).toContainText(/(Player 01 & Player 02|P\. 01 & P\. 02)/);
+    await expect(courtOneCard).toContainText(/(Player 03 & Player 04|P\. 03 & P\. 04)/);
+    await expect(host.locator('.waiting-players-list')).toContainText(/(Player 09|P\. 09)/);
+    await expect(host.locator('.waiting-players-list')).toContainText(/(Player 10|P\. 10)/);
 
     // Before any match finishes, gear menu has no Undo button
     await host.getByTitle('Settings').click();
@@ -113,15 +119,17 @@ test('multi-court mode reveals Undo Last Match in settings and restores court an
     await host.keyboard.press('Escape');
 
     // Complete match on Court 1 (Team A win)
-    await courtOneCard.getByRole('button', { name: /win$/ }).first().click();
+    await courtOneCard.getByRole('button', { name: /wins?$/i }).first().click();
+    const skipBtn2 = host.getByRole('button', { name: /Skip Score/i });
+    if (await skipBtn2.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await skipBtn2.click();
+    }
 
-    // WinnerModal opens after a win; autoClose is false by default, so dismiss it.
-    await expect(host.locator('.modal-overlay')).toBeVisible({ timeout: 5_000 });
-    await host.keyboard.press('Escape');
-    await expect(host.locator('.modal-overlay')).not.toBeVisible({ timeout: 3_000 });
+    // MatchCompletionToast confirms win with undo capability
+    await expect(host.locator('text=/won/i')).toBeVisible({ timeout: 5_000 });
 
     // Now Court 1 rotated: Player 09 and Player 10 were pulled onto Court 1
-    await expect(courtOneCard).not.toContainText('Player 01 & Player 02');
+    await expect(courtOneCard).not.toContainText(/(Player 01 & Player 02|P\. 01 & P\. 02)/);
 
     // Gear menu MUST now reveal Undo Last Match!
     await host.getByTitle('Settings').click();
@@ -132,11 +140,11 @@ test('multi-court mode reveals Undo Last Match in settings and restores court an
     await undoBtn.click();
 
     // Verify Court 1 has Player 01 & 02 vs Player 03 & 04 restored!
-    await expect(courtOneCard).toContainText('Player 01 & Player 02');
-    await expect(courtOneCard).toContainText('Player 03 & Player 04');
+    await expect(courtOneCard).toContainText(/(Player 01 & Player 02|P\. 01 & P\. 02)/);
+    await expect(courtOneCard).toContainText(/(Player 03 & Player 04|P\. 03 & P\. 04)/);
     // Waiting queue has Player 09 and Player 10 back!
-    await expect(host.locator('.waiting-players-list')).toContainText('Player 09');
-    await expect(host.locator('.waiting-players-list')).toContainText('Player 10');
+    await expect(host.locator('.waiting-players-list')).toContainText(/(Player 09|P\. 09)/);
+    await expect(host.locator('.waiting-players-list')).toContainText(/(Player 10|P\. 10)/);
   } finally {
     await hostContext.close();
   }

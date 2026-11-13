@@ -1,11 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import {
   Sun, Moon, ArrowLeft, Users, Swords, UserPlus,
-  Trash2, Star, BookOpen, Play, Wifi,
+  Trash2, Star, BookOpen, Play, Wifi, Check, Clock, UserCheck, RotateCcw,
 } from 'lucide-react';
 import type { RosterEntry, SkillBracket } from '@/lib/sessionService';
+import { matchesPlayerFilter, SMART_FILTER_THRESHOLD } from '../../lib/nameFormatter';
 
 export interface SetupViewProps {
   gameMode:            'singles' | 'doubles' | null;
@@ -44,6 +46,14 @@ export interface SetupViewProps {
   onSinglesFormatChange?: (format: 'pool' | 'king') => void;
   skilledBrackets?:    { beginner: string[]; intermediate: string[]; advanced: string[] };
   onSetPlayerSkill?:   (name: string, skill: SkillBracket | undefined) => void;
+  expectedPlayers?:    string[];
+  onCheckInPlayer?:    (name: string) => void;
+  onUndoCheckInPlayer?: (name: string) => void;
+  onCheckInAll?:       () => void;
+  onRemoveExpectedPlayer?: (name: string) => void;
+  onAddExpectedFromPaste?: () => void;
+  onAddExpectedFromRoster?: () => void;
+  onUncheckAll?:       () => void;
 }
 
 export function SetupView({
@@ -61,6 +71,14 @@ export function SetupView({
   onSinglesFormatChange,
   skilledBrackets,
   onSetPlayerSkill,
+  expectedPlayers = [],
+  onCheckInPlayer,
+  onUndoCheckInPlayer,
+  onCheckInAll,
+  onRemoveExpectedPlayer,
+  onAddExpectedFromPaste,
+  onAddExpectedFromRoster,
+  onUncheckAll,
 }: SetupViewProps) {
   const minPlayers = gameMode === 'doubles' && courtCount > 1
     ? courtCount * 4
@@ -69,6 +87,11 @@ export function SetupView({
       : 5;
   const [skillPickerFor, setSkillPickerFor] = useState<string | null>(null);
   const [tempSkillPickerFor, setTempSkillPickerFor] = useState<string | null>(null);
+  const [expectedFilter, setExpectedFilter] = useState('');
+  const showExpectedFilter = expectedPlayers.length > SMART_FILTER_THRESHOLD;
+  const filteredExpectedPlayers = showExpectedFilter
+    ? expectedPlayers.filter(name => matchesPlayerFilter(name, expectedFilter))
+    : expectedPlayers;
 
   const SKILL_BRACKETS: SkillBracket[] = ['beginner', 'intermediate', 'advanced'];
   const SKILL_LABEL: Record<SkillBracket, string> = { beginner: 'B', intermediate: 'I', advanced: 'A' };
@@ -82,18 +105,23 @@ export function SetupView({
   };
 
   return (
-    <div className={`queue-system setup-page ${darkMode ? 'dark' : ''}`}>
-      <button className="dark-mode-toggle" onClick={onToggleDark}>
+    <div className={`queue-system setup-page ${darkMode ? 'dark dark-mode' : ''}`} suppressHydrationWarning>
+      <button type="button" className="dark-mode-toggle" onClick={onToggleDark} suppressHydrationWarning>
         {darkMode ? <Sun size={17} /> : <Moon size={17} />}
       </button>
-      <button className="back-home" onClick={onBack}>
+      <button type="button" className="back-home" onClick={onBack} suppressHydrationWarning>
         <ArrowLeft size={14} /> Back
       </button>
 
       <div className="setup-hero">
-        <div className="setup-hero-icon">
-          {gameMode === 'singles' ? <Swords size={26} /> : <Users size={26} />}
-        </div>
+        <Image
+          src="/padq-logo.png"
+          alt="PADQ"
+          width={103}
+          height={36}
+          priority
+          style={{ marginBottom: '8px' }}
+        />
         <h1 className="app-name">{gameMode === 'singles' ? 'Singles' : 'Doubles'} Queue</h1>
         <p className="app-subtitle">Add players to get started</p>
       </div>
@@ -109,6 +137,7 @@ export function SetupView({
                 onClick={() => onCourtCountChange(Math.max(1, courtCount - 1))}
                 type="button"
                 disabled={courtCount <= 1}
+                suppressHydrationWarning
               >−</button>
               <span className="court-count-value">{courtCount}</span>
               <button
@@ -116,16 +145,21 @@ export function SetupView({
                 onClick={() => onCourtCountChange(Math.min(maxCourts, courtCount + 1))}
                 type="button"
                 disabled={courtCount >= maxCourts}
+                suppressHydrationWarning
               >+</button>
             </div>
             {courtCount > 1 && gameMode === 'doubles' && (
               <span className="setup-field-hint">
-                Needs {courtCount * 4}+ players · shared waiting queue
+                {tempPlayers.length >= courtCount * 4
+                  ? `${courtCount * 4} players on court, ${tempPlayers.length - courtCount * 4} waiting in queue`
+                  : `Needs ${courtCount * 4}+ players · shared waiting queue`}
               </span>
             )}
             {courtCount > 1 && gameMode === 'singles' && (
               <span className="setup-field-hint">
-                {courtCount} courts · shared queue · 2 player per court
+                {tempPlayers.length >= courtCount * 2
+                  ? `${courtCount * 2} players on court, ${tempPlayers.length - courtCount * 2} waiting in queue`
+                  : `Needs ${courtCount * 2}+ players · shared waiting queue`}
               </span>
             )}
           </div>
@@ -138,14 +172,14 @@ export function SetupView({
             <div className="singles-format-selector">
               <button
                 type="button"
-                className={`format-option-btn ${singlesFormat === 'pool' ? 'format-option-btn--active' : ''}`}
+                className={`format-option-btn ${singlesFormat === 'pool' ? 'format-option-btn--active' : ''}`} suppressHydrationWarning
                 onClick={() => onSinglesFormatChange?.('pool')}
               >
                 Pool Rotation <span className="format-default-badge">(Default)</span>
               </button>
               <button
                 type="button"
-                className={`format-option-btn ${singlesFormat === 'king' ? 'format-option-btn--active' : ''}`}
+                className={`format-option-btn ${singlesFormat === 'king' ? 'format-option-btn--active' : ''}`} suppressHydrationWarning
                 onClick={() => onSinglesFormatChange?.('king')}
               >
                 King of the Court
@@ -172,6 +206,9 @@ export function SetupView({
             placeholder="Leave blank for open access"
             maxLength={4}
             autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            suppressHydrationWarning
           />
         </div>}
 
@@ -181,11 +218,12 @@ export function SetupView({
             type="button"
             className={`roster-toggle-btn${showRoster ? ' roster-toggle-btn--active' : ''}`}
             onClick={onToggleRoster}
+            suppressHydrationWarning
           >
             <BookOpen size={13} /> From Roster ({roster.length})
           </button>
           {tempPlayers.length > 0 && (
-            <button type="button" className="roster-save-btn" onClick={onSaveToRoster}>
+            <button type="button" className="roster-save-btn" onClick={onSaveToRoster} suppressHydrationWarning>
               <Star size={13} /> Save to Roster
             </button>
           )}
@@ -199,7 +237,8 @@ export function SetupView({
             <div className="roster-panel">
               <div className="roster-list">
                 {roster.map((entry, i) => {
-                  const isAdded = tempPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase());
+                  const isAdded = tempPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase()) ||
+                    expectedPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase());
                   const pickerOpen = skillPickerFor === entry.name;
                   return (
                     <div key={`roster-${i}-${entry.name}`} className="roster-item roster-item--col">
@@ -227,6 +266,7 @@ export function SetupView({
                           className="roster-remove-btn"
                           onClick={e => { e.preventDefault(); onRemoveFromRoster(entry.name); }}
                           title="Remove from roster"
+                          suppressHydrationWarning
                         >×</button>
                       </div>
                       {showSkillTagging && pickerOpen && (
@@ -256,6 +296,7 @@ export function SetupView({
                   type="button"
                   className="roster-action-btn"
                   onClick={onSelectAllRoster}
+                  suppressHydrationWarning
                 >
                   Select All
                 </button>
@@ -263,10 +304,22 @@ export function SetupView({
                   type="button"
                   className={`roster-action-btn${rosterSelected.size > 0 ? ' roster-action-btn--primary' : ''}`}
                   onClick={onAddFromRoster}
+                  suppressHydrationWarning
                   disabled={rosterSelected.size === 0}
                 >
                   Add Selected ({rosterSelected.size})
                 </button>
+                {onAddExpectedFromRoster && (
+                  <button
+                    type="button"
+                    className="roster-action-btn add-expected-btn"
+                    onClick={onAddExpectedFromRoster}
+                    suppressHydrationWarning
+                    disabled={rosterSelected.size === 0}
+                  >
+                    Add as Expected ({rosterSelected.size})
+                  </button>
+                )}
               </div>
             </div>
           )
@@ -279,30 +332,174 @@ export function SetupView({
             onChange={e => { onCurrentNameChange(e.target.value); }}
             placeholder="Enter player name"
             onKeyDown={e => e.key === 'Enter' && onAddPlayer()}
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            suppressHydrationWarning
           />
-          <button onClick={onAddPlayer} className="add-btn"><UserPlus size={15} /></button>
+          <button type="button" onClick={onAddPlayer} className="add-btn" suppressHydrationWarning><UserPlus size={15} /></button>
         </div>
         {errorMsg && <p className="setup-error-msg">{errorMsg}</p>}
         <div className="input-group">
-          <input
-            type="text"
+          <textarea
+            rows={2}
+            className="paste-textarea"
             value={pasteInput}
             onChange={e => onPasteInputChange(e.target.value)}
-            placeholder="Paste names separated by commas…"
-            onKeyDown={e => e.key === 'Enter' && onAddFromPaste()}
+            placeholder="Paste names separated by commas or numbered list…"
+            onKeyDown={e => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                onAddFromPaste();
+              }
+            }}
+            autoComplete="off"
+            data-1p-ignore
+            data-lpignore="true"
+            suppressHydrationWarning
           />
           <button
-            onClick={onAddFromPaste}
+            type="button"
+            onClick={() => onAddFromPaste()}
             className="add-btn add-btn--paste"
+            suppressHydrationWarning
             title="Add all"
           >
             <Users size={15} />
           </button>
+          {onAddExpectedFromPaste && (
+            <button
+              type="button"
+              onClick={onAddExpectedFromPaste}
+              className="add-btn add-expected-btn"
+              disabled={!pasteInput.trim()}
+              suppressHydrationWarning
+              title="Add as Expected"
+            >
+              <Clock size={15} />
+            </button>
+          )}
         </div>
+
+        {/* Expected Arrivals / Not Yet Here */}
+        {expectedPlayers.length > 0 && (
+          <div className="expected-arrivals-panel">
+            <div className="expected-arrivals-header">
+              <h3>
+                <Clock size={13} /> Expected Arrivals ({expectedPlayers.length})
+              </h3>
+              {onCheckInAll && (
+                <button
+                  type="button"
+                  className="checkin-all-btn"
+                  onClick={onCheckInAll}
+                  suppressHydrationWarning
+                >
+                  <Check size={12} /> Check In All
+                </button>
+              )}
+            </div>
+            {showExpectedFilter && (
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                <input
+                  type="text"
+                  placeholder="Filter expected arrivals…"
+                  aria-label="Filter expected arrivals"
+                  value={expectedFilter}
+                  onChange={e => setExpectedFilter(e.target.value)}
+                  suppressHydrationWarning
+                  style={{
+                    width: '100%',
+                    height: '38px',
+                    padding: '0 32px 0 10px',
+                    borderRadius: 'var(--r-sm, 8px)',
+                    border: '1px solid var(--line-subtle, #252d47)',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    color: 'var(--text-primary, #f8fafc)',
+                    fontSize: '16px',
+                    outline: 'none',
+                    boxSizing: 'border-box',
+                  }}
+                />
+                {expectedFilter && (
+                  <button
+                    type="button"
+                    aria-label="Clear expected arrivals filter"
+                    onClick={() => setExpectedFilter('')}
+                    suppressHydrationWarning
+                    style={{
+                      position: 'absolute',
+                      right: '4px',
+                      width: '28px',
+                      height: '28px',
+                      border: 'none',
+                      background: 'transparent',
+                      color: 'var(--text-muted, #94a3b8)',
+                      fontSize: '1rem',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
+            )}
+            <div className="expected-chips-list">
+              {filteredExpectedPlayers.map((name) => (
+                <div key={`expected-${name}`} className="expected-player-chip">
+                  <span className="expected-name">{name}</span>
+                  <div className="expected-actions">
+                    {onCheckInPlayer && (
+                      <button
+                        type="button"
+                        className="checkin-btn"
+                        onClick={() => onCheckInPlayer(name)}
+                        title="Check in player"
+                        suppressHydrationWarning
+                      >
+                        <UserCheck size={12} /> Check In
+                      </button>
+                    )}
+                    {onRemoveExpectedPlayer && (
+                      <button
+                        type="button"
+                        className="remove-expected-btn"
+                        onClick={() => onRemoveExpectedPlayer(name)}
+                        title="Remove expected player"
+                        suppressHydrationWarning
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {tempPlayers.length > 0 && (
           <div className="players-list">
-            <h3><Users size={13} /> Players ({tempPlayers.length})</h3>
+            <div className="setup-players-header">
+              <h3><Users size={13} /> Players ({tempPlayers.length})</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span className="setup-checked-in-pill">Checked In</span>
+                {onUncheckAll && (
+                  <button
+                    type="button"
+                    className="uncheck-all-btn"
+                    onClick={onUncheckAll}
+                    title="Move all players to Expected Arrivals"
+                    suppressHydrationWarning
+                  >
+                    Uncheck All
+                  </button>
+                )}
+              </div>
+            </div>
             <ul>
               {tempPlayers.map((p, i) => {
                 const playerSkill = getTempPlayerSkill(p);
@@ -327,9 +524,22 @@ export function SetupView({
                           )
                         )}
                       </span>
-                      <button onClick={() => onRemoveTempPlayer(i)} className="remove-btn">
-                        <Trash2 size={12} />
-                      </button>
+                      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        {onUndoCheckInPlayer && (
+                          <button
+                            type="button"
+                            onClick={() => onUndoCheckInPlayer(p)}
+                            className="remove-btn"
+                            title="Move back to Expected"
+                            suppressHydrationWarning
+                          >
+                            <RotateCcw size={12} />
+                          </button>
+                        )}
+                        <button type="button" onClick={() => onRemoveTempPlayer(i)} className="remove-btn" suppressHydrationWarning title="Remove player">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                     {showSkillTagging && pickerOpen && (
                       <div className="skill-picker">
@@ -358,8 +568,10 @@ export function SetupView({
 
         {/* ── Lock Partners (doubles multi-court only) ── */}
         <button
+          type="button"
           onClick={onStartQueue}
           className="start-btn"
+          suppressHydrationWarning
           disabled={tempPlayers.length < minPlayers || isSaving}
         >
           {isSaving

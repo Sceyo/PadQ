@@ -14,6 +14,7 @@
 .guideModal {
   width: min(500px, calc(100vw - 32px));
   max-height: min(680px, calc(100vh - 48px));
+  max-height: min(680px, calc(100dvh - 48px));
   padding: 0; text-align: left; display: flex; flex-direction: column;
   overflow: hidden;
 }

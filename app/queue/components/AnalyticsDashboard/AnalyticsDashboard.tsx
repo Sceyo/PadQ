@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { BarChart2, TrendingUp, Activity, Clock, Flame, Layers, Share2 } from 'lucide-react';
+import { BarChart2, TrendingUp, Activity, Clock, Flame, Layers, Share2, Trophy, ArrowLeftRight } from 'lucide-react';
+import { flipHistoryEntryWinner } from '../../lib/historyCorrection';
+import { formatDisplayName } from '../../lib/nameFormatter';
 import type { PlayerStat, MatchHistoryEntry } from '../../lib/types';
 import { comparePlayerStats, formatPointDiff, formatMatchupStrength } from '../../lib/playerUtils';
 import type { CareerStatsMap } from '@/lib/sessionService';
@@ -31,26 +33,20 @@ export const AnalyticsDashboard: React.FC<{
   history?: MatchHistoryEntry[];
   roomCode?: string | null;
   mode?: string;
-}> = ({ stats, careerStats, skilledBrackets, history = [], roomCode, mode = 'Doubles' }) => {
-  const hasCareer  = careerStats && Object.keys(careerStats).length > 0;
+  initialTab?: 'session' | 'history' | 'skilled';
+  onCorrectHistoryEntry?: (entryId: number, updated: MatchHistoryEntry) => void;
+}> = ({ stats, careerStats: _careerStats, skilledBrackets, history = [], roomCode, mode = 'Doubles', initialTab, onCorrectHistoryEntry }) => {
   const hasSkilled = !!skilledBrackets && (
     skilledBrackets.beginner.length > 0 ||
     skilledBrackets.intermediate.length > 0 ||
     skilledBrackets.advanced.length > 0
   );
 
-  const [tab, setTab] = useState<'session' | 'career' | 'skilled'>(
-    hasSkilled ? 'skilled' : 'session'
+  const [tab, setTab] = useState<'session' | 'history' | 'skilled'>(
+    initialTab ?? (hasSkilled ? 'skilled' : 'session')
   );
   const [showRecapModal, setShowRecapModal] = useState(false);
 
-  const careerList = Object.entries(careerStats ?? {})
-    .map(([name, s]) => ({
-      name,
-      wins: s.wins, losses: s.losses, gamesPlayed: s.gamesPlayed,
-      winRate: s.gamesPlayed === 0 ? 0 : Math.round((s.wins / s.gamesPlayed) * 100),
-    }))
-    .sort((a, b) => b.wins - a.wins || b.winRate - a.winRate);
 
   const sorted  = [...stats].sort(comparePlayerStats);
   const maxGP   = Math.max(...stats.map(s => s.gamesPlayed), 1);
@@ -59,34 +55,36 @@ export const AnalyticsDashboard: React.FC<{
   return (
     <div className="analytics-panel">
       <div className="analytics-header-row">
-        {(hasCareer || hasSkilled) ? (
-          <div className="analytics-tab-row">
-            {hasSkilled && (
-              <button
-                className={`analytics-tab-btn ${tab === 'skilled' ? 'active' : ''}`}
-                onClick={() => setTab('skilled')}
-              >
-                <Layers size={12} style={{ verticalAlign: 'middle', marginRight: 4 }} />Skilled
-              </button>
-            )}
+        <div className="analytics-tab-row">
+          {hasSkilled && (
             <button
-              className={`analytics-tab-btn ${tab === 'session' ? 'active' : ''}`}
-              onClick={() => setTab('session')}
+              type="button"
+              className={`analytics-tab-btn ${tab === 'skilled' ? 'active' : ''}`}
+              onClick={() => setTab('skilled')}
             >
-              Session
+              <Layers size={14} />
+              <span>Skilled</span>
             </button>
-            {hasCareer && (
-              <button
-                className={`analytics-tab-btn ${tab === 'career' ? 'active' : ''}`}
-                onClick={() => setTab('career')}
-              >
-                Career
-              </button>
-            )}
-          </div>
-        ) : <div />}
+          )}
+          <button
+            type="button"
+            className={`analytics-tab-btn ${tab === 'session' ? 'active' : ''}`}
+            onClick={() => setTab('session')}
+          >
+            <Trophy size={14} />
+            <span>Session</span>
+          </button>
+          <button
+            type="button"
+            className={`analytics-tab-btn ${tab === 'history' ? 'active' : ''}`}
+            onClick={() => setTab('history')}
+          >
+            <Clock size={14} />
+            <span>History</span>
+          </button>
+        </div>
 
-        {stats.length > 0 && (
+        {(stats.length > 0 || history.length > 0) && (
           <button
             type="button"
             className="analytics-share-recap-btn"
@@ -150,7 +148,7 @@ export const AnalyticsDashboard: React.FC<{
                               return (
                                 <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
                                   <td className="col-rank-num">{i + 1}</td>
-                                  <td><strong>{s.name}</strong></td>
+                                  <td><strong title={s.name}>{formatDisplayName(s.name)}</strong></td>
                                   <td className="col-wins">{s.wins}</td>
                                   <td className="col-losses">{s.losses}</td>
                                   <td>{s.gamesPlayed}</td>
@@ -181,7 +179,7 @@ export const AnalyticsDashboard: React.FC<{
                               <div className="analytics-card-header">
                                 <div className="analytics-card-player">
                                   <span className="analytics-card-rank-num">#{i + 1}</span>
-                                  <strong className="analytics-card-name">{s.name}</strong>
+                                  <strong className="analytics-card-name" title={s.name}>{formatDisplayName(s.name)}</strong>
                                 </div>
                                 <span className={`skill-badge skill-badge--${level}`}>{meta.letter}</span>
                               </div>
@@ -235,7 +233,7 @@ export const AnalyticsDashboard: React.FC<{
             ? <p className="muted-hint">No stats yet — play some matches!</p>
             : (
               <>
-                <div className="analytics-section-label"><BarChart2 size={13} /> Leaderboard</div>
+                <div className="analytics-section-label"><BarChart2 size={13} /><span>Leaderboard</span></div>
                 <div className="analytics-table-scroll analytics-desktop-only">
                   <table className="analytics-table">
                     <thead>
@@ -255,7 +253,7 @@ export const AnalyticsDashboard: React.FC<{
                         return (
                           <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
                             <td className="col-rank-num">{i + 1}</td>
-                            <td><strong>{s.name}</strong></td>
+                            <td><strong title={s.name}>{formatDisplayName(s.name)}</strong></td>
                             <td><RankBadge rank={s.rank} /></td>
                             <td className="col-wins">{s.wins}</td>
                             <td className="col-losses">{s.losses}</td>
@@ -283,7 +281,7 @@ export const AnalyticsDashboard: React.FC<{
                         <div className="analytics-card-header">
                           <div className="analytics-card-player">
                             <span className="analytics-card-rank-num">#{i + 1}</span>
-                            <strong className="analytics-card-name">{s.name}</strong>
+                            <strong className="analytics-card-name" title={s.name}>{formatDisplayName(s.name)}</strong>
                           </div>
                           <div className="analytics-card-badges">
                             <RankBadge rank={s.rank} />
@@ -339,7 +337,7 @@ export const AnalyticsDashboard: React.FC<{
                 <div className="frequency-chart">
                   {sorted.map(s => (
                     <div key={s.name} className="freq-row">
-                      <span className="freq-name" title={s.name}>{s.name}</span>
+                      <span className="freq-name" title={s.name}>{formatDisplayName(s.name)}</span>
                       <StatBar value={s.gamesPlayed} max={maxGP} color="#818cf8" />
                       <span className="freq-count">{s.gamesPlayed} <span className="freq-unit">GP</span></span>
                     </div>
@@ -350,66 +348,47 @@ export const AnalyticsDashboard: React.FC<{
         </>
       )}
 
-      {tab === 'career' && hasCareer && (
-        <>
-          <div className="analytics-section-label"><BarChart2 size={13} /> All-Time Career Stats (this device)</div>
-          {careerList.length === 0
-            ? <p className="muted-hint">No career data yet.</p>
-            : (
-              <>
-                <div className="analytics-table-scroll analytics-desktop-only">
-                  <table className="analytics-table">
-                    <thead>
-                      <tr><th>#</th><th>Player</th><th><TrendingUp size={11} /> W</th><th>L</th><th><Activity size={11} /> GP</th><th>Win %</th></tr>
-                    </thead>
-                    <tbody>
-                      {careerList.map((s, i) => (
-                        <tr key={s.name} className={i === 0 ? 'analytics-top' : ''}>
-                          <td className="col-rank-num">{i + 1}</td>
-                          <td><strong>{s.name}</strong></td>
-                          <td className="col-wins">{s.wins}</td>
-                          <td className="col-losses">{s.losses}</td>
-                          <td>{s.gamesPlayed}</td>
-                          <td><div className="winrate-cell"><span>{s.winRate}%</span><StatBar value={s.winRate} max={100} color="#22c55e" /></div></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="analytics-mobile-cards">
-                  {careerList.map((s, i) => (
-                    <div key={s.name} className={`analytics-player-card ${i === 0 ? 'analytics-top-card' : ''}`}>
-                      <div className="analytics-card-header">
-                        <div className="analytics-card-player">
-                          <span className="analytics-card-rank-num">#{i + 1}</span>
-                          <strong className="analytics-card-name">{s.name}</strong>
-                        </div>
-                      </div>
-                      <div className="analytics-card-stats analytics-card-stats--3col">
-                        <div className="analytics-stat-item">
-                          <span className="analytics-stat-label">W - L</span>
-                          <span className="analytics-stat-val">
-                            <span className="col-wins">{s.wins}</span> - <span className="col-losses">{s.losses}</span>
-                          </span>
-                        </div>
-                        <div className="analytics-stat-item">
-                          <span className="analytics-stat-label">GP</span>
-                          <span className="analytics-stat-val">{s.gamesPlayed}</span>
-                        </div>
-                        <div className="analytics-stat-item">
-                          <span className="analytics-stat-label">Win %</span>
-                          <div className="analytics-stat-val winrate-cell">
-                            <span>{s.winRate}%</span>
-                            <StatBar value={s.winRate} max={100} color="#22c55e" />
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-        </>
+      {tab === 'history' && (
+        <div className="analytics-history-wrap">
+          <div className="analytics-section-label">
+            <Clock size={13} /> Match History {history.length > 0 && `(${history.length})`}
+          </div>
+          {history.length === 0 ? (
+            <p className="muted-hint" style={{ padding: '24px 0', textAlign: 'center' }}>
+              No matches played yet in this session.
+            </p>
+          ) : (
+            <ul className="history-list">
+              {history.map(e => (
+                <li key={e.id} className="history-item">
+                  <div className="history-time">{e.timestamp}</div>
+                  <div className="history-match">
+                    {e.mode?.includes('(') && (
+                      <div className="history-court-tag">{e.mode.match(/\(([^)]+)\)/)?.[1]}</div>
+                    )}
+                    <div>{e.players}</div>
+                  </div>
+                  <div className="history-winner">
+                    <Trophy size={11} style={{ display: 'inline', marginRight: 4, verticalAlign: 'middle' }} />
+                    {e.winner}
+                  </div>
+                  {e.score && <div className="history-score">{e.score}</div>}
+                  {onCorrectHistoryEntry && (
+                    <button
+                      type="button"
+                      className="history-flip-btn"
+                      onClick={() => onCorrectHistoryEntry(e.id, flipHistoryEntryWinner(e))}
+                      title="Retroactively flip match winner"
+                      aria-label={`Flip winner for match ${e.id}`}
+                    >
+                      <ArrowLeftRight size={11} /> Flip Winner
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );

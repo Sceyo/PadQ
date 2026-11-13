@@ -20,13 +20,14 @@
  */
 
 import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Trophy, Flame, History, ArrowLeft, Users, Swords,
-  Wifi, Check,
+  Wifi, Check, Sun, Moon,
   BarChart2, TrendingUp, Activity, AlertCircle,
-  Loader2, Share2,
+  Loader2, Share2, Coffee,
 } from 'lucide-react';
 import {
   subscribeToSession,
@@ -35,6 +36,7 @@ import {
   SessionDoc,
   MatchHistoryEntry,
   TournamentMatch,
+  CourtSlot,
 } from '@/lib/sessionService';
 import { useSessionAccess } from '@/hooks/useSessionAccess';
 import AccessCodeModal from '@/app/queue/components/atoms/AccessCodeModal';
@@ -43,7 +45,16 @@ import { StreakBadge } from '@/app/queue/components/atoms/StreakBadge';
 import { buildPlayerStats, comparePlayerStats, formatPointDiff, formatMatchupStrength } from '@/app/queue/lib/playerUtils';
 import { V1_RELEASE } from '@/app/queue/lib/releaseConfig';
 import { RecapModal } from '@/app/queue/components/RecapCard';
-import { LiveCourtStatus } from './LiveCourtStatus';
+import { LiveCourtStatus, WaitingQueueChips } from './LiveCourtStatus';
+import { resolveWatchTurnContext } from '@/app/queue/lib/watchTurnContext';
+import {
+  getPlayerTurnZone,
+  shouldTriggerTurnAlert,
+  fireBrowserTurnAlert,
+  getWatchedPlayer,
+  setWatchedPlayer,
+  type PlayerTurnZone,
+} from '@/app/queue/lib/turnAlert';
 import './watch.css';
 
 // ═══════════════════════════════════════════════════════════
@@ -127,6 +138,27 @@ function WatchPageContent() {
   // ── Access control: PIN gate ─────────────────────────────
   const { access, submitPin } = useSessionAccess(sessionId);
 
+  // ── Theme State ──────────────────────────────────────────
+  const [darkMode, setDarkMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    try {
+      const saved = localStorage.getItem('padq_dark_mode');
+      return saved !== null ? saved === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    document.body.classList.toggle('dark-mode', darkMode);
+    document.documentElement.classList.toggle('dark-mode', darkMode);
+    try {
+      localStorage.setItem('padq_dark_mode', String(darkMode));
+    } catch {
+      // storage unavailable
+    }
+  }, [darkMode]);
+
   // ── Firebase state ──────────────────────────────────────
   const [session,         setSession]         = useState<SessionDoc | null>(null);
   const [history,         setHistory]         = useState<MatchHistoryEntry[]>([]);
@@ -155,8 +187,57 @@ function WatchPageContent() {
   };
 
   // ── Match announcement (Task 12) ────────────────────────
-  const [announcement,   setAnnouncement]    = useState<string | null>(null);
+  const [announcement,   setAnnouncement]    = useState<{ label: string; text: string } | null>(null);
   const prevMatchKeyRef = useRef<string>('');
+  const prevCourtSlotsRef = useRef<CourtSlot[] | null>(null);
+
+  // Spectator Turn Alert
+  const [watchedPlayer, setWatchedPlayerState] = useState<string | null>(() => getWatchedPlayer(sessionId));
+  const prevTurnZoneRef = useRef<PlayerTurnZone | null>(null);
+
+  const watchTurnCtx = useMemo(() => {
+    if (!session) return null;
+    return resolveWatchTurnContext({
+      gameMode: session.gameMode ?? 'doubles',
+      courtName: session.courtName,
+      courtSlots: session.courtSlots,
+      queue: session.queue,
+      sittingOut: session.sittingOut,
+      priorityPlayers: session.priorityPlayers,
+    });
+  }, [session]);
+
+  useEffect(() => {
+    if (!watchedPlayer || !watchTurnCtx) {
+      prevTurnZoneRef.current = null;
+      return;
+    }
+    const zoneResult = getPlayerTurnZone(
+      watchedPlayer,
+      watchTurnCtx.effectiveCourts,
+      watchTurnCtx.waitingQueue,
+      watchTurnCtx.playersPerMatch
+    );
+
+    if (prevTurnZoneRef.current && shouldTriggerTurnAlert(prevTurnZoneRef.current, zoneResult.zone)) {
+      const alertMsg = zoneResult.zone === 'on-court'
+        ? `You are on court${zoneResult.courtName ? ` (${zoneResult.courtName})` : ''}!`
+        : 'You are on deck! Get ready to play.';
+      fireBrowserTurnAlert(alertMsg);
+    }
+    prevTurnZoneRef.current = zoneResult.zone;
+  }, [watchedPlayer, watchTurnCtx]);
+
+  const toggleWatchPlayer = (playerName: string) => {
+    setWatchedPlayerState(current => {
+      const next = current === playerName ? null : playerName;
+      setWatchedPlayer(sessionId, next);
+      if (next) {
+        fireBrowserTurnAlert();
+      }
+      return next;
+    });
+  };
 
   // ── Guardrail: validate session exists before subscribing ──
 
@@ -235,6 +316,38 @@ function WatchPageContent() {
   // ── Match change detection — fires announcement ──────────
   useEffect(() => {
     if (!session?.isLive) return;
+
+    // Multi-court match detection
+    if (session.courtSlots && session.courtSlots.length > 0) {
+      if (prevCourtSlotsRef.current) {
+        const minOnCourt = session.gameMode === 'singles' ? 2 : 4;
+        const changedCourt = session.courtSlots.find(curr => {
+          const prev = prevCourtSlotsRef.current?.find(p => p.id === curr.id);
+          return prev && curr.onCourt.length >= minOnCourt && curr.onCourt.join(',') !== prev.onCourt.join(',');
+        });
+
+        if (changedCourt) {
+          const isSingles = session.gameMode === 'singles';
+          const tA = isSingles ? changedCourt.onCourt[0] : changedCourt.onCourt.slice(0, 2).join(' & ');
+          const tB = isSingles ? changedCourt.onCourt[1] : changedCourt.onCourt.slice(2, 4).join(' & ');
+          const payload = {
+            label: `🎾 NOW PLAYING ON ${changedCourt.name.toUpperCase()}`,
+            text: `${tA}  vs  ${tB}`,
+          };
+          const showTimer = setTimeout(() => setAnnouncement(payload), 0);
+          const clearTimer = setTimeout(() => setAnnouncement(null), 6000);
+          prevCourtSlotsRef.current = session.courtSlots.map(c => ({ ...c, onCourt: [...c.onCourt] }));
+          return () => {
+            clearTimeout(showTimer);
+            clearTimeout(clearTimer);
+          };
+        }
+      }
+      prevCourtSlotsRef.current = session.courtSlots.map(c => ({ ...c, onCourt: [...c.onCourt] }));
+      return;
+    }
+
+    // Single-court match detection
     const q  = session.queue ?? [];
     const gm = session.gameMode;
     let key = '';
@@ -247,7 +360,8 @@ function WatchPageContent() {
         ? `${q[0]} vs ${q[1]}`
         : `${q[0]} & ${q[1]}  vs  ${q[2]} & ${q[3]}`;
       prevMatchKeyRef.current = key;
-      const showTimer = setTimeout(() => setAnnouncement(text), 0);
+      const payload = { label: '🎉 NEXT UP ON COURT', text };
+      const showTimer = setTimeout(() => setAnnouncement(payload), 0);
       const clearTimer = setTimeout(() => setAnnouncement(null), 6000);
       return () => {
         clearTimeout(showTimer);
@@ -437,46 +551,72 @@ function WatchPageContent() {
       {announcement && (
         <div className="w-announcement" role="alert">
           <div className="w-announcement-inner">
-            <div className="w-announcement-label">🏓 NEXT UP ON COURT</div>
-            <div className="w-announcement-match">{announcement}</div>
-            <button className="w-announcement-close" onClick={() => setAnnouncement(null)}>✕</button>
+            <div className="w-announcement-label">{announcement.label}</div>
+            <div className="w-announcement-match">{announcement.text}</div>
+            <button className="w-announcement-close" aria-label="Close match announcement" onClick={() => setAnnouncement(null)}>✕</button>
           </div>
         </div>
       )}
 
       {/* ── Top bar ── */}
-      <div className="w-topbar">
-        <button className="w-back-btn" onClick={() => router.push('/')}>
-          <ArrowLeft size={14} /> Home
-        </button>
-        <Link
-          className="w-back-btn"
-          href="/privacy"
-          onClick={() => {
-            if (typeof window !== 'undefined') {
-              sessionStorage.setItem('padq_privacy_from', window.location.pathname + window.location.search);
-            }
-          }}
-        >
-          Privacy
-        </Link>
+      <header className="w-topbar">
+        <div className="w-topbar-left">
+          <button className="w-back-btn" onClick={() => router.push('/')} aria-label="Back to home">
+            <ArrowLeft size={14} /> Home
+          </button>
+          <div style={{ display: 'flex', alignItems: 'center', margin: '0 4px' }}>
+            <Image
+              src="/padq-logo.png"
+              alt="PadQ"
+              width={74}
+              height={26}
+              priority
 
-        <div className="w-session-info">
-          <span className={`w-dot ${status === 'live' ? 'w-dot--live' : 'w-dot--off'}`} />
-          <span className="w-live-label">LIVE</span>
-          <span className="w-room-code">{sessionId}</span>
+            />
+          </div>
         </div>
 
-        <div className="w-topbar-mode">
-          {gameMode === 'singles' ? <Swords size={14} /> : <Users size={14} />}
-          {gameMode === 'singles' ? 'Singles' : 'Doubles'} ·{' '}
-          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : visibleQueueMode === 'skilled' ? 'Skilled' : 'Default'}
+        <div className="w-topbar-right">
+          <div className="w-session-info">
+            <span className={`w-dot ${status === 'live' ? 'w-dot--live' : 'w-dot--off'}`} />
+            <span className="w-live-label">LIVE</span>
+            <span className="w-room-code">{sessionId}</span>
+          </div>
+
+          <Link
+            className="w-back-btn"
+            href="/privacy"
+            onClick={() => {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem('padq_privacy_from', window.location.pathname + window.location.search);
+              }
+            }}
+          >
+            Privacy
+          </Link>
+
+          <button
+            type="button"
+            className="w-theme-toggle"
+            onClick={() => setDarkMode(d => !d)}
+            aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {darkMode ? <Sun size={15} /> : <Moon size={15} />}
+          </button>
         </div>
-      </div>
+      </header>
 
       {/* ── Viewer read-only banner ── */}
       <div className="w-viewer-banner">
-        <Wifi size={13} /> You are watching live. Only the host can make changes.
+        <div className="w-viewer-banner-text">
+          <Wifi size={13} /> You are watching live. Only the host can make changes.
+        </div>
+        <div className="w-topbar-mode">
+          {gameMode === 'singles' ? <Swords size={12} /> : <Users size={12} />}
+          {gameMode === 'singles' ? 'Singles' : 'Doubles'} ·{' '}
+          {visibleQueueMode === 'tournament' ? 'Tournament' : visibleQueueMode === 'playall' ? 'Play-all' : visibleQueueMode === 'skilled' ? 'Skilled' : 'Default'}
+        </div>
       </div>
 
       <div className="w-body">
@@ -487,8 +627,9 @@ function WatchPageContent() {
             ══════════════════════════════════════════════════ */}
         {!isMultiCourt && session.liveScore?.active && (() => {
           const ls = session.liveScore!;
-          const aWon = ls.scoreA >= ls.limit;
-          const bWon = ls.scoreB >= ls.limit;
+          const limit = ls.limit ?? 11;
+          const aWon = ls.scoreA >= limit && ls.scoreA - ls.scoreB >= 2;
+          const bWon = ls.scoreB >= limit && ls.scoreB - ls.scoreA >= 2;
           return (
             <div className="w-live-score-hero">
               <div className="w-live-score-badge">
@@ -498,7 +639,7 @@ function WatchPageContent() {
               </div>
               <div className="w-live-score-board">
                 <div className={`w-live-side ${aWon ? 'w-live-side--winner' : ''}`}>
-                  <div className="w-live-team-label">Team A</div>
+                  <div className="w-live-team-label">{gameMode === 'singles' ? 'Player 1' : 'Team A'}</div>
                   <div className="w-live-player-name">{ls.labelA}</div>
                   <div className="w-live-score-num">{ls.scoreA}</div>
                 </div>
@@ -507,7 +648,7 @@ function WatchPageContent() {
                   {(aWon || bWon) && <div className="w-live-gameover">Game Over!</div>}
                 </div>
                 <div className={`w-live-side ${bWon ? 'w-live-side--winner' : ''}`}>
-                  <div className="w-live-team-label">Team B</div>
+                  <div className="w-live-team-label">{gameMode === 'singles' ? 'Player 2' : 'Team B'}</div>
                   <div className="w-live-player-name">{ls.labelB}</div>
                   <div className="w-live-score-num">{ls.scoreB}</div>
                 </div>
@@ -644,6 +785,12 @@ function WatchPageContent() {
               queue={queue}
               selectedCourtId={selectedCourtId}
               onSelectCourt={selectCourt}
+              sittingOut={session?.sittingOut ?? []}
+              players={session?.players ?? []}
+              priorityPlayers={session?.priorityPlayers ?? []}
+              lockedPartners={session?.lockedPartners ?? []}
+              watchedPlayer={watchedPlayer}
+              onToggleWatchPlayer={toggleWatchPlayer}
             />
           </div>
         )}
@@ -694,8 +841,8 @@ function WatchPageContent() {
             ══════════════════════════════════════════════════ */}
         {!isTournament && !isSkilled && !isMultiCourt && (
           <>
-            {/* Current match */}
-            {currentSinglesMatch && (
+            {/* Current match — only show standalone On Court card if Live Score hero is not already active */}
+            {!session.liveScore?.active && currentSinglesMatch && (
               <div className="w-section">
                 <h2 className="w-section-title"><Swords size={16} /> On Court Now</h2>
                 <div className="w-vs-row">
@@ -712,7 +859,7 @@ function WatchPageContent() {
               </div>
             )}
 
-            {currentDoublesNext && (
+            {!session.liveScore?.active && currentDoublesNext && (
               <div className="w-section">
                 <h2 className="w-section-title"><Users size={16} /> On Court Now</h2>
                 <div className="w-vs-row">
@@ -752,6 +899,39 @@ function WatchPageContent() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {watchTurnCtx && watchTurnCtx.waitingQueue.length > 0 && (
+              <div className="w-section">
+                <h2 className="w-section-title">
+                  <Users size={15} /> Next in Queue
+                </h2>
+                <WaitingQueueChips
+                  waitingQueue={watchTurnCtx.waitingQueue}
+                  playersPerMatch={watchTurnCtx.playersPerMatch}
+                  activeCourtCount={1}
+                  prioritySet={new Set(session?.priorityPlayers ?? [])}
+                  partnerMap={session?.lockedPartners ? new Map(session.lockedPartners.flatMap(p => [[p.a, p.b], [p.b, p.a]])) : undefined}
+                  watchedPlayer={watchedPlayer}
+                  onToggleWatchPlayer={toggleWatchPlayer}
+                />
+              </div>
+            )}
+
+            {session?.sittingOut && session.sittingOut.length > 0 && (
+              <div className="w-section">
+                <h2 className="w-section-title">
+                  <Coffee size={15} /> On Break ({session.sittingOut.length})
+                </h2>
+                <div className="w-break-chips">
+                  {session.sittingOut.map(p => (
+                    <span key={`w-break-sc-${p}`} className="w-break-chip">
+                      <span>{p}</span>
+                      <span className="w-status-pill w-status-pill--on-break">On break</span>
+                    </span>
+                  ))}
+                </div>
               </div>
             )}
           </>

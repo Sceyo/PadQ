@@ -39,7 +39,7 @@ function toTeamArray(players: string[]): Team[] {
   return teams;
 }
 
-function pairKey(a: string, b: string): string {
+export function pairKey(a: string, b: string): string {
   return [a, b].sort().join('+');
 }
 
@@ -106,38 +106,55 @@ function formTeams(
   return { teamA: candidates[0].teamA, teamB: candidates[0].teamB };
 }
 
-function smartSelectPool(
+export function smartSelectPool(
   candidates: string[],
   recentPairs: string[],
   recentMatches: string[],
   lastMatchPlayers: Set<string>,
   skillMap: Record<string, number>,
+  mustInclude: string[] = [],
 ): string[] {
   const window = candidates.slice(0, SELECTION_WINDOW);
   if (window.length <= 4) return window.slice(0, 4);
 
-  let bestScore = Infinity;
-  let bestCombo: string[] = window.slice(0, 4);
-
-  for (let i = 0; i < window.length - 3; i++) {
-    for (let j = i + 1; j < window.length - 2; j++) {
-      for (let k = j + 1; k < window.length - 1; k++) {
-        for (let l = k + 1; l < window.length; l++) {
-          const [a, b, c, d] = [window[i], window[j], window[k], window[l]];
-          const pairings = allPairings([a, b, c, d] as [string, string, string, string]);
-          const minPairingScore = Math.min(
-            ...pairings.map(p =>
-              scoreCandidate(p.teamA, p.teamB, recentPairs, recentMatches, lastMatchPlayers, skillMap),
-            ),
-          );
-          if (minPairingScore < bestScore) {
-            bestScore = minPairingScore;
-            bestCombo = [a, b, c, d];
-          }
-        }
-      }
-    }
+  const forced = mustInclude.filter((p, idx, arr) => window.includes(p) && arr.indexOf(p) === idx);
+  if (forced.length >= 4) {
+    return forced.slice(0, 4);
   }
+
+  const forcedSet = new Set(forced);
+  const remainingWindow = window.filter(p => !forcedSet.has(p));
+  const needed = 4 - forced.length;
+
+  if (remainingWindow.length <= needed) {
+    return [...forced, ...remainingWindow].slice(0, 4);
+  }
+
+  let bestScore = Infinity;
+  let bestCombo: string[] = [...forced, ...remainingWindow.slice(0, needed)];
+
+  const search = (startIdx: number, chosen: string[]) => {
+    if (chosen.length === 4) {
+      const [a, b, c, d] = chosen;
+      const pairings = allPairings([a, b, c, d] as [string, string, string, string]);
+      const minPairingScore = Math.min(
+        ...pairings.map(p =>
+          scoreCandidate(p.teamA, p.teamB, recentPairs, recentMatches, lastMatchPlayers, skillMap),
+        ),
+      );
+      if (minPairingScore < bestScore) {
+        bestScore = minPairingScore;
+        bestCombo = [...chosen];
+      }
+      return;
+    }
+    const slotsLeft = 4 - chosen.length;
+    for (let i = startIdx; i <= remainingWindow.length - slotsLeft; i++) {
+      search(i + 1, [...chosen, remainingWindow[i]]);
+    }
+  };
+
+  search(0, [...forced]);
   return bestCombo;
 }
 
@@ -211,12 +228,12 @@ function balancePools(
   if (nextW1.length > MAX_POOL_SIZE) {
     const overflow = nextW1.slice(MAX_POOL_SIZE);
     nextW1 = nextW1.slice(0, MAX_POOL_SIZE);
-    nextWaiting = [...nextWaiting, ...overflow];
+    nextWaiting = [...nextWaiting, ...overflow.filter(p => !nextWaiting.includes(p))];
   }
   if (nextL1.length > MAX_POOL_SIZE) {
     const overflow = nextL1.slice(MAX_POOL_SIZE);
     nextL1 = nextL1.slice(0, MAX_POOL_SIZE);
-    nextWaiting = [...nextWaiting, ...overflow];
+    nextWaiting = [...nextWaiting, ...overflow.filter(p => !nextWaiting.includes(p))];
   }
 
   return { w1: nextW1, l1: nextL1, waiting: nextWaiting };
@@ -251,9 +268,11 @@ export function buildNextMatch(
   state: PaddleState,
   allPlayers: string[],
   skillMap: Record<string, number> = {},
+  priorityPlayers: string[] = [],
 ): Match {
   const lastMatchPlayers = lastMatchPlayerSet(state.recentMatches);
   const eligible = new Set(allPlayers);
+  const eligiblePriority = priorityPlayers.filter(p => eligible.has(p));
 
   if (state.phase === 'INIT') {
     const base = state.matchIndexInPhase * 4;
@@ -271,11 +290,11 @@ export function buildNextMatch(
     if (candidates.length < 4) {
       candidates = [
         ...candidates,
-        ...state.l1.filter(p => eligible.has(p)).slice(0, 4 - candidates.length),
+        ...state.l1.filter(p => eligible.has(p) && !candidates.includes(p)).slice(0, 4 - candidates.length),
       ];
     }
     if (candidates.length < 4) return fallbackMatch(candidates);
-    const selected = smartSelectPool(candidates, state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap);
+    const selected = smartSelectPool(candidates, state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap, eligiblePriority);
     if (selected.length < 4) return fallbackMatch(selected);
     return formTeams(selected[0], selected[1], selected[2], selected[3], state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap);
   }
@@ -284,11 +303,11 @@ export function buildNextMatch(
   if (candidates.length < 4) {
     candidates = [
       ...candidates,
-      ...state.w1.filter(p => eligible.has(p)).slice(0, 4 - candidates.length),
+      ...state.w1.filter(p => eligible.has(p) && !candidates.includes(p)).slice(0, 4 - candidates.length),
     ];
   }
   if (candidates.length < 4) return fallbackMatch(candidates);
-  const selected = smartSelectPool(candidates, state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap);
+  const selected = smartSelectPool(candidates, state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap, eligiblePriority);
   if (selected.length < 4) return fallbackMatch(selected);
   return formTeams(selected[0], selected[1], selected[2], selected[3], state.recentPairs, state.recentMatches, lastMatchPlayers, skillMap);
 }
@@ -299,7 +318,8 @@ export function advancePaddleState(
   loserTeam: Team,
   allPlayers: string[],
   skillMap: Record<string, number> = {},
-): { nextState: PaddleState; newQueue: string[] } {
+  priorityPlayers: string[] = [],
+): { nextState: PaddleState; newQueue: string[]; consumedPriority: string[] } {
   const allFour        = [...winnerTeam, ...loserTeam];
   const nextMatchCount = state.matchCount + 1;
 
@@ -339,14 +359,16 @@ export function advancePaddleState(
   if (state.phase === 'INIT') {
     const initMatchesNeeded = Math.max(1, Math.floor(allPlayers.length / 4));
     if (nextMatchIndex >= initMatchesNeeded) {
-      const seededSet = new Set(allPlayers.slice(0, initMatchesNeeded * 4));
-      const overflow  = allPlayers.filter(p => !seededSet.has(p) && !nextWaiting.includes(p));
+      const overflow = allPlayers.filter(
+        p => !nextW1.includes(p) && !nextL1.includes(p) && !nextWaiting.includes(p),
+      );
       nextWaiting = [...nextWaiting, ...overflow];
 
       const unplayed = nextWaiting.filter(p => !nextPlayedThisCycle.has(p));
       // Prepend unplayed players so they get priority; balancePools trims
       // from the back, so newly-injected front-entries are preserved.
       nextW1      = [...unplayed, ...nextW1.filter(p => !unplayed.includes(p))];
+      nextL1      = nextL1.filter(p => !unplayed.includes(p));
       nextWaiting = nextWaiting.filter(p => nextPlayedThisCycle.has(p));
       ({ w1: nextW1, l1: nextL1, waiting: nextWaiting } = balancePools(nextW1, nextL1, nextWaiting));
 
@@ -378,12 +400,31 @@ export function advancePaddleState(
       // entries) rather than the front, so the newly-injected unplayed
       // players at the front are preserved, not immediately re-evicted.
       nextW1      = [...unplayed, ...nextW1.filter(p => !unplayed.includes(p))];
+      nextL1      = nextL1.filter(p => !unplayed.includes(p));
       nextWaiting = nextWaiting.filter(p => nextPlayedThisCycle.has(p));
       ({ w1: nextW1, l1: nextL1, waiting: nextWaiting } = balancePools(nextW1, nextL1, nextWaiting));
     }
 
     nextPhase      = 'WINNERS';
     nextMatchIndex = 0;
+  }
+
+  if (nextPhase !== 'INIT' && priorityPlayers.length > 0) {
+    const eligibleSet = new Set(allPlayers);
+    const eligiblePriority = priorityPlayers.filter(
+      (p, idx, arr) => eligibleSet.has(p) && arr.indexOf(p) === idx,
+    );
+    if (eligiblePriority.length > 0) {
+      const prioritySet = new Set(eligiblePriority);
+      nextW1 = nextW1.filter(p => !prioritySet.has(p));
+      nextL1 = nextL1.filter(p => !prioritySet.has(p));
+      nextWaiting = nextWaiting.filter(p => !prioritySet.has(p));
+      if (nextPhase === 'WINNERS') {
+        nextW1 = [...eligiblePriority, ...nextW1];
+      } else if (nextPhase === 'LOSERS') {
+        nextL1 = [...eligiblePriority, ...nextL1];
+      }
+    }
   }
 
   const nextWinnersPool = toTeamArray(nextW1);
@@ -404,12 +445,62 @@ export function advancePaddleState(
     losersPool:        nextLosersPool,
   };
 
-  const nextMatch = buildNextMatch(nextState, allPlayers, skillMap);
+  const nextMatch = buildNextMatch(nextState, allPlayers, skillMap, priorityPlayers);
   const onCourt   = new Set([...nextMatch.teamA, ...nextMatch.teamB]);
   const offCourt  = allPlayers.filter(p => !onCourt.has(p));
   const newQueue  = [...nextMatch.teamA, ...nextMatch.teamB, ...offCourt];
+  const consumedPriority = priorityPlayers.filter(
+    (p, idx, arr) => onCourt.has(p) && arr.indexOf(p) === idx,
+  );
 
-  return { nextState, newQueue };
+  if (process.env.NODE_ENV !== 'production') {
+    try {
+      assertPaddleStateConsistent(nextState, allPlayers);
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  return { nextState, newQueue, consumedPriority };
+}
+
+/**
+ * Guard to verify single-court doubles engine pool consistency:
+ * - w1, l1, waitingQueue are pairwise disjoint.
+ * - Every member of w1, l1, waitingQueue is in activePlayers.
+ *
+ * In test environment: throws Error if inconsistent.
+ * In non-test environment: logs console.error without crashing or silent repair.
+ */
+export function assertPaddleStateConsistent(
+  state: PaddleState,
+  activePlayers: string[],
+): void {
+  const activeSet = new Set(activePlayers);
+  const seen = new Set<string>();
+  const duplicates: string[] = [];
+  const unknown: string[] = [];
+
+  for (const pool of [state.w1, state.l1, state.waitingQueue]) {
+    for (const p of pool) {
+      if (seen.has(p) && !duplicates.includes(p)) {
+        duplicates.push(p);
+      }
+      seen.add(p);
+      if (!activeSet.has(p) && !unknown.includes(p)) {
+        unknown.push(p);
+      }
+    }
+  }
+
+  if (duplicates.length > 0 || unknown.length > 0) {
+    const msg = `[assertPaddleStateConsistent] Inconsistency detected! Duplicates: [${duplicates.join(', ')}], Unknown active players: [${unknown.join(', ')}]`;
+    if (process.env.NODE_ENV === 'test') {
+      throw new Error(msg);
+    } else {
+      console.error(msg, { state, activePlayers });
+    }
+  }
 }
 
 export function addPlayerToWaiting(state: PaddleState, playerName: string): PaddleState {
@@ -468,54 +559,81 @@ export function selectPartnerAwareMatch(
   );
   const playerSet = new Set(players);
   const partnerOf = new Map<string, string>();
+  const waitingForPartner = new Set<string>();
 
   for (const [a, b] of lockedPairs) {
-    if (a === b || !playerSet.has(a) || !playerSet.has(b)) continue;
+    if (a === b) continue;
     if (partnerOf.has(a) || partnerOf.has(b)) continue;
-    partnerOf.set(a, b);
-    partnerOf.set(b, a);
-  }
-
-  const consumed = new Set<string>();
-  const units: string[][] = [];
-  for (const player of players) {
-    if (consumed.has(player)) continue;
-    const partner = partnerOf.get(player);
-    if (partner) {
-      const pair = [player, partner].sort(
-        (a, b) => players.indexOf(a) - players.indexOf(b)
-      );
-      units.push(pair);
-      consumed.add(player);
-      consumed.add(partner);
-    } else {
-      units.push([player]);
-      consumed.add(player);
+    if (playerSet.has(a) && playerSet.has(b)) {
+      partnerOf.set(a, b);
+      partnerOf.set(b, a);
+    } else if (playerSet.has(a) && !playerSet.has(b)) {
+      waitingForPartner.add(a);
+    } else if (playerSet.has(b) && !playerSet.has(a)) {
+      waitingForPartner.add(b);
     }
   }
 
-  let bestUnits: string[][] | null = null;
-  let bestScore = Number.POSITIVE_INFINITY;
-  const search = (index: number, chosen: string[][], size: number) => {
-    if (size === 4) {
-      // A locked pair owns one queue position: the position of whichever
-      // partner has waited longest. Charging both player indices would make a
-      // pair with one late-listed member starve behind four single players.
-      const score = chosen.reduce(
-        (sum, unit) => sum + Math.min(...unit.map(p => players.indexOf(p))),
-        0,
-      );
-      if (score < bestScore) {
-        bestScore = score;
-        bestUnits = [...chosen];
+  const buildUnits = (excludeWaitingPartners: boolean): string[][] => {
+    const consumed = new Set<string>();
+    const res: string[][] = [];
+    for (const player of players) {
+      if (consumed.has(player)) continue;
+      if (excludeWaitingPartners && waitingForPartner.has(player)) continue;
+      const partner = partnerOf.get(player);
+      if (partner) {
+        const pair = [player, partner].sort(
+          (a, b) => players.indexOf(a) - players.indexOf(b)
+        );
+        res.push(pair);
+        consumed.add(player);
+        consumed.add(partner);
+      } else {
+        res.push([player]);
+        consumed.add(player);
       }
-      return;
     }
-    if (size > 4 || index >= units.length) return;
-    search(index + 1, [...chosen, units[index]], size + units[index].length);
-    search(index + 1, chosen, size);
+    return res;
   };
-  search(0, [], 0);
+
+  const findBestMatch = (candidateUnits: string[][]): string[][] | null => {
+    let bestMatch: string[][] | null = null;
+    let bestScore = Number.POSITIVE_INFINITY;
+    const search = (index: number, chosen: string[][], size: number) => {
+      if (size === 4) {
+        // A locked pair owns one queue position: the position of whichever
+        // partner has waited longest. Charging both player indices would make a
+        // pair with one late-listed member starve behind four single players.
+        const score = chosen.reduce(
+          (sum, unit) => sum + Math.min(...unit.map(p => players.indexOf(p))),
+          0,
+        );
+        if (score < bestScore) {
+          bestScore = score;
+          bestMatch = [...chosen];
+        }
+        return;
+      }
+      if (size > 4 || index >= candidateUnits.length) return;
+      search(index + 1, [...chosen, candidateUnits[index]], size + candidateUnits[index].length);
+      search(index + 1, chosen, size);
+    };
+    search(0, [], 0);
+    return bestMatch;
+  };
+
+  // Option 2 (Asynchronous / Global Pairing):
+  // 1. Try to form a full 4-player match while letting waiting partners hold their queue spot
+  // until their partner finishes their match on another court.
+  let units = buildUnits(true);
+  let bestUnits = findBestMatch(units);
+
+  // 2. Constrained fallback: If we cannot form a full 4-player match without them (e.g. tight 8-player 2-court
+  // session where holding them back would starve the court), fall back to including them as singles.
+  if (!bestUnits && waitingForPartner.size > 0) {
+    units = buildUnits(false);
+    bestUnits = findBestMatch(units);
+  }
 
   // Fewer than four eligible players: preserve atomicity and return the
   // earliest units that fit, allowing callers to show an incomplete court.
@@ -561,10 +679,49 @@ export function seedMultiCourtDoubles(
  * Rotate one independently finishing court through a shared FIFO bench.
  * Finishers go to the back; locked pairs remain one indivisible queue unit.
  */
+export interface MultiCourtRotateOptions {
+  recentPairs?: string[];
+  recentMatches?: string[];
+  lastMatchPlayers?: Set<string>;
+  skillMap?: Record<string, number>;
+}
+
+export function balanceSelectedMatch(
+  selectedPlayers: string[],
+  lockedPairs: LockedPartnerPair[],
+  recentPairs: string[] = [],
+  recentMatches: string[] = [],
+  lastMatchPlayers: Set<string> = new Set(),
+  skillMap: Record<string, number> = {},
+): string[] {
+  if (selectedPlayers.length !== 4) return [...selectedPlayers];
+
+  const playerSet = new Set(selectedPlayers);
+  const activeLocked = lockedPairs.filter(
+    ([a, b]) => playerSet.has(a) && playerSet.has(b)
+  );
+
+  if (activeLocked.length >= 2) {
+    return [...activeLocked[0], ...activeLocked[1]];
+  }
+
+  if (activeLocked.length === 1) {
+    const lockedTeam = activeLocked[0];
+    const lockedMembers = new Set(lockedTeam);
+    const otherPlayers = selectedPlayers.filter(p => !lockedMembers.has(p));
+    return [...lockedTeam, ...otherPlayers];
+  }
+
+  const [p0, p1, p2, p3] = selectedPlayers;
+  const best = formTeams(p0, p1, p2, p3, recentPairs, recentMatches, lastMatchPlayers, skillMap);
+  return [...best.teamA, ...best.teamB];
+}
+
 export function rotateMultiCourtDoubles(
   waitingPlayers: string[],
   finishedPlayers: string[],
   lockedPairs: LockedPartnerPair[],
+  options?: MultiCourtRotateOptions,
 ): PartnerAwareSelection {
   const finishedSet = new Set(finishedPlayers);
   // Court slots store Team A followed by Team B. Re-appending that order
@@ -579,5 +736,20 @@ export function rotateMultiCourtDoubles(
     ...waitingPlayers.filter(player => !finishedSet.has(player)),
     ...rotatedFinishers,
   ];
-  return selectPartnerAwareMatch(ranked, lockedPairs);
+  const selection = selectPartnerAwareMatch(ranked, lockedPairs);
+  if (options) {
+    const balancedOnCourt = balanceSelectedMatch(
+      selection.onCourt,
+      lockedPairs,
+      options.recentPairs ?? [],
+      options.recentMatches ?? [],
+      options.lastMatchPlayers ?? new Set(),
+      options.skillMap ?? {},
+    );
+    return {
+      onCourt: balancedOnCourt,
+      waiting: selection.waiting,
+    };
+  }
+  return selection;
 }

@@ -12,16 +12,25 @@ export interface RecapCardProps {
   history: MatchHistoryEntry[];
   roomCode?: string | null;
   mode?: string;
-  variant?: 'host' | 'viewer';
+  variant?: 'host' | 'viewer' | 'player';
+  selectedPlayerName?: string;
 }
 
 export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function RecapCard(
-  { stats, history, roomCode, mode = 'Doubles', variant = 'host' },
+  { stats, history, roomCode, mode = 'Doubles', variant = 'host', selectedPlayerName },
   ref,
 ) {
   const recap = computeSessionRecap(stats, history);
   const dateStr = formatRecapDate();
   const permanentUrl = 'https://pad-q.vercel.app?utm_source=recap_card';
+
+  const targetPlayer =
+    (selectedPlayerName ? recap.sortedPlayers.find(p => p.name === selectedPlayerName) : null) ??
+    recap.sortedPlayers[0];
+  const targetRankIdx = targetPlayer
+    ? recap.sortedPlayers.findIndex(p => p.name === targetPlayer.name)
+    : 0;
+  const rankNum = targetRankIdx + 1;
 
   return (
     <div className="recap-card-root" ref={ref} data-variant={variant}>
@@ -165,7 +174,7 @@ export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function Rec
             </div>
           )}
         </main>
-      ) : (
+      ) : variant === 'viewer' ? (
         /* Viewer Variant: Full Session Standings Board */
         <main className="recap-viewer-content">
           <div className="recap-viewer-table-shell">
@@ -207,6 +216,44 @@ export const RecapCard = forwardRef<HTMLDivElement, RecapCardProps>(function Rec
             {recap.sortedPlayers.length > 10 && (
               <div className="recap-more-hint">
                 +{recap.sortedPlayers.length - 10} additional players in rotation
+              </div>
+            )}
+          </div>
+        </main>
+      ) : (
+        /* Player Spotlight Card Variant */
+        <main className="recap-player-content">
+          <div className="recap-player-spotlight-card">
+            <div className="recap-player-rank-banner">
+              <span className="recap-player-rank-badge">#{rankNum} OF {recap.sortedPlayers.length}</span>
+              <span className="recap-player-tier-badge">{targetPlayer?.rank ?? 'Bronze'}</span>
+            </div>
+            <div className="recap-player-spotlight-name">{targetPlayer?.name ?? 'Player'}</div>
+            <div className="recap-player-stat-grid">
+              <div className="recap-player-stat-cell">
+                <span className="recap-player-stat-label">RECORD</span>
+                <span className="recap-player-stat-val">{targetPlayer?.wins ?? 0}W - {targetPlayer?.losses ?? 0}L</span>
+              </div>
+              <div className="recap-player-stat-cell">
+                <span className="recap-player-stat-label">WIN RATE</span>
+                <span className="recap-player-stat-val">{targetPlayer?.winRate ?? 0}%</span>
+              </div>
+              <div className="recap-player-stat-cell">
+                <span className="recap-player-stat-label">POINT DIFF</span>
+                <span className="recap-player-stat-val">
+                  {targetPlayer?.pointDiff !== undefined ? (targetPlayer.pointDiff > 0 ? `+${targetPlayer.pointDiff}` : targetPlayer.pointDiff) : '—'}
+                </span>
+              </div>
+              <div className="recap-player-stat-cell">
+                <span className="recap-player-stat-label">MATCHUP STR</span>
+                <span className="recap-player-stat-val">
+                  {targetPlayer?.matchupStrength !== undefined ? `${targetPlayer.matchupStrength}%` : '—'}
+                </span>
+              </div>
+            </div>
+            {(targetPlayer?.streak ?? 0) >= 2 && (
+              <div className="recap-player-streak-banner">
+                <Flame size={16} /> {targetPlayer?.streak} Match Win Streak
               </div>
             )}
           </div>

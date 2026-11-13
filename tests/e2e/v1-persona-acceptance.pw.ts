@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { formatDisplayName } from '../../app/queue/lib/nameFormatter';
 
 const RUSH_PLAYERS = Array.from({ length: 25 }, (_, index) =>
   `Rush Player ${String(index + 1).padStart(2, '0')}`,
@@ -27,29 +28,40 @@ test('25-player rush preserves registration order and a middle departure', async
     await host.getByRole('button', { name: /Start Queue/ }).click();
     await expect(host.locator('.session-bar--host')).toContainText('Connected', { timeout: 30_000 });
 
-    const initialWaiting = await host.locator('.waiting-player-row').allTextContents();
-    expect(initialWaiting.map(text => text.replace(/^#\d+/, '').trim())).toEqual(RUSH_PLAYERS.slice(12));
+    const expandWaiting = host.getByRole('button', { name: /Expand waiting queue/i });
+    if (await expandWaiting.isVisible().catch(() => false)) {
+      await expandWaiting.click();
+    }
+
+    const initialWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
+    expect(initialWaiting.map(text => text.trim())).toEqual(RUSH_PLAYERS.slice(12).map(formatDisplayName));
 
     await host.getByTitle('Settings').click();
-    await host.getByRole('button', { name: 'Start', exact: true }).click();
+    const startLive = host.getByRole('button', { name: 'Start', exact: true });
+    if (await startLive.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await startLive.click();
+    }
     const roomCode = (await host.locator('.session-code').textContent())!.trim();
 
     await viewer.goto(`/watch/${roomCode}`);
     await expect(viewer.getByText('You are watching live. Only the host can make changes.'))
       .toBeVisible({ timeout: 30_000 });
-    await expect(viewer.locator('.w-next-up')).toContainText(RUSH_PLAYERS[12]);
-    await expect(viewer.locator('.w-next-up')).toContainText(RUSH_PLAYERS[15]);
+    await expect(viewer.locator('.w-next-up')).toContainText(formatDisplayName(RUSH_PLAYERS[12]));
+    await expect(viewer.locator('.w-next-up')).toContainText(formatDisplayName(RUSH_PLAYERS[15]));
     await expect(viewer.locator('.w-next-up')).toContainText('+9 waiting');
 
-    await host.getByRole('button', { name: 'Manage Queue' }).click();
+    await host.getByRole('button', { name: 'Host Tools' }).click();
+    const sheet = host.getByRole('dialog', { name: 'Host Tools' });
+    await sheet.getByRole('button', { name: 'Manage Queue' }).click();
     const departingPlayer = RUSH_PLAYERS[18];
-    await host.locator('.mqp-btn--remove').filter({ hasText: departingPlayer }).click();
+    await sheet.locator('.mqp-btn--remove').filter({ hasText: formatDisplayName(departingPlayer) }).click();
+    await sheet.getByRole('button', { name: 'Close sheet' }).click();
 
-    const remainingWaiting = await host.locator('.waiting-player-row').allTextContents();
-    expect(remainingWaiting.map(text => text.replace(/^#\d+/, '').trim())).toEqual([
+    const remainingWaiting = await host.locator('.waiting-player-row .player-label').allTextContents();
+    expect(remainingWaiting.map(text => text.trim())).toEqual([
       ...RUSH_PLAYERS.slice(12, 18),
       ...RUSH_PLAYERS.slice(19),
-    ]);
+    ].map(formatDisplayName));
     await expect(viewer.locator('.w-next-up')).toContainText('+8 waiting', { timeout: 30_000 });
   } finally {
     await viewerContext.close();

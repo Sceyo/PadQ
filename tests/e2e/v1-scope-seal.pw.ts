@@ -26,9 +26,11 @@ test('deferred features stay sealed when URL parameters try to enable them', asy
   await page.getByRole('button', { name: /Start Queue/ }).click();
 
   await expect(page.locator('.session-bar--host')).toContainText('Connected', { timeout: 20_000 });
+  await page.getByRole('button', { name: 'Host Tools' }).click();
   await expect(page.getByRole('button', { name: 'Add Player' })).toBeVisible();
   await expect(page.getByRole('button', { name: /Set Partners/ })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Enable Scoring' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close sheet' }).click();
 
   await page.getByTitle('Settings').click();
   await expect(page.getByRole('menuitem', { name: /All Courts/i })).toHaveCount(0);

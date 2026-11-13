@@ -26,7 +26,9 @@ Vercel Hobby.
 - One authenticated host controls the room from one browser identity.
 - Up to 30 players and 3 shared courts.
 - Default singles and doubles rotations.
-- Optional fixed partner pairs, capped at `floor(players / 2)`.
+- Optional fixed partner pairs (`Global Asynchronous Partner Pairing`), capped at `floor(players / 2)`.
+- Two-tier pre-session check-in, Smart Roster Paste, collapsible Expected Late Arrivals drawer with 1-tap `Check In` and `Check In All`, and smart `> 6` player search filters across Host Tools drawers.
+- Compact player name formatting (`L. Chong`, `A.L. Waters`) across court cards, queues, break drawers, and leaderboards.
 - Host records completed winners for each court.
 - Viewers choose Court 1–3 and see current players, the waiting queue, upcoming
   assignments, completed history, and performance.
@@ -88,6 +90,8 @@ and capacity standards as the default queue:
 - Skill-aware matchmaking and visible skill brackets.
 - Configurable singles streak limits.
 - Event-level CSV roster import and result export.
+- Dynamic match-duration learning to auto-refine deterministic queue ETA badges.
+- Opponent-aware Elo / DUPR rating projections.
 
 V1.3 does not enable every archived feature at once. Each format must prove that
 it cannot corrupt the default queue, exceed the player/court limits, or expose

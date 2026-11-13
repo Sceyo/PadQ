@@ -2,7 +2,7 @@
 
 import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { toBlob, toPng } from 'html-to-image';
-import { X, Share2, Download, Copy, Check, Loader2, Crown, ListFilter } from 'lucide-react';
+import { X, Share2, Download, Copy, Check, Loader2, Crown, ListFilter, User } from 'lucide-react';
 import type { PlayerStat, MatchHistoryEntry } from '../../lib/types';
 import { RecapCard } from './RecapCard';
 import './RecapModal.css';
@@ -14,7 +14,7 @@ export interface RecapModalProps {
   history: MatchHistoryEntry[];
   roomCode?: string | null;
   mode?: string;
-  defaultVariant?: 'host' | 'viewer';
+  defaultVariant?: 'host' | 'viewer' | 'player';
 }
 
 export const RecapModal: React.FC<RecapModalProps> = ({
@@ -27,7 +27,8 @@ export const RecapModal: React.FC<RecapModalProps> = ({
   defaultVariant = 'host',
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
-  const [variant, setVariant] = useState<'host' | 'viewer'>(defaultVariant);
+  const [variant, setVariant] = useState<'host' | 'viewer' | 'player'>(defaultVariant);
+  const [selectedPlayer, setSelectedPlayer] = useState<string>(stats[0]?.name ?? '');
   const [isGenerating, setIsGenerating] = useState(false);
   const [copied, setCopied] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<string | null>(null);
@@ -36,6 +37,12 @@ export const RecapModal: React.FC<RecapModalProps> = ({
   useEffect(() => {
     setVariant(defaultVariant);
   }, [defaultVariant]);
+
+  useEffect(() => {
+    if (!selectedPlayer && stats.length > 0) {
+      setSelectedPlayer(stats[0].name);
+    }
+  }, [stats, selectedPlayer]);
 
   // Handle Escape key
   useEffect(() => {
@@ -54,10 +61,15 @@ export const RecapModal: React.FC<RecapModalProps> = ({
 
   const getFileName = useCallback(() => {
     const codePart = roomCode ? `-${roomCode.toUpperCase()}` : '';
-    const variantPart = variant === 'host' ? '-podium' : '-standings';
+    const variantPart =
+      variant === 'host'
+        ? '-podium'
+        : variant === 'viewer'
+        ? '-standings'
+        : `-player-${selectedPlayer || 'card'}`;
     const dateStr = new Date().toISOString().slice(0, 10);
     return `padq-session${codePart}${variantPart}-${dateStr}.png`;
-  }, [roomCode, variant]);
+  }, [roomCode, variant, selectedPlayer]);
 
   const handleDownload = useCallback(async () => {
     if (!cardRef.current || isGenerating) return;
@@ -189,6 +201,13 @@ export const RecapModal: React.FC<RecapModalProps> = ({
             >
               <ListFilter size={14} /> Full Standings
             </button>
+            <button
+              type="button"
+              className={`recap-variant-btn ${variant === 'player' ? 'active' : ''}`}
+              onClick={() => setVariant('player')}
+            >
+              <User size={14} /> Player Card
+            </button>
           </div>
 
           <button
@@ -201,6 +220,27 @@ export const RecapModal: React.FC<RecapModalProps> = ({
           </button>
         </div>
 
+        {variant === 'player' && stats.length > 0 && (
+          <div className="recap-player-select-bar">
+            <label htmlFor="recap-player-select" className="recap-player-select-label">
+              Select player:
+            </label>
+            <select
+              id="recap-player-select"
+              aria-label="Select player"
+              className="recap-player-select"
+              value={selectedPlayer}
+              onChange={(e) => setSelectedPlayer(e.target.value)}
+            >
+              {stats.map((s, idx) => (
+                <option key={s.name} value={s.name}>
+                  #{idx + 1} {s.name} ({s.wins}W - {s.losses}L)
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
         {/* Modal Body / Scaled Preview Canvas */}
         <div className="recap-preview-viewport">
           <div className="recap-preview-scaler">
@@ -210,6 +250,7 @@ export const RecapModal: React.FC<RecapModalProps> = ({
               roomCode={roomCode}
               mode={mode}
               variant={variant}
+              selectedPlayerName={selectedPlayer}
             />
           </div>
         </div>
@@ -223,6 +264,7 @@ export const RecapModal: React.FC<RecapModalProps> = ({
             roomCode={roomCode}
             mode={mode}
             variant={variant}
+            selectedPlayerName={selectedPlayer}
           />
         </div>
 

@@ -1,4 +1,8 @@
+import React from 'react';
 import type { CourtSlot } from '@/lib/sessionService';
+import { accountPlayers } from '@/app/queue/lib/queueTransitions';
+import { formatEtaLabel } from '@/app/queue/lib/etaEngine';
+import { formatDisplayName } from '@/app/queue/lib/nameFormatter';
 
 type GameMode = 'singles' | 'doubles';
 
@@ -8,6 +12,12 @@ interface Props {
   queue: string[];
   selectedCourtId: string;
   onSelectCourt: (courtId: string) => void;
+  sittingOut?: string[];
+  players?: string[];
+  priorityPlayers?: string[];
+  lockedPartners?: Array<{ a: string; b: string }>;
+  watchedPlayer?: string | null;
+  onToggleWatchPlayer?: (playerName: string) => void;
 }
 
 export function resolveSelectedCourt(courtSlots: CourtSlot[], selectedCourtId: string) {
@@ -18,19 +28,146 @@ export function getNextPlayers(queue: string[], gameMode: GameMode) {
   return queue.slice(0, gameMode === 'doubles' ? 4 : 2);
 }
 
+export interface WaitingQueueChipsProps {
+  waitingQueue: string[];
+  playersPerMatch: number;
+  activeCourtCount: number;
+  prioritySet?: Set<string>;
+  partnerMap?: Record<string, string> | Map<string, string>;
+  watchedPlayer?: string | null;
+  onToggleWatchPlayer?: (playerName: string) => void;
+}
+
+export function WaitingQueueChips({
+  waitingQueue,
+  playersPerMatch,
+  activeCourtCount,
+  prioritySet,
+  partnerMap,
+  watchedPlayer,
+  onToggleWatchPlayer,
+}: WaitingQueueChipsProps) {
+  if (waitingQueue.length === 0) {
+    return <span className="w-muted">All active players are assigned.</span>;
+  }
+
+  const getPartner = (p: string) => {
+    if (!partnerMap) return undefined;
+    if (partnerMap instanceof Map) return partnerMap.get(p);
+    return partnerMap[p];
+  };
+
+  const isPriority = (p: string) => prioritySet?.has(p) ?? false;
+
+  return (
+    <div className="w-queue-chips">
+      {waitingQueue.map((player, index) => {
+        const isOnDeck = index < playersPerMatch;
+        const etaLabel = formatEtaLabel(index + 1, playersPerMatch, activeCourtCount > 1);
+        const isWatched = watchedPlayer === player;
+        const partner = getPartner(player);
+
+        const innerContent = (
+          <>
+            <span className="w-queue-num">#{index + 1}</span> {formatDisplayName(player)}
+            {partner && (
+              <span className="w-partner-pill" title={`Paired with ${partner}`}>
+                🔗
+              </span>
+            )}
+            {isPriority(player) && (
+              <span className="w-status-pill w-status-pill--priority">Next up</span>
+            )}
+            {isWatched && (
+              <span className="w-status-pill w-status-pill--alert-on" title="Turn alert armed">
+                🔔 Alert on
+              </span>
+            )}
+            {isOnDeck ? (
+              <span className="w-status-pill w-status-pill--on-deck">On deck</span>
+            ) : (
+              etaLabel && <span className="w-status-pill w-status-pill--eta">{etaLabel}</span>
+            )}
+          </>
+        );
+
+        if (onToggleWatchPlayer) {
+          return (
+            <button
+              type="button"
+              key={`${index}-${player}`}
+              className={`w-queue-chip w-queue-chip--interactive ${isWatched ? 'w-queue-chip--watched' : ''}`}
+              onClick={() => onToggleWatchPlayer(player)}
+              aria-pressed={isWatched}
+              aria-label={`Turn alert: ${player} (${isWatched ? 'on' : 'off'})`}
+            >
+              {innerContent}
+            </button>
+          );
+        }
+
+        return (
+          <span
+            key={`${index}-${player}`}
+            className="w-queue-chip"
+          >
+            {innerContent}
+          </span>
+        );
+      })}
+      {waitingQueue.length > playersPerMatch && (
+        <span className="w-queue-more">+{waitingQueue.length - playersPerMatch} waiting</span>
+      )}
+    </div>
+  );
+}
+
 export function LiveCourtStatus({
   courtSlots,
   gameMode,
   queue,
   selectedCourtId,
   onSelectCourt,
+  sittingOut = [],
+  players,
+  priorityPlayers = [],
+  lockedPartners = [],
+  watchedPlayer = null,
+  onToggleWatchPlayer,
 }: Props) {
   const selectedCourt = resolveSelectedCourt(courtSlots, selectedCourtId);
   const playersNeeded = gameMode === 'doubles' ? 4 : 2;
   const hasMatch = (selectedCourt?.onCourt.length ?? 0) >= playersNeeded;
-  const onCourt = new Set(courtSlots.flatMap(court => court.onCourt));
-  const waitingQueue = queue.filter(player => !onCourt.has(player));
+
+  const accounting = accountPlayers({
+    gameMode,
+    players: players ?? [...new Set([...courtSlots.flatMap(court => court.onCourt), ...queue, ...sittingOut])],
+    queue,
+    courtSlots,
+    sittingOut,
+  });
+
+  const breakSet = new Set(accounting.onBreak);
+  const rawWaitingQueue = accounting.queued.filter(p => !breakSet.has(p));
+  const prioritySet = new Set(priorityPlayers);
+  const priorityWaiting = priorityPlayers.filter(p => rawWaitingQueue.includes(p));
+  const otherWaiting = rawWaitingQueue.filter(p => !prioritySet.has(p));
+  const waitingQueue = [...priorityWaiting, ...otherWaiting];
+  const onBreak = Array.from(accounting.onBreak);
   const nextPlayers = getNextPlayers(waitingQueue, gameMode);
+
+  // Partner pairing map for fast lookup
+  const partnerMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!lockedPartners) return map;
+    for (const pair of lockedPartners) {
+      if (pair.a && pair.b) {
+        map[pair.a] = pair.b;
+        map[pair.b] = pair.a;
+      }
+    }
+    return map;
+  }, [lockedPartners]);
 
   if (!selectedCourt) {
     return <p className="w-muted">Courts are not assigned yet.</p>;
@@ -80,10 +217,46 @@ export function LiveCourtStatus({
         </div>
 
         {hasMatch ? (
-          <div className="w-vs-row">
-            <span className="w-player-chip w-player-chip--team">{teamA.join(' & ')}</span>
-            <span className="w-vs">VS</span>
-            <span className="w-player-chip w-player-chip--team">{teamB.join(' & ')}</span>
+          <div className="w-matchup-container">
+            <div className="w-team-box w-team-box--a">
+              <span className="w-team-tag w-team-tag--a">{gameMode === 'singles' ? 'Player 1' : 'Team 1'}</span>
+              <div className="w-team-players">
+                {teamA.map((player, idx) => (
+                  <React.Fragment key={`w-a-${idx}-${player}`}>
+                    {idx > 0 && <span className="w-partner-and">{' & '}</span>}
+                    <div className="w-player-chip w-player-chip--individual">
+                      <span className="w-player-name" title={player}>{formatDisplayName(player)}</span>
+                      {partnerMap[player] && (
+                        <span className="w-partner-badge" title={`Paired with ${partnerMap[player]}`} aria-label={`Paired with ${partnerMap[player]}`}>
+                          🔗
+                        </span>
+                      )}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
+
+            <div className="w-vs-badge" aria-label="Versus">VS</div>
+
+            <div className="w-team-box w-team-box--b">
+              <span className="w-team-tag w-team-tag--b">{gameMode === 'singles' ? 'Player 2' : 'Team 2'}</span>
+              <div className="w-team-players">
+                {teamB.map((player, idx) => (
+                  <React.Fragment key={`w-b-${idx}-${player}`}>
+                    {idx > 0 && <span className="w-partner-and">{' & '}</span>}
+                    <div className="w-player-chip w-player-chip--individual">
+                      <span className="w-player-name" title={player}>{formatDisplayName(player)}</span>
+                      {partnerMap[player] && (
+                        <span className="w-partner-badge" title={`Paired with ${partnerMap[player]}`} aria-label={`Paired with ${partnerMap[player]}`}>
+                          🔗
+                        </span>
+                      )}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <p className="w-muted">The host will assign the next available players here.</p>
@@ -95,21 +268,32 @@ export function LiveCourtStatus({
           <span className="w-court-focus-kicker">Next in queue</span>
           <p>Assignment is confirmed when the next court becomes available.</p>
         </div>
-        {nextPlayers.length > 0 ? (
-          <div className="w-queue-chips">
-            {nextPlayers.map((player, index) => (
-              <span key={`${index}-${player}`} className="w-queue-chip">
-                <span className="w-queue-num">#{index + 1}</span> {player}
+        <WaitingQueueChips
+          waitingQueue={waitingQueue}
+          playersPerMatch={playersNeeded}
+          activeCourtCount={courtSlots.length}
+          prioritySet={prioritySet}
+          partnerMap={partnerMap}
+          watchedPlayer={watchedPlayer}
+          onToggleWatchPlayer={onToggleWatchPlayer}
+        />
+      </div>
+
+      {onBreak.length > 0 && (
+        <div className="w-on-break">
+          <div>
+            <span className="w-court-focus-kicker">On break ({onBreak.length})</span>
+          </div>
+          <div className="w-break-chips">
+            {onBreak.map(player => (
+              <span key={`w-break-${player}`} className="w-break-chip">
+                <span>{player}</span>
+                <span className="w-status-pill w-status-pill--on-break">On break</span>
               </span>
             ))}
-            {waitingQueue.length > nextPlayers.length && (
-              <span className="w-queue-more">+{waitingQueue.length - nextPlayers.length} waiting</span>
-            )}
           </div>
-        ) : (
-          <span className="w-muted">All active players are assigned.</span>
-        )}
-      </div>
+        </div>
+      )}
     </>
   );
 }

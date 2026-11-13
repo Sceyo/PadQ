@@ -23,6 +23,7 @@ import {
   updateQueueSafely,
   batchMatchResult,
   commitMultiCourtResult,
+  replaceHistoryEntry,
   clearHistory,
   deleteSessionData,
   deleteLatestHistoryEntry,
@@ -57,6 +58,7 @@ export interface SessionState {
   isSaving:          boolean;   // true while a write is in-flight
   isReconnecting:    boolean;   // true when onSnapshot drops and is retrying
   isExpired:         boolean;   // true when session was deleted (TTL or hard reset)
+  isResuming:        boolean;   // true while reconnecting to a session found in localStorage
 
   // Persisted fields (mirrors Firestore document)
   players:           string[];
@@ -75,6 +77,7 @@ export interface SessionState {
   doublesEngineState: Record<string, unknown> | null;
   singlesEngineState: Record<string, unknown> | null;
   sittingOut:        string[];
+  priorityPlayers:   string[];
 }
 
 export interface SessionActions {
@@ -87,6 +90,7 @@ export interface SessionActions {
   syncField:         (patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>) => Promise<void>;
   clearMatchHistory: () => Promise<void>;
   deleteHostedSession: () => Promise<void>;
+  correctHistoryEntry: (entryId: number, updated: MatchHistoryEntry) => Promise<boolean>;
 }
 
 type CourtResultFailureReason = 'permission' | 'unavailable' | 'unknown';
@@ -147,6 +151,7 @@ const INITIAL_STATE: SessionState = {
   isSaving:          false,
   isReconnecting:    false,
   isExpired:         false,
+  isResuming:        false,
   players:           [],
   queue:             [],
   playAllRel:        {},
@@ -163,13 +168,20 @@ const INITIAL_STATE: SessionState = {
   doublesEngineState: null,
   singlesEngineState: null,
   sittingOut:        [],
+  priorityPlayers:   [],
 };
 
 // ── Hook ───────────────────────────────────────────────────
 
 export function useSession(): SessionState & SessionActions {
 
-  const [state, setState] = useState<SessionState>(INITIAL_STATE);
+  const [state, setState] = useState<SessionState>(() => {
+    const hasStored = typeof window !== 'undefined' && Boolean(localStorage.getItem('padq_host_session_id'));
+    return {
+      ...INITIAL_STATE,
+      isResuming: hasStored,
+    };
+  });
 
   // Refs so async callbacks always see the latest values
   // without stale closures
@@ -201,6 +213,7 @@ export function useSession(): SessionState & SessionActions {
     doublesEngineState: (data.doublesEngineState as Record<string, unknown>) ?? null,
     singlesEngineState: (data.singlesEngineState as Record<string, unknown>) ?? null,
     sittingOut:         data.sittingOut ?? [],
+    priorityPlayers:    data.priorityPlayers ?? [],
   });
 
   // ── Listener setup ─────────────────────────────────────────
@@ -233,7 +246,7 @@ export function useSession(): SessionState & SessionActions {
         const code = (err as { code?: string })?.code ?? '';
         if (code.includes('permission-denied')) {
           clearHostFromStorage();
-          setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+          setState(prev => ({ ...INITIAL_STATE, isExpired: true, isResuming: false }));
         } else {
           setState(prev => ({ ...prev, isConnected: false, isReconnecting: true }));
         }
@@ -310,14 +323,17 @@ export function useSession(): SessionState & SessionActions {
 
   useEffect(() => {
     const { sessionId } = loadHostFromStorage();
-    if (!sessionId) return;
+    if (!sessionId) {
+      setState(prev => prev.isResuming ? { ...prev, isResuming: false } : prev);
+      return;
+    }
 
     loadSession(sessionId).then(data => {
       if (!data) {
         // Session expired (TTL deleted it) or never existed.
         // Clear stale storage so the host starts fresh.
         clearHostFromStorage();
-        setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+        setState({ ...INITIAL_STATE, isExpired: true });
         return;
       }
 
@@ -332,6 +348,7 @@ export function useSession(): SessionState & SessionActions {
         ...prev,
         sessionId,
         isHost: data.hostUid === auth.currentUser?.uid,
+        isResuming: false,
         ...docToState(data),
       }));
 
@@ -342,7 +359,7 @@ export function useSession(): SessionState & SessionActions {
         triggerFatalAuthError(err);
       } else {
         clearHostFromStorage();
-        setState(prev => ({ ...INITIAL_STATE, isExpired: true }));
+        setState({ ...INITIAL_STATE, isExpired: true });
       }
     });
 
@@ -495,6 +512,7 @@ export function useSession(): SessionState & SessionActions {
         revision: Math.max(prev.revision, result.revision),
         queue: result.queue,
         courtSlots: result.courtSlots,
+        ...(result.priorityPlayers !== undefined ? { priorityPlayers: result.priorityPlayers } : {}),
       }));
       return result;
     } catch (err) {
@@ -547,7 +565,7 @@ export function useSession(): SessionState & SessionActions {
         'players', 'queue', 'playAllRel', 'queueMode', 'elimType',
         'tournamentMatches', 'tournamentActive', 'tournamentWinner',
         'doublesEngineState', 'singlesEngineState', 'courtSlots',
-        'lockedPartners', 'sittingOut',
+        'lockedPartners', 'sittingOut', 'priorityPlayers',
       ]);
       const needsRevision = Object.keys(patch).some(key => revisionSensitive.has(key as keyof SessionDoc));
       const write = revisionWriteChainRef.current.then(async () => {
@@ -607,6 +625,53 @@ export function useSession(): SessionState & SessionActions {
     }
   }, [state.isHost]);
 
+  /**
+   * correctHistoryEntry
+   * Atomically replaces an existing match history entry in Firestore
+   * (e.g. flipping the winning side) and updates local state.
+   */
+  const correctHistoryEntry = useCallback(async (
+    entryId: number,
+    updated: MatchHistoryEntry,
+  ): Promise<boolean> => {
+    const sessionId = sessionIdRef.current;
+    if (!sessionId || !state.isHost) return false;
+
+    setState(prev => ({
+      ...prev,
+      matchHistory: prev.matchHistory.map(h => (h.id === entryId ? { ...h, ...updated } : h)),
+      isSaving: true,
+    }));
+
+    try {
+      let success = false;
+      const write = revisionWriteChainRef.current.then(async () => {
+        const outcome = await replaceHistoryEntry(sessionId, updated.commandId, updated);
+        if (outcome.status === 'committed') {
+          revisionRef.current = outcome.revision;
+          setState(prev => ({
+            ...prev,
+            revision: outcome.revision,
+            matchHistory: prev.matchHistory.map(h =>
+              h.id === entryId ? { ...h, ...updated, commandId: outcome.commandId, revision: outcome.revision } : h
+            ),
+          }));
+          success = true;
+        } else {
+          success = false;
+        }
+      });
+      revisionWriteChainRef.current = write.catch(() => undefined);
+      await write;
+      return success;
+    } catch (err) {
+      console.error('[useSession] correctHistoryEntry error:', err);
+      return false;
+    } finally {
+      setState(prev => ({ ...prev, isSaving: false }));
+    }
+  }, [state.isHost]);
+
   return {
     ...state,
     startSession,
@@ -618,5 +683,6 @@ export function useSession(): SessionState & SessionActions {
     syncField,
     clearMatchHistory,
     deleteHostedSession,
+    correctHistoryEntry,
   };
 }

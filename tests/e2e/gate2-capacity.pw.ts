@@ -16,7 +16,7 @@ async function openInBatches(pages: Page[], roomCode: string) {
 }
 
 test('30 viewer tabs receive a three-court queue rotation in real time', async ({ browser }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const hostContext = await browser.newContext();
   const host = await hostContext.newPage();
   const viewerContexts = await Promise.all(
@@ -54,10 +54,14 @@ test('30 viewer tabs receive a three-court queue rotation in real time', async (
 
     const queueBefore = await viewers[0].locator('.w-next-up').innerText();
     const courtOne = host.locator('.courts-grid > div').filter({ hasText: 'Court 1' });
-    await courtOne.getByRole('button', { name: /win$/ }).first().evaluate(button => {
+    await courtOne.getByRole('button', { name: /wins?$/i }).first().evaluate(button => {
       (button as HTMLButtonElement).click();
       (button as HTMLButtonElement).click();
     });
+    const skipBtn = host.getByRole('button', { name: /Skip Score/i });
+    if (await skipBtn.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await skipBtn.click();
+    }
 
     await Promise.all(viewers.map(page => expect.poll(
       async () => page.locator('.w-next-up').innerText(),

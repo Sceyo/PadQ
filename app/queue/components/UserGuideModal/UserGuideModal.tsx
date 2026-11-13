@@ -5,8 +5,8 @@ import { X } from 'lucide-react';
 
 const GUIDE_SECTIONS = [
   {
-    title: '🚀 Starting a Session',
-    body: 'Add up to 30 players, choose Singles or Doubles and up to 3 courts, then tap Start Queue. Players are queued in the order you enter them. A 6-character Room Code is generated for spectators.',
+    title: '🚀 Starting a Session & Check-In',
+    body: 'Add up to 30 players, choose Singles or Doubles and up to 3 courts, then tap Start Queue.\n• Paste Lists & Add as Expected (🕒): Paste a Reclub or numbered registration list and tap the clock icon to stage everyone into Expected Arrivals without putting absent players on court.\n• Check In / Check In All: Tap Check In as players physically arrive (preserving arrival order) or Check In All at once. Any unchecked players automatically carry over into Host Tools → Expected Late Arrivals for 1-tap mid-session check-in.',
   },
   {
     title: '🏸 Paddle Queue (Default)',
@@ -14,23 +14,23 @@ const GUIDE_SECTIONS = [
   },
   {
     title: '🔄 V1 Queue Rotation',
-    body: 'PAD-Q V1 uses the Default rotation: structured Winners/Losers cycles with unplayed-player prioritisation. For multi-court sessions, all courts draw from one shared waiting queue and unlocked teammates are split before their next shared rotation. Optional locked partner pairs intentionally stay together when assigned.',
+    body: 'PAD-Q V1 uses the Default rotation: structured Winners/Losers cycles with unplayed-player prioritisation (and a 3-win streak cap in Singles). For multi-court sessions, all courts draw from one shared waiting queue and unlocked teammates are split before their next shared rotation. Tap the swap icon on any court card to manually adjust or swap player positions.',
   },
   {
     title: '🏆 Scoring',
-    body: "Single-court sessions can use + / − point-by-point scoring. Deuce extends the game until one team leads by 2 past the target. In multi-court V1, record only the winning team on each court so all courts remain quick to manage.",
+    body: 'Single-court sessions support live + / − point-by-point scoring with deuce extensions until a team leads by 2. Multi-court sessions feature rapid 1-tap winner buttons, plus an optional Match Scores toggle in Host Tools that lets hosts directly enter final scores (e.g. 11–9) with 1-tap presets to power Point Differential (+/−).',
   },
   {
-    title: '📡 Go Live & Sharing',
-    body: 'Tap Go Live to allow spectators. Share via QR code, copy link, or native share sheet (WhatsApp/SMS). Viewers see the queue and Live Court Status in real time. Single-court viewers also see the score when scoring is enabled; multi-court viewers see current players and completed results.',
+    title: '📡 Go Live, ETAs & Turn Alerts',
+    body: 'Tap Go Live to broadcast the room code or QR link to spectators. Viewers see Live Court Status, the full waiting queue with deterministic ETA wait badges (Next Up, ~10m), and match history.\n• 🔔 Alert On (Spectator Turn Alerts): Viewers can tap their own name in the Live Watch waiting queue to arm a personal turn alert ("🔔 Alert on"). When they advance into On Deck (Next Up) or onto a court, their phone plays an audio chime and vibrates.',
   },
   {
-    title: '📊 Stats & Suggestions',
-    body: 'Stats tab shows wins, losses, win rate, streak, and rank tiers (Bronze→Diamond). Smart Suggestions alert you to overused/underused players, hot streaks, and unbalanced teams.',
+    title: '📊 Stats, Standings & Flip Winner',
+    body: 'Standings rank players by Wins, then Win %, Point Differential (+/−), and Opponent Win % (OWP matchup strength) for fair tiebreaks. Hosts can also tap Flip Winner on any completed match in History to retroactively correct a misrecorded result, or export shareable Session & Player Spotlight stat cards.',
   },
   {
-    title: '⚙️ Reset Options',
-    body: 'Clear History — wipes match log only; queue and players stay.\nHard Reset — clears ALL cached data and returns to homepage.',
+    title: '⚙️ Host Tools & Settings',
+    body: '• Host Tools (Sliders Icon) — Add late players, toggle Match Scores, expand Expected Late Arrivals (with Check In & Check In All), lock Doubles Partners, reorder the queue, or Manage Players On Break. Drawers with more than 6 players automatically show a quick search filter.\n• Undo Last Match — restores previous match and queue state if recorded in error.\n• End & Delete Event — permanently ends the live event and removes the room while keeping saved device rosters and career stats.',
   },
 ] as const;
 

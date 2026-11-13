@@ -5,7 +5,7 @@
 .recap-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: var(--z-modal, 1100);
   background: rgba(4, 6, 12, 0.85);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -75,8 +75,10 @@
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: #94a3b8;
-  width: 32px;
-  height: 32px;
+  width: 46px;
+  height: 46px;
+  min-width: 46px;
+  min-height: 46px;
   border-radius: 50%;
   cursor: pointer;
   display: flex;
@@ -172,7 +174,7 @@
   height: 1080px;
   overflow: hidden;
   pointer-events: none;
-  z-index: -9999;
+  z-index: -1;
 }
 
 /* ── Feedback Toast ─────────────────────────────────── */
@@ -201,6 +203,7 @@
 .recap-action-btn {
   flex: 1;
   min-width: 120px;
+  min-height: 46px;
   padding: 11px 16px;
   border-radius: 12px;
   font: 700 0.88rem inherit;
@@ -252,4 +255,39 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Player Selector Bar */
+.recap-player-select-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 24px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.recap-player-select-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #94a3b8;
+}
+
+.recap-player-select {
+  background: #161a2c;
+  color: #f0f4ff;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 1rem; /* 16px strictly stops iOS Safari auto-zoom */
+  min-height: var(--tap-min, 44px);
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.recap-player-select:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
 }

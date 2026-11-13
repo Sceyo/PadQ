@@ -482,6 +482,89 @@ suite('Firestore V1 production rules', () => {
     await assertFails(updateDoc(doc(host, 'sessions', 'H8MTCH', 'history', UUID_A), { winner: 'C & D' }));
   });
 
+  it('allows atomic replacement of history entry (delete + revision+1 + set new commandId) and supports double flip A -> B -> A', async () => {
+    const host = env.authenticatedContext('host-flip').firestore();
+    const attacker = env.authenticatedContext('attacker-flip').firestore();
+    const ref = doc(host, 'sessions', 'F7K9HP');
+    await assertSucceeds(setDoc(ref, sessionData('host-flip')));
+
+    const UUID_1 = '11111111-1111-4111-8111-111111111111';
+    const UUID_2 = '22222222-2222-4222-8222-222222222222';
+    const UUID_3 = '33333333-3333-4333-8333-333333333333';
+
+    // 1. Initial history entry (revision 1)
+    await assertSucceeds(runTransaction(host, async tx => {
+      const snap = await tx.get(ref);
+      expect(snap.data()?.revision).toBe(0);
+      tx.update(ref, {
+        queue: ['E', 'F', 'A', 'B', 'C', 'D'],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      });
+      tx.set(doc(host, 'sessions', 'F7K9HP', 'history', UUID_1), historyData(UUID_1, 1));
+    }));
+
+    // 2. Direct update is denied
+    await assertFails(updateDoc(doc(host, 'sessions', 'F7K9HP', 'history', UUID_1), { winner: 'C & D' }));
+
+    // 3. Attacker attempting atomic replacement is denied
+    await assertFails(runTransaction(attacker, async tx => {
+      await tx.get(doc(attacker, 'sessions', 'F7K9HP'));
+      await tx.get(doc(attacker, 'sessions', 'F7K9HP', 'history', UUID_1));
+      tx.delete(doc(attacker, 'sessions', 'F7K9HP', 'history', UUID_1));
+      tx.update(doc(attacker, 'sessions', 'F7K9HP'), { revision: 2, updatedAt: serverTimestamp(), lastActiveAt: serverTimestamp() });
+      tx.set(doc(attacker, 'sessions', 'F7K9HP', 'history', UUID_2), {
+        ...historyData(UUID_2, 2),
+        winner: 'C & D',
+      });
+    }));
+
+    // 4. Host atomic replacement (flip A -> B, revision 2) succeeds
+    await assertSucceeds(runTransaction(host, async tx => {
+      const sSnap = await tx.get(ref);
+      expect(sSnap.data()?.revision).toBe(1);
+      const hSnap = await tx.get(doc(host, 'sessions', 'F7K9HP', 'history', UUID_1));
+      expect(hSnap.exists()).toBe(true);
+      tx.delete(doc(host, 'sessions', 'F7K9HP', 'history', UUID_1));
+      tx.update(ref, {
+        revision: 2,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      });
+      tx.set(doc(host, 'sessions', 'F7K9HP', 'history', UUID_2), {
+        ...historyData(UUID_2, 2),
+        winner: 'C & D',
+      });
+    }));
+
+    const hSnap2 = await getDoc(doc(host, 'sessions', 'F7K9HP', 'history', UUID_2));
+    expect(hSnap2.exists()).toBe(true);
+    expect(hSnap2.data()?.winner).toBe('C & D');
+
+    // 5. Host second flip (B -> A, revision 3) succeeds
+    await assertSucceeds(runTransaction(host, async tx => {
+      const sSnap = await tx.get(ref);
+      expect(sSnap.data()?.revision).toBe(2);
+      const hSnap = await tx.get(doc(host, 'sessions', 'F7K9HP', 'history', UUID_2));
+      expect(hSnap.exists()).toBe(true);
+      tx.delete(doc(host, 'sessions', 'F7K9HP', 'history', UUID_2));
+      tx.update(ref, {
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      });
+      tx.set(doc(host, 'sessions', 'F7K9HP', 'history', UUID_3), {
+        ...historyData(UUID_3, 3),
+        winner: 'A & B',
+      });
+    }));
+
+    const hSnap3 = await getDoc(doc(host, 'sessions', 'F7K9HP', 'history', UUID_3));
+    expect(hSnap3.exists()).toBe(true);
+    expect(hSnap3.data()?.winner).toBe('A & B');
+  });
+
   it('denies orphan history access and non-host history writes', async () => {
     const host = env.authenticatedContext('host-9').firestore();
     const attacker = env.authenticatedContext('attacker-9').firestore();
@@ -1012,5 +1095,151 @@ suite('Firestore V1 production rules', () => {
         lastActiveAt: serverTimestamp(),
       }));
     });
+
+    it('supports optional priorityPlayers on session create and session update', async () => {
+      const host = env.authenticatedContext('host-pp').firestore();
+      const ref = doc(host, 'sessions', 'P7PLYR');
+
+      // Create with valid priorityPlayers
+      await assertSucceeds(setDoc(ref, sessionData('host-pp', {
+        priorityPlayers: ['A', 'B'],
+      })));
+
+      // Revisioned update modifying priorityPlayers
+      await assertSucceeds(updateDoc(ref, {
+        priorityPlayers: ['C'],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Revisioned update clearing priorityPlayers
+      await assertSucceeds(updateDoc(ref, {
+        priorityPlayers: [],
+        revision: 2,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: update with invalid player in priorityPlayers is rejected
+      await assertFails(updateDoc(ref, {
+        priorityPlayers: ['NONEXISTENT'],
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: update with duplicates in priorityPlayers is rejected
+      await assertFails(updateDoc(ref, {
+        priorityPlayers: ['A', 'A'],
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('rejects session create with invalid priorityPlayers', async () => {
+      const host = env.authenticatedContext('host-pp-neg').firestore();
+      const refInvalidPlayer = doc(host, 'sessions', 'P7BADP');
+      const refDuplicate = doc(host, 'sessions', 'P7DUPP');
+
+      await assertFails(setDoc(refInvalidPlayer, sessionData('host-pp-neg', {
+        priorityPlayers: ['Z'],
+      })));
+
+      await assertFails(setDoc(refDuplicate, sessionData('host-pp-neg', {
+        priorityPlayers: ['A', 'A'],
+      })));
+    });
+
+    it('accepts write containing players, queue, and priorityPlayers together on newcomer late join and rejects invalid priority name', async () => {
+      const host = env.authenticatedContext('host-pp-late').firestore();
+      const ref = doc(host, 'sessions', 'P7LATE');
+
+      // Initial session with 5 players
+      await assertSucceeds(setDoc(ref, sessionData('host-pp-late', {
+        players: ['A', 'B', 'C', 'D', 'E'],
+        queue: ['A', 'B', 'C', 'D', 'E'],
+        priorityPlayers: [],
+      })));
+
+      // Late newcomer 'F' joins: updates players, queue, and priorityPlayers in same write
+      await assertSucceeds(updateDoc(ref, {
+        players: ['A', 'B', 'C', 'D', 'E', 'F'],
+        queue: ['A', 'B', 'C', 'D', 'E', 'F'],
+        priorityPlayers: ['F'],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: priority name 'Z' not in players is rejected
+      await assertFails(updateDoc(ref, {
+        players: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+        queue: ['A', 'B', 'C', 'D', 'E', 'F', 'G'],
+        priorityPlayers: ['Z'],
+        revision: 2,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
+
+    it('accepts revisioned update containing sittingOut alongside queue, courtSlots, and priorityPlayers (20-player headroom)', async () => {
+      const host = env.authenticatedContext('host-so-rev').firestore();
+      const ref = doc(host, 'sessions', 'S7REV2');
+      const p20 = Array.from({ length: 20 }, (_, i) => `P${String(i + 1).padStart(2, '0')}`);
+      const initialCourtSlots = [
+        { id: 'c1', name: 'Court 1', onCourt: p20.slice(0, 4) },
+      ];
+
+      // Seed 20-player session with initial court and queue
+      await assertSucceeds(setDoc(ref, sessionData('host-so-rev', {
+        players: p20,
+        queue: p20.slice(4),
+        courtSlots: initialCourtSlots,
+        sittingOut: [],
+        priorityPlayers: [],
+      })));
+
+      // Host sits out a player and replaces on court with priority player:
+      // updates courtSlots, priorityPlayers, queue, sittingOut, revision simultaneously
+      await assertSucceeds(updateDoc(ref, {
+        courtSlots: [
+          { id: 'c1', name: 'Court 1', onCourt: [p20[0], p20[1], p20[2], p20[4]] },
+        ],
+        priorityPlayers: [p20[5]],
+        queue: p20.slice(6),
+        sittingOut: [p20[3]],
+        revision: 1,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Host returns sat-out player to queue and clears sittingOut in a revisioned update
+      await assertSucceeds(updateDoc(ref, {
+        queue: [...p20.slice(6), p20[3]],
+        sittingOut: [],
+        revision: 2,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: sittingOut containing player not in roster is rejected
+      await assertFails(updateDoc(ref, {
+        sittingOut: ['P99_UNKNOWN'],
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+
+      // Negative: sittingOut containing duplicate player is rejected
+      await assertFails(updateDoc(ref, {
+        sittingOut: [p20[0], p20[0]],
+        revision: 3,
+        updatedAt: serverTimestamp(),
+        lastActiveAt: serverTimestamp(),
+      }));
+    });
   });
 });
+

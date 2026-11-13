@@ -4,13 +4,71 @@ import React, { useState } from 'react';
 import { UserPlus, PlusCircle, ListOrdered, UserCheck, Link2, X } from 'lucide-react';
 import type { PlayerStat } from '../../lib/types';
 import { PlayerLabel } from '../atoms/PlayerLabel';
+import { matchesPlayerFilter, SMART_FILTER_THRESHOLD } from '../../lib/nameFormatter';
 
-export const AddPlayerPanel: React.FC<{ onAdd: (name: string) => void }> = ({ onAdd }) => {
+export interface AddPlayerPanelProps {
+  onAdd?: (name: string) => void;
+  onAddPlayer?: (name: string) => void;
+  allPlayers?: string[];
+  lateArrivals?: string[];
+  onCheckInLateArrival?: (name: string) => void;
+  onDismissLateArrival?: (name: string) => void;
+}
+
+export const AddPlayerPanel: React.FC<AddPlayerPanelProps> = ({
+  onAdd,
+  onAddPlayer,
+  lateArrivals = [],
+  onCheckInLateArrival,
+  onDismissLateArrival,
+}) => {
   const [open, setOpen] = useState(false);
   const [val, setVal] = useState('');
-  const commit = () => { const t = val.trim(); if (!t) return; onAdd(t); setVal(''); setOpen(false); };
+  const addFn = onAddPlayer ?? onAdd ?? (() => {});
+  const commit = () => {
+    const t = val.trim();
+    if (!t) return;
+    addFn(t);
+    setVal('');
+    setOpen(false);
+  };
+
   return (
     <div className="live-panel">
+      {lateArrivals.length > 0 && (
+        <div className="late-arrivals-tray" style={{ marginBottom: '10px' }}>
+          <div className="late-arrivals-title" style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', fontWeight: 700, color: 'var(--txt-2, #94a3b8)', marginBottom: '6px' }}>
+            <UserCheck size={12} /> Late Arrivals ({lateArrivals.length})
+          </div>
+          <div className="late-arrivals-chips" style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+            {lateArrivals.map(name => (
+              <span key={`late-${name}`} className="late-arrival-chip" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '3px 8px', borderRadius: '6px', background: 'var(--card-alt, #1e2438)', fontSize: '0.8rem', border: '1px solid var(--border, #333d5e)' }}>
+                <span>{name}</span>
+                {onCheckInLateArrival && (
+                  <button
+                    type="button"
+                    onClick={() => onCheckInLateArrival(name)}
+                    style={{ background: 'var(--primary, #3b82f6)', color: '#fff', border: 'none', borderRadius: '4px', padding: '0 10px', minHeight: '44px', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center' }}
+                  >
+                    Check In
+                  </button>
+                )}
+                {onDismissLateArrival && (
+                  <button
+                    type="button"
+                    onClick={() => onDismissLateArrival(name)}
+                    title={`Dismiss ${name}`}
+                    style={{ background: 'none', border: 'none', color: 'var(--txt-3, #64748b)', cursor: 'pointer', fontSize: '1.25rem', minWidth: '44px', minHeight: '44px', padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <button className="live-panel-toggle" onClick={() => setOpen(o => !o)}>
         <UserPlus size={13} /> {open ? 'Cancel' : 'Add Player'}
       </button>
@@ -30,15 +88,18 @@ export const ManualQueuePanel: React.FC<{
   statsMap:   Record<string, PlayerStat>;
   onAdd:      (p: string) => void;
   onRemove:   (i: number) => void;
-}> = ({ allPlayers, queue, statsMap, onAdd, onRemove }) => {
-  const [open, setOpen] = useState(false);
+  hideToggle?: boolean;
+}> = ({ allPlayers, queue, statsMap, onAdd, onRemove, hideToggle = false }) => {
+  const [open, setOpen] = useState(hideToggle);
   const notQueued = allPlayers.filter(p => !queue.includes(p));
   return (
     <div className="live-panel">
-      <button className="live-panel-toggle" onClick={() => setOpen(o => !o)}>
-        <ListOrdered size={13} /> {open ? 'Hide' : 'Manage'} Queue
-      </button>
-      {open && (
+      {!hideToggle && (
+        <button className="live-panel-toggle" onClick={() => setOpen(o => !o)}>
+          <ListOrdered size={13} /> {open ? 'Hide' : 'Manage'} Queue
+        </button>
+      )}
+      {(open || hideToggle) && (
         <div className="mqp-body">
           <div className="mqp-col">
             <div className="mqp-col-header"><UserCheck size={11} /> Available</div>
@@ -101,16 +162,25 @@ export function addPartnerPair(
   return [...pairs, [first, second]];
 }
 
+export function getPlayerLocationLabel(
+  player: string,
+  playerGroups?: string[][],
+): string | null {
+  if (!playerGroups || playerGroups.length === 0) return null;
+  if (playerGroups[0]?.includes(player)) return 'Queue';
+  for (let i = 1; i < playerGroups.length; i += 1) {
+    if (playerGroups[i]?.includes(player)) return `Court ${i}`;
+  }
+  return null;
+}
+
 export function getCompatiblePartnerPlayers(
   availablePlayers: string[],
-  playerGroups: string[][],
-  selected: string | null,
+  _playerGroups?: string[][],
+  _selected?: string | null,
 ): string[] {
-  if (!selected) return availablePlayers;
-  const selectedGroup = playerGroups.find(group => group.includes(selected));
-  if (!selectedGroup) return [selected];
-  const groupSet = new Set(selectedGroup);
-  return availablePlayers.filter(player => groupSet.has(player));
+  // Option 2 (Global Pairing): Any unpartnered player across all courts and queue is selectable.
+  return availablePlayers;
 }
 
 export const PartnerPanel: React.FC<{
@@ -118,14 +188,26 @@ export const PartnerPanel: React.FC<{
   playerGroups: string[][];
   pairs:        LockedPartnerPair[];
   onChange:     (pairs: LockedPartnerPair[]) => void;
-}> = ({ players, playerGroups, pairs, onChange }) => {
-  const [open, setOpen] = useState(false);
+  hideToggle?:  boolean;
+}> = ({ players, playerGroups, pairs, onChange, hideToggle = false }) => {
+  const [open, setOpen] = useState(hideToggle);
   const [selected, setSelected] = useState<string | null>(null);
   const [draftPairs, setDraftPairs] = useState<LockedPartnerPair[]>(pairs);
+  const [justSaved, setJustSaved] = useState(false);
+  const [partnerFilter, setPartnerFilter] = useState('');
+
+  React.useEffect(() => {
+    setDraftPairs(pairs);
+  }, [pairs]);
+
   const maxPairs = getMaxPartnerPairs(players.length);
   const availablePlayers = getAvailablePartnerPlayers(players, draftPairs);
   const compatiblePlayers = getCompatiblePartnerPlayers(availablePlayers, playerGroups, selected);
   const limitReached = draftPairs.length >= maxPairs;
+  const showFilter = compatiblePlayers.length > SMART_FILTER_THRESHOLD;
+  const filteredCompatiblePlayers = showFilter
+    ? compatiblePlayers.filter(player => matchesPlayerFilter(player, partnerFilter))
+    : compatiblePlayers;
 
   const choosePlayer = (player: string) => {
     if (!selected) {
@@ -136,8 +218,18 @@ export const PartnerPanel: React.FC<{
       setSelected(null);
       return;
     }
-    if (!limitReached) setDraftPairs(addPartnerPair(players, draftPairs, selected, player));
+    if (!limitReached) {
+      const nextPairs = addPartnerPair(players, draftPairs, selected, player);
+      setDraftPairs(nextPairs);
+      if (hideToggle) onChange(nextPairs);
+    }
     setSelected(null);
+  };
+
+  const removePair = (index: number) => {
+    const nextPairs = draftPairs.filter((_, pairIndex) => pairIndex !== index);
+    setDraftPairs(nextPairs);
+    if (hideToggle) onChange(nextPairs);
   };
 
   const toggleOpen = () => {
@@ -148,23 +240,27 @@ export const PartnerPanel: React.FC<{
 
   const savePairs = () => {
     onChange(draftPairs);
-    setOpen(false);
+    setJustSaved(true);
+    setTimeout(() => setJustSaved(false), 2000);
+    if (!hideToggle) setOpen(false);
     setSelected(null);
   };
 
   return (
     <div className="live-panel partner-panel">
-      <button className="live-panel-toggle" onClick={toggleOpen} type="button">
-        <Link2 size={13} /> {open ? 'Hide Partners' : 'Set Partners'}
-        <span className="partner-panel-count">{pairs.length}/{maxPairs}</span>
-      </button>
+      {!hideToggle && (
+        <button className="live-panel-toggle" onClick={toggleOpen} type="button">
+          <Link2 size={13} /> {open ? 'Hide Partners' : 'Set Partners'}
+          <span className="partner-panel-count">{pairs.length}/{maxPairs}</span>
+        </button>
+      )}
 
-      {open && (
+      {(open || hideToggle) && (
         <div className="partner-panel-body">
           <div className="partner-panel-heading">
             <div>
               <strong>Partner pairs</strong>
-              <p>Choose two players from the same court or waiting queue. Changes apply on their next assignment.</p>
+              <p>Pair any two players across courts or queue. Changes apply on their next assignment.</p>
             </div>
             <span>{maxPairs} max for {players.length} players</span>
           </div>
@@ -179,7 +275,7 @@ export const PartnerPanel: React.FC<{
                     type="button"
                     title={`Remove ${a} and ${b}`}
                     aria-label={`Remove partner pair ${a} and ${b}`}
-                    onClick={() => setDraftPairs(draftPairs.filter((_, pairIndex) => pairIndex !== index))}
+                    onClick={() => removePair(index)}
                   >
                     <X size={11} />
                   </button>
@@ -189,19 +285,71 @@ export const PartnerPanel: React.FC<{
           )}
 
           {!limitReached && availablePlayers.length >= 2 ? (
-            <div className="partner-player-grid">
-              {compatiblePlayers.map(player => (
-                <button
-                  key={player}
-                  type="button"
-                  aria-pressed={selected === player}
-                  className={`partner-player-btn${selected === player ? ' partner-player-btn--selected' : ''}`}
-                  onClick={() => choosePlayer(player)}
-                >
-                  {player}
-                </button>
-              ))}
-            </div>
+            <>
+              {showFilter && (
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', marginBottom: '8px' }}>
+                  <input
+                    type="text"
+                    placeholder="Filter available players…"
+                    aria-label="Filter available partners"
+                    value={partnerFilter}
+                    onChange={e => setPartnerFilter(e.target.value)}
+                    style={{
+                      width: '100%',
+                      height: '38px',
+                      padding: '0 32px 0 10px',
+                      borderRadius: 'var(--r-sm, 8px)',
+                      border: '1px solid var(--line-subtle, #252d47)',
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      color: 'var(--text-primary, #f8fafc)',
+                      fontSize: '16px',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {partnerFilter && (
+                    <button
+                      type="button"
+                      aria-label="Clear partner filter"
+                      onClick={() => setPartnerFilter('')}
+                      style={{
+                        position: 'absolute',
+                        right: '4px',
+                        width: '28px',
+                        height: '28px',
+                        border: 'none',
+                        background: 'transparent',
+                        color: 'var(--text-muted, #94a3b8)',
+                        fontSize: '1rem',
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )}
+              <div className="partner-player-grid">
+                {filteredCompatiblePlayers.map(player => {
+                  const loc = getPlayerLocationLabel(player, playerGroups);
+                  return (
+                    <button
+                      key={player}
+                      type="button"
+                      aria-pressed={selected === player}
+                      className={`partner-player-btn${selected === player ? ' partner-player-btn--selected' : ''}`}
+                      onClick={() => choosePlayer(player)}
+                    >
+                      <span className="partner-player-name">{player}</span>
+                      {loc && <span className="partner-player-loc">{loc}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
           ) : (
             <p className="partner-panel-limit">
               {draftPairs.length === 0 ? 'At least two players are required.' : 'All available partner pairs are set.'}
@@ -210,8 +358,13 @@ export const PartnerPanel: React.FC<{
 
           <div className="partner-panel-actions">
             <button type="button" className="partner-panel-cancel" onClick={toggleOpen}>Cancel</button>
-            <button type="button" className="partner-panel-save" onClick={savePairs}>
-              Save {draftPairs.length === 1 ? '1 pair' : `${draftPairs.length} pairs`}
+            <button
+              type="button"
+              className="partner-panel-save"
+              onClick={savePairs}
+              style={justSaved ? { background: '#22c55e', borderColor: '#16a34a', color: '#ffffff' } : undefined}
+            >
+              {justSaved ? '✓ Pairs Confirmed!' : `Save ${draftPairs.length === 1 ? '1 pair' : `${draftPairs.length} pairs`}`}
             </button>
           </div>
         </div>

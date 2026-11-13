@@ -4,41 +4,49 @@ This directory contains the operational, architectural, testing, and release doc
 
 ---
 
-## 🚀 V1.2 Documentation (Active Development)
-Documentation for V1.2 features, including the revived Skill-Aware Matchmaking engine:
-- [v1.2/ARCHITECTURE_AND_ANALYSIS.md](v1.2/ARCHITECTURE_AND_ANALYSIS.md) — Architectural design, option trade-off matrix, ADR-0005, and empirical analysis adhering to enterprise guidelines.
+## V1.2 Documentation (Active Development — `Matchmaking-skill-based`)
+Documentation for V1.2 features, including Skill-Aware Matchmaking:
+- [v1.2/ARCHITECTURE_AND_ANALYSIS.md](v1.2/ARCHITECTURE_AND_ANALYSIS.md) — Architectural design, option trade-off matrix, ADR-0005, and empirical analysis.
 - [v1.2/SKILL_AWARE_MATCHMAKING.md](v1.2/SKILL_AWARE_MATCHMAKING.md) — Functional specification, priority cascades (P1–P3B), snake-draft team ordering, and dual-projection court synchronization.
 
 ---
 
-## 📦 V1 Documentation (Production Baseline)
-Historical and operational documentation governing the V1.0 release baseline:
+## 1. Release & Verification
+- [V1-RELEASE-GATES.md](V1-RELEASE-GATES.md) — Definitive release gates, requirements, and sign-offs for production launch.
+- [V1-PUBLIC-RELEASE-TASKS.md](V1-PUBLIC-RELEASE-TASKS.md) — Public release checklist, recent audit entries, and verification status.
+- [GATE4-RELEASE-CANDIDATE.md](GATE4-RELEASE-CANDIDATE.md) — Release candidate qualification audit and verification logs.
+- [V1-SCOPE-SEAL.md](V1-SCOPE-SEAL.md) — Scope boundary seal and deferred feature registry.
+- [V1-PERSONA-ACCEPTANCE-MATRIX.md](V1-PERSONA-ACCEPTANCE-MATRIX.md) — Acceptance criteria verified across Host, Player, and Viewer personas.
+- [PRODUCTION_READINESS_AND_DEPLOYMENT_REPORT.md](PRODUCTION_READINESS_AND_DEPLOYMENT_REPORT.md) — Production deployment and readiness assessment.
 
-### 1. Release & Verification
-- [v1/V1-RELEASE-GATES.md](v1/V1-RELEASE-GATES.md) — Definitive release gates, requirements, and sign-offs for production launch.
-- [v1/V1-PUBLIC-RELEASE-TASKS.md](v1/V1-PUBLIC-RELEASE-TASKS.md) — Public release checklist, open testing validation, and verification status.
-- [v1/GATE4-RELEASE-CANDIDATE.md](v1/GATE4-RELEASE-CANDIDATE.md) — Release candidate qualification audit and verification logs.
-- [v1/V1-SCOPE-SEAL.md](v1/V1-SCOPE-SEAL.md) — Scope boundary seal and deferred feature registry.
-- [v1/V1-PERSONA-ACCEPTANCE-MATRIX.md](v1/V1-PERSONA-ACCEPTANCE-MATRIX.md) — Acceptance criteria verified across Host, Player, and Viewer personas.
-- [v1/PRODUCTION_READINESS_AND_DEPLOYMENT_REPORT.md](v1/PRODUCTION_READINESS_AND_DEPLOYMENT_REPORT.md) — Production deployment and readiness assessment.
+## 2. Capacity, Testing & Scenarios
+- [GATE2-CAPACITY-REPORT.md](GATE2-CAPACITY-REPORT.md) — Free-tier capacity limits, Firestore read/write budgets, and concurrency gates.
+- [V1-FULL-STRESS-REPORT.md](V1-FULL-STRESS-REPORT.md) — Multi-court concurrent match resolution and high-volume rush stress results.
+- [V1-SCORE-RESILIENCE-SCENARIOS.md](V1-SCORE-RESILIENCE-SCENARIOS.md) — Score correction, network resilience, and recovery scenarios.
+- [report.md](report.md) — Consolidated test execution and validation benchmarks.
 
-### 2. Capacity, Testing & Scenarios
-- [v1/GATE2-CAPACITY-REPORT.md](v1/GATE2-CAPACITY-REPORT.md) — Free-tier capacity limits, Firestore read/write budgets, and concurrency gates.
-- [v1/V1-FULL-STRESS-REPORT.md](v1/V1-FULL-STRESS-REPORT.md) — Multi-court concurrent match resolution and high-volume rush stress results.
-- [v1/V1-SCORE-RESILIENCE-SCENARIOS.md](v1/V1-SCORE-RESILIENCE-SCENARIOS.md) — Score correction, network resilience, and recovery scenarios.
-- [v1/report.md](v1/report.md) — Consolidated test execution, suggestions tracking, and validation benchmarks.
+## 3. Security & Compliance
+- [FIREBASE-APP-CHECK-ROLLOUT.md](FIREBASE-APP-CHECK-ROLLOUT.md) — Firebase App Check rollout, monitoring, and reCAPTCHA Enterprise enforcement.
+- [PADQ-FREE-API-SECURITY-AUDIT.md](PADQ-FREE-API-SECURITY-AUDIT.md) — Security audit covering Spark zero-spend boundaries and authorization.
+- [firestore-security-audit.local.md](firestore-security-audit.local.md) — Local Firestore security rules audit and test evaluation.
 
-### 3. Security & Compliance
-- [v1/FIREBASE-APP-CHECK-ROLLOUT.md](v1/FIREBASE-APP-CHECK-ROLLOUT.md) — Firebase App Check rollout, monitoring, and reCAPTCHA Enterprise enforcement.
-- [v1/PADQ-FREE-API-SECURITY-AUDIT.md](v1/PADQ-FREE-API-SECURITY-AUDIT.md) — Security audit covering Spark zero-spend boundaries and authorization.
-- [v1/firestore-security-audit.local.md](v1/firestore-security-audit.local.md) — Local Firestore security rules audit and test evaluation.
-
-### 4. Design & Operations
-- [v1/V1-SUPERVISED-EVENT-RUNBOOK.md](v1/V1-SUPERVISED-EVENT-RUNBOOK.md) — Host and coordinator step-by-step event runbook.
-- [v1/DESIGN_MATCHUP_DIFFERENTIAL.md](v1/DESIGN_MATCHUP_DIFFERENTIAL.md) — Point Differential (+/-) and Matchup Strength (OWP) algorithm specification.
-
----
-
-## 🗺️ System Roadmap & Standards
-- [PADQ-RELEASE-ROADMAP.md](PADQ-RELEASE-ROADMAP.md) — Post-V1 roadmap and version backlog (V1.0 through V2.0).
+## 4. Design, ADRs & Feature Specifications
+- [V1-SUPERVISED-EVENT-RUNBOOK.md](V1-SUPERVISED-EVENT-RUNBOOK.md) — Host and coordinator step-by-step event runbook.
+- [DESIGN_MATCHUP_DIFFERENTIAL.md](DESIGN_MATCHUP_DIFFERENTIAL.md) — Matchup differential, Point Differential (+/-), and 4-tier tiebreaker specification (Implemented in V1).
+- [PADQ-RELEASE-ROADMAP.md](PADQ-RELEASE-ROADMAP.md) — Post-V1 roadmap and feature backlog.
 - [PADQ-PROMPT.md](PADQ-PROMPT.md) — System architectural reference and prompt specifications.
+- [adr/0001-dual-intent-sit-out.md](adr/0001-dual-intent-sit-out.md) — ADR 0001: Dual-intent sit-out and break handling.
+- [adr/0002-deterministic-queue-eta.md](adr/0002-deterministic-queue-eta.md) — ADR 0002: Deterministic waiting queue ETA calculation.
+- [adr/0003-priority-return.md](adr/0003-priority-return.md) — ADR 0003: Priority return from break vs back-of-queue return.
+- [adr/0004-single-session-court-slots.md](adr/0004-single-session-court-slots.md) — ADR 0004: Single-session `courtSlots` multi-court architecture.
+- [superpowers/specs/2026-11-05-compact-player-names-design.md](superpowers/specs/2026-11-05-compact-player-names-design.md) — Compact player display name (`formatDisplayName`) and smart host-drawer filter (`matchesPlayerFilter`) specification.
+- [superpowers/plans/2026-11-01-pre-session-checkin-and-engine-parity.md](superpowers/plans/2026-11-01-pre-session-checkin-and-engine-parity.md) — Pre-session check-in, smart paste, turn alerts, and engine parity plan.
+- [superpowers/plans/2026-11-03-fix-six-live-wiring-bugs.md](superpowers/plans/2026-11-03-fix-six-live-wiring-bugs.md) — Live wiring parity and mobile touch target hardening plan.
+- [superpowers/plans/2026-11-05-compact-player-names.md](superpowers/plans/2026-11-05-compact-player-names.md) — Compact player names implementation and verification plan.
+
+## 5. Engineering Standards & Operational Guidelines
+- [`.claude/guidelines/architecture.md`](../.claude/guidelines/architecture.md) — System design, boundary honesty, and one-way vs two-way doors.
+- [`.claude/guidelines/observability-reliability.md`](../.claude/guidelines/observability-reliability.md) — Reliability patterns, idempotency, bounded retries, and error handling.
+- [`.claude/guidelines/performance.md`](../.claude/guidelines/performance.md) — Performance workflow, algorithmic bounds, and Spark $0 cost discipline.
+- [`.claude/guidelines/code-review.md`](../.claude/guidelines/code-review.md) — Prioritized code review hierarchy and PR discipline.
+- [`.claude/guidelines/debugging.md`](../.claude/guidelines/debugging.md) — Scientific debugging, reproduction, and regression test prevention.

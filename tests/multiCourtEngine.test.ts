@@ -44,6 +44,31 @@ describe('partner-aware multi-court doubles', () => {
     expect(result.waiting).toHaveLength(4);
   });
 
+  it('Option 2: holds back a player in waiting whose partner is still in a match on another court', () => {
+    // P1 is on Court 1 (absent from ranked list). P9 is in queue.
+    const ranked = ['P9', 'P10', 'P11', 'P12', 'P5', 'P6', 'P7', 'P8'];
+    const locked: LockedPartnerPair[] = [['P1', 'P9']];
+
+    // When Court 2 rotates, P9's partner P1 is absent (on Court 1).
+    // P9 must stay in waiting while the other available players form the court.
+    const result = selectPartnerAwareMatch(ranked, locked);
+
+    expect(result.onCourt).toHaveLength(4);
+    expect(result.onCourt).not.toContain('P9');
+    expect(result.waiting).toContain('P9');
+
+    // When Court 1 finishes, P1 becomes available in ranked list.
+    const nextRanked = [...result.waiting, 'P1', 'P2', 'P3', 'P4'];
+    const nextResult = selectPartnerAwareMatch(nextRanked, locked);
+
+    expect(nextResult.onCourt).toHaveLength(4);
+    expect(nextResult.onCourt).toContain('P1');
+    expect(nextResult.onCourt).toContain('P9');
+    expect(Math.floor(nextResult.onCourt.indexOf('P1') / 2)).toBe(
+      Math.floor(nextResult.onCourt.indexOf('P9') / 2),
+    );
+  });
+
   it('seeds three courts without splitting any locked pair', () => {
     const players = Array.from({ length: 30 }, (_, i) => `P${i + 1}`);
     const locked: LockedPartnerPair[] = [['P2', 'P29'], ['P7', 'P8'], ['P17', 'P25']];
@@ -275,4 +300,37 @@ describe('partner-aware multi-court doubles', () => {
     }
   });
 
+
+describe('planMultiCourtResult — sitting-out finishers defensive exclusion (Phase 1, Row 8)', () => {
+  it('doubles: finisher who is sittingOut does not re-enter next.waiting or a new match', () => {
+    const state = {
+      queue: ['Q1', 'Q2', 'Q3', 'Q4'],
+      courtSlots: [
+        { id: 'court-0', name: 'Court 1', onCourt: ['A1', 'A2', 'B1', 'B2'] },
+      ],
+      sittingOut: ['A1'],
+    };
+    const result = planMultiCourtResult(state, 'court-0', ['A1', 'A2', 'B1', 'B2'], 'A', 'doubles');
+    expect(result).not.toBeNull();
+    // A1 is in sittingOut, so A1 must NOT be in queue and must NOT be on court
+    expect(result!.queue).not.toContain('A1');
+    expect(result!.courtSlots[0].onCourt).not.toContain('A1');
+  });
+
+  it('singles: loser who is sittingOut is not added to queue; winner who is sittingOut steps down', () => {
+    const state = {
+      queue: ['Q1', 'Q2'],
+      courtSlots: [
+        { id: 'court-0', name: 'Court 1', onCourt: ['P1', 'P2'] },
+      ],
+      sittingOut: ['P1', 'P2'],
+    };
+    const result = planMultiCourtResult(state, 'court-0', ['P1', 'P2'], 'A', 'singles');
+    expect(result).not.toBeNull();
+    // Loser P2 was in sittingOut -> not in queue
+    expect(result!.queue).not.toContain('P2');
+    // Winner P1 was in sittingOut -> stepped down, not on court
+    expect(result!.courtSlots[0].onCourt).not.toContain('P1');
+  });
+});
 });

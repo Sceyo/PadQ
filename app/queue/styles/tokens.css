@@ -1,0 +1,161 @@
+/* ═══════════════════════════════════════════════════════════
+   tokens.css — PadQ Mobile-First Semantic Design System Tokens
+   Adheres to ui-ux.md guidelines & existing palette roles.
+   ═══════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Spacing Scale (4/8px base) ── */
+  --sp-0_5: 2px;
+  --sp-1: 4px;
+  --sp-1_5: 6px;
+  --sp-2: 8px;
+  --sp-2_5: 10px;
+  --sp-3: 12px;
+  --sp-3_5: 14px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-10: 40px;
+
+  /* ── Radii ── */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r-md: 14px;
+  --r-lg: 18px;
+  --r-xl: 22px;
+  --r-pill: 9999px;
+
+  /* ── Typography Scale ── */
+  --fs-xs: 0.8125rem;   /* 13px - labels, badges, timestamps */
+  --fs-sm: 0.9375rem;   /* 15px - secondary text, chip labels */
+  --fs-base: 1rem;      /* 16px - inputs (stops iOS zoom), standard body */
+  --fs-md: 1.0625rem;   /* 17px - player names, primary action buttons */
+  --fs-lg: 1.25rem;     /* 20px - card headers, modal titles */
+  --fs-xl: 2.125rem;    /* 34px - live score numbers */
+  --fs-display: 2.5rem; /* 40px - hero Bebas Neue titles */
+
+  /* ── Line Heights ── */
+  --lh-tight: 1.1;
+  --lh-snug: 1.25;
+  --lh-normal: 1.5;
+
+  /* ── Layout & Touch Dimensions ── */
+  --tap-min: 44px;
+  --header-h: 52px;
+  --bar-h: 56px;
+  --player-card-h: 48px;
+
+  /* ── Safe Area Inset Fallbacks ── */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+
+  /* Extra mobile browser clearance (WebKit/Safari bottom floating chrome) */
+  --bar-clearance: calc(var(--bar-h) + var(--safe-bottom) + var(--sp-3));
+
+  /* ── Z-Index Scale (Strict) ── */
+  --z-base: 0;
+  --z-sticky: 100;
+  --z-action-bar: 200;
+  --z-overlay: 1000;
+  --z-dialog: 1100;
+  --z-toast: 1200;
+
+  /* ── Palette: Semantic Roles (Default / Dark Mode) ── */
+  --surface-bg: #0b0d17;
+  --surface-bg-alt: #101424;
+  --surface-card: #131726;
+  --surface-card-alt: #161a2c;
+  --surface-elevated: #1a2035;
+  --surface-modal: #16192b;
+
+  --line-subtle: #252d47;
+  --line-strong: #333d5e;
+
+  /* Text Roles (Contrast >= 4.5:1 checked) */
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #94a3b8;
+
+  /* Team Visual Identity */
+  --team-a-text: #4ade80;
+  --team-a-border: rgba(74, 222, 128, 0.45);
+  --team-a-bg: rgba(74, 222, 128, 0.08);
+
+  --team-b-text: #60a5fa;
+  --team-b-border: rgba(96, 165, 250, 0.45);
+  --team-b-bg: rgba(96, 165, 250, 0.08);
+
+  /* Action & Status Accents (WCAG AA Compliant) */
+  --accent-primary: #5457e0;
+  --accent-hover: #484bc7;
+  --accent-surface: rgba(84, 87, 224, 0.12);
+
+  --status-success: #22c55e;
+  --status-success-bg: rgba(34, 197, 94, 0.12);
+
+  --status-warn: #f59e0b;
+  --status-warn-bg: rgba(245, 158, 11, 0.15);
+
+  --status-danger: #ef4444;
+  --status-danger-bg: rgba(239, 68, 68, 0.12);
+
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 48px rgba(0, 0, 0, 0.65);
+}
+
+/* Light Mode Overrides */
+body:not(.dark-mode) {
+  --surface-bg: #eef2f7;
+  --surface-bg-alt: #f3f6fb;
+  --surface-card: #ffffff;
+  --surface-card-alt: #f8fafc;
+  --surface-elevated: #f8fafc;
+  --surface-modal: #ffffff;
+
+  --line-subtle: #d8e1ec;
+  --line-strong: #b8c6d8;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #52637a;
+
+  --team-a-text: #15803d;
+  --team-a-border: rgba(21, 128, 61, 0.38);
+  --team-a-bg: rgba(22, 163, 74, 0.07);
+
+  --team-b-text: #1d4ed8;
+  --team-b-border: rgba(29, 78, 216, 0.38);
+  --team-b-bg: rgba(37, 99, 235, 0.07);
+
+  --accent-primary: #4f46e5;
+  --accent-hover: #4338ca;
+  --accent-surface: rgba(79, 70, 229, 0.09);
+
+  --status-success: #16a34a;
+  --status-success-bg: rgba(22, 163, 74, 0.10);
+
+  --status-warn: #b45309;
+  --status-warn-bg: rgba(180, 83, 9, 0.12);
+
+  --status-danger: #dc2626;
+  --status-danger-bg: rgba(220, 38, 38, 0.10);
+
+  --shadow-sm: 0 2px 6px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 6px 20px rgba(15, 23, 42, 0.09), 0 2px 6px rgba(15, 23, 42, 0.04);
+  --shadow-lg: 0 16px 48px rgba(15, 23, 42, 0.14), 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+/* ── Accessibility: Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -22,12 +22,13 @@ import {
   serverTimestamp,
   collection,
   query,
+  where,
   orderBy,
   limit,
   Unsubscribe,
   Timestamp,
 } from 'firebase/firestore';
-import { db, ensureAuthenticated } from './firebase';
+import { db, ensureAuthenticated, assertFirebaseConfig } from './firebase';
 import { generateRoomCode } from './roomCode';
 import { planMultiCourtResult } from '@/app/queue/lib/multiCourtResult';
 
@@ -114,6 +115,7 @@ export interface SessionDoc {
   /** Firestore-safe partner pairs (nested arrays are not supported). */
   lockedPartners?: Array<{ a: string; b: string }>;
   sittingOut?: string[];
+  priorityPlayers?: string[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
   /**
@@ -142,6 +144,7 @@ const sessionRef = (id: string) => doc(db, 'sessions', id);
 export async function createSession(
   data: Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt' | 'updatedAt' | 'lastActiveAt'>,
 ): Promise<{ sessionId: string }> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   for (let attempt = 0; attempt < 8; attempt++) {
     const sessionId = generateRoomCode();
@@ -153,7 +156,7 @@ export async function createSession(
           ...data,
           hostUid: user.uid,
           revision: 0,
-          isLive:       false,
+          isLive:       data.isLive ?? false,
           createdAt:    serverTimestamp(),
           updatedAt:    serverTimestamp(),
           lastActiveAt: serverTimestamp(),
@@ -236,6 +239,7 @@ export async function updateQueueSafely(
   updater: (current: Pick<SessionDoc, 'queue' | 'players' | 'tournamentMatches'>) =>
     Partial<SessionDoc>,
 ): Promise<number> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   const ref = sessionRef(sessionId);
 
@@ -282,6 +286,7 @@ export async function updateSessionSafely(
   expectedRevision: number,
   patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>,
 ): Promise<number> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   return runTransaction(db, async tx => {
     const ref = sessionRef(sessionId);
@@ -327,6 +332,9 @@ export interface CourtResultCommand {
   gameMode: 'singles' | 'doubles';
   id: number;
   timestamp: string;
+  score?: string;
+  history?: Array<{ id?: number; mode?: string; players: string; winner: string; timestamp?: string; score?: string }>;
+  skillMap?: Record<string, number>;
 }
 
 export type CourtResultCommit = {
@@ -334,6 +342,7 @@ export type CourtResultCommit = {
   revision: number;
   queue: string[];
   courtSlots: CourtSlot[];
+  priorityPlayers?: string[];
 };
 
 export async function batchMatchResult(
@@ -343,6 +352,7 @@ export async function batchMatchResult(
   patch: Partial<Omit<SessionDoc, 'hostUid' | 'revision' | 'createdAt'>>,
   entry: Omit<MatchHistoryEntry, 'commandId' | 'revision'>,
 ): Promise<CommitMatchResult> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   const sRef   = sessionRef(sessionId);
   const hRef   = doc(db, 'sessions', sessionId, 'history', commandId);
@@ -386,6 +396,7 @@ export async function commitMultiCourtResult(
   commandId: string,
   command: CourtResultCommand,
 ): Promise<CourtResultCommit> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   const sRef = sessionRef(sessionId);
   const hRef = doc(db, 'sessions', sessionId, 'history', commandId);
@@ -413,6 +424,9 @@ export async function commitMultiCourtResult(
         courtSlots: currentSlots,
         lockedPartners: current.lockedPartners,
         sittingOut: current.sittingOut,
+        priorityPlayers: current.priorityPlayers,
+        history: command.history,
+        skillMap: command.skillMap,
       },
       command.courtId,
       command.expectedPlayers,
@@ -432,6 +446,7 @@ export async function commitMultiCourtResult(
     tx.update(sRef, {
       queue: planned.queue,
       courtSlots: planned.courtSlots,
+      ...(planned.priorityPlayers !== undefined ? { priorityPlayers: planned.priorityPlayers } : {}),
       revision: nextRevision,
       updatedAt: serverTimestamp(),
       lastActiveAt: serverTimestamp(),
@@ -444,6 +459,7 @@ export async function commitMultiCourtResult(
       timestamp: command.timestamp,
       commandId,
       revision: nextRevision,
+      ...(command.score ? { score: command.score } : {}),
     });
 
     return {
@@ -451,6 +467,102 @@ export async function commitMultiCourtResult(
       revision: nextRevision,
       queue: planned.queue,
       courtSlots: planned.courtSlots,
+      ...(planned.priorityPlayers !== undefined ? { priorityPlayers: planned.priorityPlayers } : {}),
+    };
+  });
+}
+
+export type ReplaceHistoryOutcome =
+  | { status: 'committed'; revision: number; commandId: string }
+  | { status: 'not_found'; revision: number };
+
+/**
+ * replaceHistoryEntry
+ * Atomically replaces an existing match history entry with updated fields (e.g. "Flip Winner").
+ * Conforms to firestore.rules by deleting the old history doc and creating a new one
+ * with a new commandId and incremented session revision within a single transaction.
+ */
+export async function replaceHistoryEntry(
+  sessionId: string,
+  oldCommandId: string | undefined,
+  updatedEntry: MatchHistoryEntry,
+): Promise<ReplaceHistoryOutcome> {
+  assertFirebaseConfig();
+  const user = await ensureAuthenticated();
+  const sRef = sessionRef(sessionId);
+
+  // 1. Resolve candidate old doc ref
+  let oldHRef = oldCommandId ? doc(db, 'sessions', sessionId, 'history', oldCommandId) : null;
+  if (oldHRef) {
+    try {
+      const directSnap = await getDoc(oldHRef);
+      if (!directSnap.exists()) {
+        oldHRef = null;
+      }
+    } catch {
+      oldHRef = null;
+    }
+  }
+
+  if (!oldHRef) {
+    // Fallback: query by entry.id to support rapid double flips or missing commandId
+    try {
+      const q = query(
+        collection(db, 'sessions', sessionId, 'history'),
+        where('id', '==', updatedEntry.id),
+        limit(1)
+      );
+      const snap = await getDocs(q);
+      if (!snap.empty) {
+        oldHRef = snap.docs[0].ref;
+      }
+    } catch {
+      oldHRef = null;
+    }
+  }
+
+  if (!oldHRef) {
+    return { status: 'not_found', revision: 0 };
+  }
+
+  const targetOldRef = oldHRef;
+
+  return runTransaction(db, async tx => {
+    const sessionSnap = await tx.get(sRef);
+    const oldHistSnap = await tx.get(targetOldRef);
+
+    if (!sessionSnap.exists()) throw new Error('Session not found');
+    const current = sessionSnap.data() as SessionDoc;
+    if (current.hostUid !== user.uid) throw new Error('Not the host');
+    if (!oldHistSnap.exists()) {
+      return { status: 'not_found', revision: current.revision };
+    }
+
+    const nextRevision = current.revision + 1;
+    const newCommandId = crypto.randomUUID();
+    const newHRef = doc(db, 'sessions', sessionId, 'history', newCommandId);
+
+    tx.delete(targetOldRef);
+    tx.update(sRef, {
+      revision: nextRevision,
+      updatedAt: serverTimestamp(),
+      lastActiveAt: serverTimestamp(),
+    });
+    tx.set(newHRef, {
+      id: updatedEntry.id,
+      mode: updatedEntry.mode,
+      players: updatedEntry.players,
+      winner: updatedEntry.winner,
+      timestamp: updatedEntry.timestamp,
+      commandId: newCommandId,
+      revision: nextRevision,
+      ...(updatedEntry.score ? { score: updatedEntry.score } : {}),
+    });
+
+    return {
+      status: 'committed',
+      revision: nextRevision,
+      commandId: newCommandId,
     };
   });
 }
@@ -498,6 +610,7 @@ export async function deleteSession(
 export async function clearHistory(
   sessionId: string,
 ): Promise<void> {
+  assertFirebaseConfig();
   const user = await ensureAuthenticated();
   const sessionSnap = await getDoc(sessionRef(sessionId));
   if (sessionSnap.exists() && (sessionSnap.data() as SessionDoc).hostUid !== user.uid) {
