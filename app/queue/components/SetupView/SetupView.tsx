@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import Image from 'next/image';
 import {
   Sun, Moon, ArrowLeft, Users, Swords, UserPlus,
-  Trash2, Star, BookOpen, Play, Wifi, Check, Clock, UserCheck, RotateCcw,
+  Trash2, Star, BookOpen, Play, Wifi, Check, Clock, UserCheck, RotateCcw, X,
 } from 'lucide-react';
 import type { RosterEntry, SkillBracket } from '@/lib/sessionService';
 import { matchesPlayerFilter, SMART_FILTER_THRESHOLD } from '../../lib/nameFormatter';
@@ -17,7 +18,7 @@ export interface SetupViewProps {
   onCourtCountChange:  (n: number) => void;
   maxCourts:           number;
   showAccessPin:       boolean;
-  showSkillTagging:    boolean;
+  showSkillTagging?:   boolean;
   setupPin:            string;
   onPinChange:         (s: string) => void;
   roster:              RosterEntry[];
@@ -29,7 +30,7 @@ export interface SetupViewProps {
   onAddFromRoster:     () => void;
   onSaveToRoster:      () => void;
   onRemoveFromRoster:  (name: string) => void;
-  onSetRosterSkill:    (name: string, skill: SkillBracket | undefined) => void;
+  onSetRosterSkill?:   (name: string, skill: SkillBracket | undefined) => void;
   tempPlayers:         string[];
   currentName:         string;
   onCurrentNameChange: (s: string) => void;
@@ -38,7 +39,7 @@ export interface SetupViewProps {
   onAddPlayer:         () => void;
   onRemoveTempPlayer:  (i: number) => void;
   onAddFromPaste:      () => void;
-  onStartQueue:        () => void;
+  onStartQueue:        (mode?: 'default' | 'skilled') => void;
   isSaving:            boolean;
   onBack:              () => void;
   errorMsg?:           string;
@@ -58,7 +59,7 @@ export interface SetupViewProps {
 
 export function SetupView({
   gameMode, darkMode, onToggleDark,
-  courtCount, onCourtCountChange, maxCourts, showAccessPin, showSkillTagging,
+  courtCount, onCourtCountChange, maxCourts, showAccessPin,
   setupPin, onPinChange,
   roster, showRoster, onToggleRoster,
   rosterSelected, onRosterToggle, onSelectAllRoster, onAddFromRoster, onSaveToRoster, onRemoveFromRoster,
@@ -66,17 +67,13 @@ export function SetupView({
   pasteInput, onPasteInputChange,
   onAddPlayer, onRemoveTempPlayer, onAddFromPaste,
   onStartQueue, isSaving, onBack, errorMsg,
-  onSetRosterSkill,
   singlesFormat = 'pool',
   onSinglesFormatChange,
-  skilledBrackets,
-  onSetPlayerSkill,
   expectedPlayers = [],
   onCheckInPlayer,
   onUndoCheckInPlayer,
   onCheckInAll,
   onRemoveExpectedPlayer,
-  onAddExpectedFromPaste,
   onAddExpectedFromRoster,
   onUncheckAll,
 }: SetupViewProps) {
@@ -85,23 +82,20 @@ export function SetupView({
     : gameMode === 'singles' && courtCount > 1
       ? Math.max(5, courtCount * 2 + 1)
       : 5;
-  const [skillPickerFor, setSkillPickerFor] = useState<string | null>(null);
-  const [tempSkillPickerFor, setTempSkillPickerFor] = useState<string | null>(null);
+  const [showModeModal, setShowModeModal] = useState(false);
   const [expectedFilter, setExpectedFilter] = useState('');
   const showExpectedFilter = expectedPlayers.length > SMART_FILTER_THRESHOLD;
   const filteredExpectedPlayers = showExpectedFilter
     ? expectedPlayers.filter(name => matchesPlayerFilter(name, expectedFilter))
     : expectedPlayers;
 
-  const SKILL_BRACKETS: SkillBracket[] = ['beginner', 'intermediate', 'advanced'];
-  const SKILL_LABEL: Record<SkillBracket, string> = { beginner: 'B', intermediate: 'I', advanced: 'A' };
-  const SKILL_TITLE: Record<SkillBracket, string> = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' };
-
-  const getTempPlayerSkill = (name: string): SkillBracket | undefined => {
-    if (skilledBrackets?.beginner.includes(name)) return 'beginner';
-    if (skilledBrackets?.intermediate.includes(name)) return 'intermediate';
-    if (skilledBrackets?.advanced.includes(name)) return 'advanced';
-    return undefined;
+  const handleStartClick = () => {
+    if (tempPlayers.length < minPlayers || isSaving) return;
+    if (gameMode === 'doubles') {
+      setShowModeModal(true);
+    } else {
+      onStartQueue('default');
+    }
   };
 
   return (
@@ -222,7 +216,7 @@ export function SetupView({
           >
             <BookOpen size={13} /> From Roster ({roster.length})
           </button>
-          {tempPlayers.length > 0 && (
+          {(tempPlayers.length > 0 || expectedPlayers.length > 0) && (
             <button type="button" className="roster-save-btn" onClick={onSaveToRoster} suppressHydrationWarning>
               <Star size={13} /> Save to Roster
             </button>
@@ -239,7 +233,6 @@ export function SetupView({
                 {roster.map((entry, i) => {
                   const isAdded = tempPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase()) ||
                     expectedPlayers.some(p => p.toLowerCase() === entry.name.toLowerCase());
-                  const pickerOpen = skillPickerFor === entry.name;
                   return (
                     <div key={`roster-${i}-${entry.name}`} className="roster-item roster-item--col">
                       <div className="roster-item-row">
@@ -249,17 +242,8 @@ export function SetupView({
                           disabled={isAdded}
                           onChange={() => onRosterToggle(entry.name)}
                         />
-                        <span
-                          className={`roster-name${showSkillTagging ? ' roster-name--clickable' : ''}${isAdded ? ' roster-name--added' : ''}`}
-                          onClick={showSkillTagging ? () => setSkillPickerFor(pickerOpen ? null : entry.name) : undefined}
-                          title={showSkillTagging ? 'Tap to set skill bracket' : undefined}
-                        >
+                        <span className={`roster-name${isAdded ? ' roster-name--added' : ''}`}>
                           {entry.name}
-                          {showSkillTagging && entry.skill && (
-                            <span className={`skill-badge skill-badge--${entry.skill}`}>
-                              {SKILL_LABEL[entry.skill]}
-                            </span>
-                          )}
                         </span>
                         <button
                           type="button"
@@ -269,24 +253,6 @@ export function SetupView({
                           suppressHydrationWarning
                         >×</button>
                       </div>
-                      {showSkillTagging && pickerOpen && (
-                        <div className="skill-picker">
-                          {SKILL_BRACKETS.map(bracket => (
-                            <button
-                              key={bracket}
-                              type="button"
-                              className={`skill-pick-btn skill-pick-btn--${bracket}${entry.skill === bracket ? ' skill-pick-btn--active' : ''}`}
-                              title={SKILL_TITLE[bracket]}
-                              onClick={() => {
-                                onSetRosterSkill(entry.name, entry.skill === bracket ? undefined : bracket);
-                                setSkillPickerFor(null);
-                              }}
-                            >
-                              {SKILL_TITLE[bracket]}
-                            </button>
-                          ))}
-                        </div>
-                      )}
                     </div>
                   );
                 })}
@@ -303,23 +269,12 @@ export function SetupView({
                 <button
                   type="button"
                   className={`roster-action-btn${rosterSelected.size > 0 ? ' roster-action-btn--primary' : ''}`}
-                  onClick={onAddFromRoster}
+                  onClick={onAddExpectedFromRoster ?? onAddFromRoster}
                   suppressHydrationWarning
                   disabled={rosterSelected.size === 0}
                 >
                   Add Selected ({rosterSelected.size})
                 </button>
-                {onAddExpectedFromRoster && (
-                  <button
-                    type="button"
-                    className="roster-action-btn add-expected-btn"
-                    onClick={onAddExpectedFromRoster}
-                    suppressHydrationWarning
-                    disabled={rosterSelected.size === 0}
-                  >
-                    Add as Expected ({rosterSelected.size})
-                  </button>
-                )}
               </div>
             </div>
           )
@@ -337,7 +292,7 @@ export function SetupView({
             data-lpignore="true"
             suppressHydrationWarning
           />
-          <button type="button" onClick={onAddPlayer} className="add-btn" suppressHydrationWarning><UserPlus size={15} /></button>
+          <button type="button" onClick={onAddPlayer} className="add-btn" suppressHydrationWarning title="Add to Expected Arrivals"><UserPlus size={15} /></button>
         </div>
         {errorMsg && <p className="setup-error-msg">{errorMsg}</p>}
         <div className="input-group">
@@ -363,22 +318,10 @@ export function SetupView({
             onClick={() => onAddFromPaste()}
             className="add-btn add-btn--paste"
             suppressHydrationWarning
-            title="Add all"
+            title="Add all to Expected Arrivals"
           >
             <Users size={15} />
           </button>
-          {onAddExpectedFromPaste && (
-            <button
-              type="button"
-              onClick={onAddExpectedFromPaste}
-              className="add-btn add-expected-btn"
-              disabled={!pasteInput.trim()}
-              suppressHydrationWarning
-              title="Add as Expected"
-            >
-              <Clock size={15} />
-            </button>
-          )}
         </div>
 
         {/* Expected Arrivals / Not Yet Here */}
@@ -501,75 +444,37 @@ export function SetupView({
               </div>
             </div>
             <ul>
-              {tempPlayers.map((p, i) => {
-                const playerSkill = getTempPlayerSkill(p);
-                const pickerOpen = tempSkillPickerFor === p;
-                return (
-                  <li key={i} className="setup-player-item-col">
-                    <div className="setup-player-item-row">
-                      <span className="setup-player-num">#{i + 1}</span>
-                      <span
-                        className={`setup-player-name${showSkillTagging ? ' roster-name--clickable' : ''}`}
-                        onClick={showSkillTagging ? () => setTempSkillPickerFor(pickerOpen ? null : p) : undefined}
-                        title={showSkillTagging ? 'Tap to assign skill bracket' : undefined}
-                      >
-                        {p}
-                        {showSkillTagging && (
-                          playerSkill ? (
-                            <span className={`skill-badge skill-badge--${playerSkill}`}>
-                              {SKILL_LABEL[playerSkill]}
-                            </span>
-                          ) : (
-                            <span className="skill-badge skill-badge--untagged" title="Untagged — tap to set">?</span>
-                          )
-                        )}
-                      </span>
-                      <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {onUndoCheckInPlayer && (
-                          <button
-                            type="button"
-                            onClick={() => onUndoCheckInPlayer(p)}
-                            className="remove-btn"
-                            title="Move back to Expected"
-                            suppressHydrationWarning
-                          >
-                            <RotateCcw size={12} />
-                          </button>
-                        )}
-                        <button type="button" onClick={() => onRemoveTempPlayer(i)} className="remove-btn" suppressHydrationWarning title="Remove player">
-                          <Trash2 size={12} />
+              {tempPlayers.map((p, i) => (
+                <li key={i} className="setup-player-item-col">
+                  <div className="setup-player-item-row">
+                    <span className="setup-player-num">#{i + 1}</span>
+                    <span className="setup-player-name">{p}</span>
+                    <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      {onUndoCheckInPlayer && (
+                        <button
+                          type="button"
+                          onClick={() => onUndoCheckInPlayer(p)}
+                          className="remove-btn"
+                          title="Move back to Expected"
+                          suppressHydrationWarning
+                        >
+                          <RotateCcw size={12} />
                         </button>
-                      </div>
+                      )}
+                      <button type="button" onClick={() => onRemoveTempPlayer(i)} className="remove-btn" suppressHydrationWarning title="Remove player">
+                        <Trash2 size={12} />
+                      </button>
                     </div>
-                    {showSkillTagging && pickerOpen && (
-                      <div className="skill-picker">
-                        {SKILL_BRACKETS.map(bracket => (
-                          <button
-                            key={bracket}
-                            type="button"
-                            className={`skill-pick-btn skill-pick-btn--${bracket}${playerSkill === bracket ? ' skill-pick-btn--active' : ''}`}
-                            title={SKILL_TITLE[bracket]}
-                            onClick={() => {
-                              onSetPlayerSkill?.(p, playerSkill === bracket ? undefined : bracket);
-                              setTempSkillPickerFor(null);
-                            }}
-                          >
-                            {SKILL_TITLE[bracket]}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
+                  </div>
+                </li>
+              ))}
             </ul>
           </div>
         )}
 
-        {/* ── Lock Partners (doubles multi-court only) ── */}
         <button
           type="button"
-          onClick={onStartQueue}
+          onClick={handleStartClick}
           className="start-btn"
           suppressHydrationWarning
           disabled={tempPlayers.length < minPlayers || isSaving}
@@ -579,6 +484,138 @@ export function SetupView({
             : <><Play size={14} /> Start Queue ({tempPlayers.length}/{minPlayers} min)</>
           }
         </button>
+
+        {showModeModal && typeof document !== 'undefined' && createPortal(
+          <div
+            role="presentation"
+            onClick={() => setShowModeModal(false)}
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              width: '100vw',
+              height: '100dvh',
+              zIndex: 9999,
+              background: 'rgba(6, 8, 20, 0.78)',
+              backdropFilter: 'blur(6px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '1rem',
+              boxSizing: 'border-box',
+            }}
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="mode-modal-title"
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: '100%',
+                maxWidth: '380px',
+                borderRadius: 'var(--r-lg, 18px)',
+                border: '1px solid var(--border, #2d3348)',
+                background: 'var(--modal-bg, #1a1c2e)',
+                boxShadow: 'var(--sh-lg, 0 12px 48px rgba(0,0,0,0.6))',
+                padding: '20px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '12px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h2
+                  id="mode-modal-title"
+                  style={{
+                    margin: 0,
+                    fontSize: '0.95rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.08em',
+                    textTransform: 'uppercase',
+                    color: 'var(--txt-1, #f0f4ff)',
+                  }}
+                >
+                  MODE
+                </h2>
+                <button
+                  type="button"
+                  aria-label="Close mode selector"
+                  onClick={() => setShowModeModal(false)}
+                  style={{
+                    width: '30px',
+                    height: '30px',
+                    borderRadius: '8px',
+                    border: '1px solid var(--border, #2d3348)',
+                    background: 'var(--btn, #252840)',
+                    color: 'var(--txt-2, #94a3b8)',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    cursor: 'pointer',
+                  }}
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModeModal(false);
+                  onStartQueue('default');
+                }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '14px 16px',
+                  borderRadius: 'var(--r-md, 12px)',
+                  border: '1.5px solid var(--border, #2d3348)',
+                  background: 'var(--btn, #252840)',
+                  color: 'var(--txt-1, #f0f4ff)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <span style={{ fontSize: '0.95rem', fontWeight: 700 }}>Default</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--txt-2, #94a3b8)' }}>
+                  Standard rotation &amp; paddle rack queue
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModeModal(false);
+                  onStartQueue('skilled');
+                }}
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '14px 16px',
+                  borderRadius: 'var(--r-md, 12px)',
+                  border: '1.5px solid var(--accent, #6366f1)',
+                  background: 'rgba(99, 102, 241, 0.14)',
+                  color: 'var(--txt-1, #f0f4ff)',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <span style={{ fontSize: '0.95rem', fontWeight: 700 }}>Matchmaking</span>
+                <span style={{ fontSize: '0.78rem', color: 'var(--txt-2, #94a3b8)' }}>
+                  Skill-based brackets (Beginner / Intermediate / Advanced)
+                </span>
+              </button>
+            </div>
+          </div>
+        , document.body)}
       </div>
     </div>
   );

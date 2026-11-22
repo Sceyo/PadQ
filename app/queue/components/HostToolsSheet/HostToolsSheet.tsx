@@ -12,6 +12,7 @@ import {
   Activity,
   ChevronDown,
   ChevronUp,
+  Layers,
 } from 'lucide-react';
 import { BottomSheet } from '../OverlayHost/BottomSheet';
 import {
@@ -26,6 +27,8 @@ interface Props {
   onAddPlayer: (name: string) => boolean | void;
   scorePromptEnabled: boolean;
   onToggleScorePrompt: () => void;
+  queueMode?: 'default' | 'skilled';
+  onQueueModeChange?: (mode: 'default' | 'skilled') => void;
   lateArrivals?: string[];
   onCheckInLateArrival?: (name: string) => boolean | Promise<boolean>;
   onCheckInAllLateArrivals?: () => boolean | number | void | Promise<boolean | number | void>;
@@ -43,6 +46,8 @@ export function HostToolsSheet({
   onAddPlayer,
   scorePromptEnabled,
   onToggleScorePrompt,
+  queueMode = 'default',
+  onQueueModeChange,
   lateArrivals = [],
   onCheckInLateArrival,
   onCheckInAllLateArrivals,
@@ -254,6 +259,90 @@ export function HostToolsSheet({
             </span>
           </button>
         </div>
+
+        {onQueueModeChange && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: '12px',
+              paddingBottom: '16px',
+              marginBottom: '16px',
+              borderBottom: '1px solid var(--border, rgba(148, 163, 184, 0.16))',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0 }}>
+              <Layers size={18} style={{ color: 'var(--accent, #6366f1)', flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--txt-1, #f8fafc)' }}>
+                  Queue Mode
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--txt-2, #94a3b8)' }}>
+                  {queueMode === 'skilled' ? 'Matchmaking (skill brackets)' : 'Default rotation'}
+                </div>
+              </div>
+            </div>
+            <div
+              role="group"
+              aria-label="Queue Mode"
+              style={{
+                display: 'inline-flex',
+                padding: '3px',
+                borderRadius: '10px',
+                background: 'var(--btn, rgba(148, 163, 184, 0.14))',
+                border: '1px solid var(--border, rgba(148, 163, 184, 0.2))',
+                gap: '4px',
+                flexShrink: 0,
+              }}
+            >
+              <button
+                type="button"
+                aria-pressed={queueMode !== 'skilled'}
+                onClick={() => {
+                  if (queueMode === 'skilled') {
+                    onQueueModeChange('default');
+                  }
+                  onClose();
+                }}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: '7px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  background: queueMode !== 'skilled' ? 'var(--accent, #6366f1)' : 'transparent',
+                  color: queueMode !== 'skilled' ? '#fff' : 'var(--txt-2, #94a3b8)',
+                }}
+              >
+                Default
+              </button>
+              <button
+                type="button"
+                aria-pressed={queueMode === 'skilled'}
+                onClick={() => {
+                  if (queueMode !== 'skilled') {
+                    onQueueModeChange('skilled');
+                  }
+                  onClose();
+                }}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: '7px',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontSize: '0.76rem',
+                  fontWeight: 700,
+                  background: queueMode === 'skilled' ? 'var(--accent, #6366f1)' : 'transparent',
+                  color: queueMode === 'skilled' ? '#fff' : 'var(--txt-2, #94a3b8)',
+                }}
+              >
+                Matchmaking
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* 3. Expected Late Arrivals Collapsible Tab */}
         {lateArrivals && lateArrivals.length > 0 && (

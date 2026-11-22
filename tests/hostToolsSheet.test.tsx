@@ -175,3 +175,67 @@ describe('HostToolsSheet — Match Scores slider toggle', () => {
     expect(screen.getByText('Jebidiah')).toBeDefined();
   });
 });
+
+describe('HostToolsSheet — Queue Mode switcher', () => {
+  it('switches back to Default mode from Matchmaking and closes the sheet', () => {
+    const onQueueModeChange = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <HostToolsSheet
+        isOpen={true}
+        onClose={onClose}
+        onAddPlayer={vi.fn()}
+        scorePromptEnabled={true}
+        onToggleScorePrompt={vi.fn()}
+        queueMode="skilled"
+        onQueueModeChange={onQueueModeChange}
+      />
+    );
+
+    expect(screen.getByText('Queue Mode')).toBeDefined();
+    expect(screen.getByText('Matchmaking (skill brackets)')).toBeDefined();
+
+    const defaultBtn = screen.getByRole('button', { name: 'Default' });
+    const matchmakingBtn = screen.getByRole('button', { name: 'Matchmaking' });
+    expect(defaultBtn.getAttribute('aria-pressed')).toBe('false');
+    expect(matchmakingBtn.getAttribute('aria-pressed')).toBe('true');
+
+    fireEvent.click(defaultBtn);
+    expect(onQueueModeChange).toHaveBeenCalledWith('default');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('switches into Matchmaking mode from Default and omits control when callback is absent', () => {
+    const onQueueModeChange = vi.fn();
+    const onClose = vi.fn();
+
+    const { rerender } = render(
+      <HostToolsSheet
+        isOpen={true}
+        onClose={onClose}
+        onAddPlayer={vi.fn()}
+        scorePromptEnabled={true}
+        onToggleScorePrompt={vi.fn()}
+        queueMode="default"
+        onQueueModeChange={onQueueModeChange}
+      />
+    );
+
+    expect(screen.getByText('Default rotation')).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'Matchmaking' }));
+    expect(onQueueModeChange).toHaveBeenCalledWith('skilled');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <HostToolsSheet
+        isOpen={true}
+        onClose={onClose}
+        onAddPlayer={vi.fn()}
+        scorePromptEnabled={true}
+        onToggleScorePrompt={vi.fn()}
+      />
+    );
+    expect(screen.queryByText('Queue Mode')).toBeNull();
+  });
+});

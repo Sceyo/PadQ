@@ -9,7 +9,7 @@ import {
   Sun, Moon, ArrowLeft,
   Star, Sparkles, RefreshCw, Layers,
   BarChart2, Wifi, WifiOff,
-  UserX, ArrowUp, SlidersHorizontal, Loader2,
+  UserX, ArrowUp, SlidersHorizontal, Loader2, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import useQueue, {
   suggestNextDoublesMatch,
@@ -167,6 +167,20 @@ function cloneSkilledState(s: SkilledState): SkilledState {
   };
 }
 
+function finalizeSkilledState(
+  state: SkilledState,
+  activeCount: number,
+  history: MatchHistoryEntry[],
+): { state: SkilledState; courtSlots: CourtSlot[]; queue: string[] } {
+  const afterRest = recalculateRestEngine(state, activeCount);
+  const afterFill = fillIdleCourtsEngine(afterRest, extractRecentPartnerPairs(history));
+  return {
+    state:      afterFill,
+    courtSlots: projectSkilledCourtsToSlots(afterFill.courts),
+    queue:      [...afterFill.waitingQueue],
+  };
+}
+
 // Deep-copy helpers so undo doesn't share references with live state
 function clonePaddleState(s: PaddleState): PaddleState {
   return {
@@ -311,11 +325,10 @@ function QueueSystemContent() {
     }
 
     const np = [...players, ...checkedInNames];
-    const nq = [...queue, ...checkedInNames];
+    let nq = [...queue, ...checkedInNames];
     const nextPriority = [...activePriorityPlayers, ...checkedInNames];
+    let projectedSlots: CourtSlot[] | null = null;
     setPlayers(np);
-    setQueue(nq);
-    queueRef.current = nq;
     setLocalPriorityPlayers(nextPriority);
 
     if (activeQueueMode === 'default' && gameMode === 'doubles') {
@@ -343,18 +356,28 @@ function QueueSystemContent() {
       }
     } else if (activeQueueMode === 'skilled' && skilledState) {
       const activeCount = np.filter(p => !activeSittingOut.includes(p)).length;
-      setSkilledState(prev => {
-        if (!prev) return prev;
-        let s = prev;
-        for (const name of checkedInNames) {
-          s = addPlayerToSkilledStateEngine(name, s, skilledBrackets);
-        }
-        return recalculateRestEngine(s, activeCount);
-      });
+      let s = skilledState;
+      for (const name of checkedInNames) {
+        s = addPlayerToSkilledStateEngine(name, s, skilledBrackets);
+      }
+      const finalized = finalizeSkilledState(s, activeCount, activeHistory);
+      setSkilledState(finalized.state);
+      projectedSlots = finalized.courtSlots;
+      setLocalCourtSlots(projectedSlots);
+      courtSlotsRef.current = projectedSlots;
+      nq = finalized.queue;
     }
 
+    setQueue(nq);
+    queueRef.current = nq;
+
     if (session.sessionId) {
-      session.syncField({ players: np, queue: nq, priorityPlayers: nextPriority });
+      session.syncField({
+        players: np,
+        queue: nq,
+        priorityPlayers: nextPriority,
+        ...(projectedSlots ? { courtSlots: projectedSlots } : {}),
+      });
       saveSessionLateArrivals(session.sessionId, remainingLateArrivals);
     }
     setLateArrivals(remainingLateArrivals);
@@ -900,7 +923,10 @@ function QueueSystemContent() {
   const addTempPlayer = () => {
     const t = currentName.trim();
     if (!t) return;
-    if (tempPlayers.length >= V1_RELEASE.maxPlayers) { setSetupErrorMsg(`V1 supports up to ${V1_RELEASE.maxPlayers} players`); return; }
+    if (tempPlayers.length + expectedPlayers.length >= V1_RELEASE.maxPlayers) {
+      setSetupErrorMsg(`V1 supports up to ${V1_RELEASE.maxPlayers} players`);
+      return;
+    }
     if (t.length > 60) { setSetupErrorMsg('Player names must be 60 characters or fewer'); return; }
     if (
       tempPlayers.some(name => name.toLowerCase() === t.toLowerCase()) ||
@@ -910,7 +936,15 @@ function QueueSystemContent() {
       return;
     }
     setSetupErrorMsg(null);
-    setTempPlayers(prev => [...prev, t]); setCurrentName('');
+    const res = addPlayersToCheckIn(
+      { expected: expectedPlayers, checkedIn: tempPlayers },
+      [t],
+      'expected',
+      V1_RELEASE.maxPlayers,
+    );
+    setExpectedPlayers(res.expected);
+    setTempPlayers(res.checkedIn);
+    setCurrentName('');
   };
   const removeTempPlayer = (i: number) => {
     const removedName = tempPlayers[i];
@@ -924,8 +958,8 @@ function QueueSystemContent() {
     }
   };
 
-  const addFromPaste = (target: 'checkedIn' | 'expected' | unknown = 'checkedIn') => {
-    const resolvedTarget: 'checkedIn' | 'expected' = target === 'expected' ? 'expected' : 'checkedIn';
+  const addFromPaste = (target: 'checkedIn' | 'expected' | unknown = 'expected') => {
+    const resolvedTarget: 'checkedIn' | 'expected' = target === 'checkedIn' ? 'checkedIn' : 'expected';
     const res = resolvePastedPlayers(
       pasteInput,
       { expected: expectedPlayers, checkedIn: tempPlayers },
@@ -947,7 +981,14 @@ function QueueSystemContent() {
     setPasteInput('');
   };
 
-  const handleStartQueue = async () => {
+  const handleStartQueue = async (selectedMode?: QueueMode) => {
+    const modeToStart: QueueMode =
+      selectedMode === 'default' ||
+      selectedMode === 'skilled' ||
+      selectedMode === 'playall' ||
+      selectedMode === 'tournament'
+        ? selectedMode
+        : localQueueMode;
     const minPlayers = gameMode === 'doubles' && courtCount > 1
       ? courtCount * 4
       : gameMode === 'singles' && courtCount > 1
@@ -962,15 +1003,18 @@ function QueueSystemContent() {
       ([a, b]) => orderedPlayers.includes(a) && orderedPlayers.includes(b),
     );
 
+    const emptyBrackets: SkilledBrackets = { beginner: [], intermediate: [], advanced: [] };
+    const startBrackets = modeToStart === 'skilled' ? emptyBrackets : skilledBrackets;
+
     let initialCourtSlots: CourtSlot[] | undefined;
     let initialQueue: string[];
     let initialSkilledState: SkilledState | null = null;
-    if (localQueueMode === 'skilled') {
+    if (modeToStart === 'skilled') {
       const defs: CourtDef[] = Array.from({ length: courtCount }, (_, i) => ({
         id: `court-${i}`,
         name: `Court ${i + 1}`,
       }));
-      initialSkilledState = initSkilledState(orderedPlayers, skilledBrackets, defs, []);
+      initialSkilledState = initSkilledState(orderedPlayers, startBrackets, defs, []);
       initialCourtSlots = projectSkilledCourtsToSlots(initialSkilledState.courts);
       initialQueue = [...initialSkilledState.waitingQueue];
     } else if (gameMode === 'doubles' && courtCount > 1) {
@@ -995,7 +1039,7 @@ function QueueSystemContent() {
       initialQueue = orderedPlayers;
     }
     let initialBracket: TournamentMatch[] = [];
-    if (localQueueMode === 'tournament') {
+    if (modeToStart === 'tournament') {
       const shuffled = shuffleArray(orderedPlayers);
       const bracketEntrants = gameMode === 'doubles'
         ? shuffled.reduce<string[]>((acc, _, i) => {
@@ -1009,7 +1053,7 @@ function QueueSystemContent() {
     const pin = V1_RELEASE.showAccessPinSetup ? (setupPin.trim().toUpperCase().slice(0, 4) || null) : null;
     const courtName = courtCount > 1 ? `${courtCount} Courts` : (setupCourtName.trim() || 'Court 1');
     const startResult = await session.startSession({
-      gameMode: gameMode ?? 'singles', queueMode: localQueueMode === 'skilled' ? 'skilled' : 'default', elimType: localElimType,
+      gameMode: gameMode ?? 'singles', queueMode: modeToStart === 'skilled' ? 'skilled' : 'default', elimType: localElimType,
       players: tempPlayers, queue: initialQueue, playAllRel: {},
       tournamentMatches: initialBracket, tournamentActive: false,
       tournamentWinner: null, isLive: true,
@@ -1030,17 +1074,22 @@ function QueueSystemContent() {
     }
 
     // Enter the host UI only after Firebase has created and authenticated the room.
+    setLocalQueueMode(modeToStart);
     resetPaddleState();
     resetSinglesState(orderedPlayers);
     resetPoolSinglesState();
-    if (initialSkilledState) setSkilledState(initialSkilledState);
+    if (initialSkilledState) {
+      setSkilledBrackets(emptyBrackets);
+      setSkilledState(initialSkilledState);
+      setShowSkillBrackets(false);
+    }
     setPlayers(orderedPlayers);
     const handedOffLate = persistSessionLateArrivals(startResult.sessionId, expectedPlayers);
     setLateArrivals(handedOffLate);
     setExpectedPlayers([]);
     setTempPlayers([]);
     setLocalHistory([]);
-    setLocalTournamentActive(localQueueMode === 'tournament');
+    setLocalTournamentActive(modeToStart === 'tournament');
     setLocalTournamentWinner(null);
     setLocalTournamentM(initialBracket);
     setLockedPartners(activeLockedPairs);
@@ -1094,6 +1143,28 @@ function QueueSystemContent() {
       resetPaddleState();
       resetSinglesState(players);
       setSkilledState(null);
+      setShowSkillBrackets(false);
+      if (courtSlots.length === 1) {
+        const onCourtPlayers = courtSlots[0].onCourt;
+        const restoredQueue = [...onCourtPlayers, ...queue.filter(p => !onCourtPlayers.includes(p))];
+        setLocalCourtSlots([]);
+        courtSlotsRef.current = [];
+        setQueue(restoredQueue);
+        queueRef.current = restoredQueue;
+        if (session.sessionId) {
+          session.syncField({
+            queueMode: 'default',
+            courtSlots: [],
+            queue: restoredQueue,
+            doublesEngineState: null,
+          });
+        }
+      } else if (session.sessionId) {
+        session.syncField({
+          queueMode: 'default',
+          doublesEngineState: null,
+        });
+      }
     }
     if (newMode === 'skilled') {
       // Build court definitions from existing court config (or default single court)
@@ -1169,32 +1240,43 @@ function QueueSystemContent() {
       setPaddleStateUI(result.paddleState);
     }
 
-    if (session.sessionId) session.syncField({ sittingOut: newSittingOut, queue: newQueue, priorityPlayers: newPriorityPlayers });
-
-    // Recalculate rest thresholds when active player count changes in skilled mode
+    // Recalculate rest thresholds & fill idle courts synchronously when active player count changes in skilled mode
     if (activeQueueMode === 'skilled' && skilledState) {
       const activeCount = players.filter(p => !newSittingOut.includes(p)).length;
-      setSkilledState(prev => {
-        if (!prev) return prev;
-        let s = prev;
-        if (isSittingOut) {
-          s = { ...s, sitOut: s.sitOut.filter(p => p !== name) };
-          s = addPlayerToSkilledStateEngine(name, s, skilledBrackets);
-        } else {
-          const sq = {
-            beginner: s.skillQueue.beginner.filter(p => p !== name),
-            intermediate: s.skillQueue.intermediate.filter(p => p !== name),
-            advanced: s.skillQueue.advanced.filter(p => p !== name),
-          };
-          s = {
-            ...s,
-            skillQueue: sq,
-            waitingQueue: [...sq.beginner, ...sq.intermediate, ...sq.advanced],
-            sitOut: [...s.sitOut, name],
-          };
-        }
-        return recalculateRestEngine(s, activeCount);
-      });
+      let s = skilledState;
+      if (isSittingOut) {
+        s = { ...s, sitOut: s.sitOut.filter(p => p !== name) };
+        s = addPlayerToSkilledStateEngine(name, s, skilledBrackets);
+      } else {
+        const sq = {
+          beginner:     s.skillQueue.beginner.filter(p => p !== name),
+          intermediate: s.skillQueue.intermediate.filter(p => p !== name),
+          advanced:     s.skillQueue.advanced.filter(p => p !== name),
+        };
+        s = {
+          ...s,
+          skillQueue:   sq,
+          waitingQueue: [...sq.beginner, ...sq.intermediate, ...sq.advanced],
+          restPool:     s.restPool.filter(e => e.name !== name),
+          sitOut:       [...s.sitOut, name],
+        };
+      }
+      const finalized = finalizeSkilledState(s, activeCount, activeHistory);
+      setSkilledState(finalized.state);
+      setQueue(finalized.queue);
+      queueRef.current = finalized.queue;
+      setLocalCourtSlots(finalized.courtSlots);
+      courtSlotsRef.current = finalized.courtSlots;
+      if (session.sessionId) {
+        session.syncField({
+          sittingOut:      newSittingOut,
+          queue:           finalized.queue,
+          courtSlots:      finalized.courtSlots,
+          priorityPlayers: newPriorityPlayers,
+        });
+      }
+    } else if (session.sessionId) {
+      session.syncField({ sittingOut: newSittingOut, queue: newQueue, priorityPlayers: newPriorityPlayers });
     }
   };
 
@@ -1303,20 +1385,53 @@ function QueueSystemContent() {
       poolSinglesState: clonePoolSinglesState(poolSinglesStateRef.current),
       singlesFormat,
       courtSlots: courtSlots.map(c => ({ ...c, onCourt: [...c.onCourt] })),
+      ...(skilledState ? { skilledState: cloneSkilledState(skilledState) } : {}),
       priorityPlayers: [...activePriorityPlayers],
       sittingOut: [...activeSittingOut],
     };
     setHasUndo(true);
 
-    setQueue(result.queue);
-    queueRef.current = result.queue;
+    let finalQueue = result.queue;
+    let finalCourtSlots = result.courtSlots;
+
+    if (activeQueueMode === 'skilled' && skilledState) {
+      const prevOnCourtSet = new Set(courtSlots.flatMap(c => c.onCourt));
+      const newOnCourtList = (result.courtSlots ?? []).flatMap(c => c.onCourt);
+      const chosenReplacement = newOnCourtList.find(p => !prevOnCourtSet.has(p));
+      const removedNames = new Set([absent, ...(chosenReplacement ? [chosenReplacement] : [])]);
+      const updatedCourts = skilledState.courts.map(c => {
+        const matchedSlot = result.courtSlots?.find(s => s.id === c.id);
+        return matchedSlot ? { ...c, players: [...matchedSlot.onCourt] } : c;
+      });
+      const updatedSq = {
+        beginner:     skilledState.skillQueue.beginner.filter(p => !removedNames.has(p)),
+        intermediate: skilledState.skillQueue.intermediate.filter(p => !removedNames.has(p)),
+        advanced:     skilledState.skillQueue.advanced.filter(p => !removedNames.has(p)),
+      };
+      const updatedSkilled: SkilledState = {
+        ...skilledState,
+        courts: updatedCourts,
+        skillQueue: updatedSq,
+        waitingQueue: [...updatedSq.beginner, ...updatedSq.intermediate, ...updatedSq.advanced],
+        restPool: skilledState.restPool.filter(e => !removedNames.has(e.name)),
+        sitOut: result.sittingOut,
+      };
+      const activeCount = players.filter(p => !result.sittingOut.includes(p)).length;
+      const finalized = finalizeSkilledState(updatedSkilled, activeCount, activeHistory);
+      setSkilledState(finalized.state);
+      finalQueue = finalized.queue;
+      finalCourtSlots = finalized.courtSlots;
+    }
+
+    setQueue(finalQueue);
+    queueRef.current = finalQueue;
     setLocalSittingOut(result.sittingOut);
     if (result.priorityPlayers !== undefined) {
       setLocalPriorityPlayers(result.priorityPlayers);
     }
-    if (result.courtSlots) {
-      setLocalCourtSlots(result.courtSlots);
-      courtSlotsRef.current = result.courtSlots;
+    if (finalCourtSlots) {
+      setLocalCourtSlots(finalCourtSlots);
+      courtSlotsRef.current = finalCourtSlots;
     }
 
     if (result.poolSinglesState) {
@@ -1334,10 +1449,10 @@ function QueueSystemContent() {
 
     if (session.sessionId) {
       session.syncField({
-        queue: result.queue,
+        queue: finalQueue,
         sittingOut: result.sittingOut,
         ...(result.priorityPlayers !== undefined ? { priorityPlayers: result.priorityPlayers } : {}),
-        ...(result.courtSlots ? { courtSlots: result.courtSlots } : {}),
+        ...(finalCourtSlots ? { courtSlots: finalCourtSlots } : {}),
       });
     }
     if (session.liveScore && (!localHasScoredPoints || (session.liveScore.scoreA === 0 && session.liveScore.scoreB === 0))) {
@@ -1906,6 +2021,14 @@ function QueueSystemContent() {
     );
     courtSlotsRef.current = updatedSlots;
     setLocalCourtSlots(updatedSlots);
+    if (activeQueueMode === 'skilled' && skilledState) {
+      setSkilledState({
+        ...skilledState,
+        courts: skilledState.courts.map(c =>
+          c.id === courtId ? { ...c, players: [...newOnCourt] } : c
+        ),
+      });
+    }
     breakOpposingPartnerPairs(newOnCourt);
     if (session.sessionId) session.syncField({ courtSlots: updatedSlots });
     setSwapCourtId(null);
@@ -1999,6 +2122,7 @@ function QueueSystemContent() {
     const np = [...players, trimmedName];
     let nq = [...queue, trimmedName];
     const nextPriority = [...activePriorityPlayers, trimmedName];
+    let projectedSlots: CourtSlot[] | null = null;
     if (activeQueueMode === 'default' && gameMode === 'doubles') {
       const newPaddleState = addPlayerToWaiting(paddleStateRef.current, trimmedName);
       paddleStateRef.current = newPaddleState;
@@ -2016,15 +2140,25 @@ function QueueSystemContent() {
     } else if (activeQueueMode === 'skilled' && skilledState) {
       const activeCount = np.filter(p => !activeSittingOut.includes(p)).length;
       const afterAdd = addPlayerToSkilledStateEngine(trimmedName, skilledState, skilledBrackets);
-      const afterRest = recalculateRestEngine(afterAdd, activeCount);
-      nq = [...afterRest.waitingQueue];
-      setSkilledState(afterRest);
+      const finalized = finalizeSkilledState(afterAdd, activeCount, activeHistory);
+      nq = finalized.queue;
+      projectedSlots = finalized.courtSlots;
+      setSkilledState(finalized.state);
+      setLocalCourtSlots(projectedSlots);
+      courtSlotsRef.current = projectedSlots;
     }
     setPlayers(np);
     setQueue(nq);
     queueRef.current = nq;
     setLocalPriorityPlayers(nextPriority);
-    if (session.sessionId) session.syncField({ players: np, queue: nq, priorityPlayers: nextPriority });
+    if (session.sessionId) {
+      session.syncField({
+        players: np,
+        queue: nq,
+        priorityPlayers: nextPriority,
+        ...(projectedSlots ? { courtSlots: projectedSlots } : {}),
+      });
+    }
     setLateArrivals(prev => {
       const next = applyLateArrivalCheckIn(prev, trimmedName, true);
       if (session.sessionId) saveSessionLateArrivals(session.sessionId, next);
@@ -2170,8 +2304,9 @@ function QueueSystemContent() {
   // ── Roster handlers ──────────────────────────────────────
 
   const handleSaveToRoster = () => {
-    if (tempPlayers.length === 0) return;
-    mergeIntoRoster(tempPlayers);
+    const allSetupPlayers = [...tempPlayers, ...expectedPlayers];
+    if (allSetupPlayers.length === 0) return;
+    mergeIntoRoster(allSetupPlayers);
     setRoster(loadRoster());
   };
 
@@ -2192,42 +2327,7 @@ function QueueSystemContent() {
     ));
   };
 
-  const applyRosterSkillTags = (addedNames: string[]) => {
-    const rosterSkillMap = new Map(roster.map(e => [e.name.toLowerCase(), e.skill]));
-    setSkilledBrackets(prev => {
-      let next = { ...prev };
-      for (const name of addedNames) {
-        const skill = rosterSkillMap.get(name.toLowerCase());
-        if (skill) {
-          next = {
-            beginner:     next.beginner.filter(n => n !== name),
-            intermediate: next.intermediate.filter(n => n !== name),
-            advanced:     next.advanced.filter(n => n !== name),
-            [skill]:      [...next[skill].filter(n => n !== name), name],
-          };
-        }
-      }
-      return next;
-    });
-  };
-
-  const handleAddFromRoster = () => {
-    const prevCheckedIn = new Set(tempPlayers.map(p => p.toLowerCase()));
-    const res = addPlayersToCheckIn(
-      { expected: expectedPlayers, checkedIn: tempPlayers },
-      Array.from(rosterSelected),
-      'checkedIn',
-      V1_RELEASE.maxPlayers,
-    );
-    setTempPlayers(res.checkedIn);
-    setExpectedPlayers(res.expected);
-    setRosterSelected(new Set());
-    const added = res.checkedIn.filter(n => !prevCheckedIn.has(n.toLowerCase()));
-    if (added.length > 0) applyRosterSkillTags(added);
-  };
-
-  const handleAddExpectedFromRoster = () => {
-    const prevExpected = new Set(expectedPlayers.map(p => p.toLowerCase()));
+  const addSelectedRosterToExpected = () => {
     const res = addPlayersToCheckIn(
       { expected: expectedPlayers, checkedIn: tempPlayers },
       Array.from(rosterSelected),
@@ -2235,10 +2335,13 @@ function QueueSystemContent() {
       V1_RELEASE.maxPlayers,
     );
     setExpectedPlayers(res.expected);
+    setTempPlayers(res.checkedIn);
     setRosterSelected(new Set());
-    const added = res.expected.filter(n => !prevExpected.has(n.toLowerCase()));
-    if (added.length > 0) applyRosterSkillTags(added);
   };
+
+  const handleAddFromRoster = addSelectedRosterToExpected;
+
+  const handleAddExpectedFromRoster = addSelectedRosterToExpected;
 
   const handleRemoveFromRosterUI = (name: string) => {
     removeFromRoster(name);
@@ -2251,52 +2354,62 @@ function QueueSystemContent() {
     setRoster(loadRoster());
   };
 
+  const reseedSkilledBeforeFirstMatch = (playerList: string[], nextBrackets: SkilledBrackets) => {
+    if (!skilledState) return;
+    const defs: CourtDef[] = skilledState.courts.map(c => ({ id: c.id, name: c.name }));
+    const seeded = initSkilledState(playerList, nextBrackets, defs, activeSittingOut);
+    const activeCount = playerList.filter(p => !activeSittingOut.includes(p)).length;
+    const finalized = finalizeSkilledState(seeded, activeCount, activeHistory);
+    setSkilledState(finalized.state);
+    setQueue(finalized.queue);
+    queueRef.current = finalized.queue;
+    setLocalCourtSlots(finalized.courtSlots);
+    courtSlotsRef.current = finalized.courtSlots;
+    if (session.sessionId) {
+      session.syncField({
+        players: playerList,
+        queue: finalized.queue,
+        courtSlots: finalized.courtSlots,
+      });
+    }
+  };
+
   // Assign a player to a bracket, moving them out of any other bracket they're in
   const handleAssignToBracket = (bracket: SkillBracket, name: string) => {
-    setSkilledBrackets(prev => {
-      const cleared = {
-        beginner:     prev.beginner.filter(n => n !== name),
-        intermediate: prev.intermediate.filter(n => n !== name),
-        advanced:     prev.advanced.filter(n => n !== name),
-      };
-      return { ...cleared, [bracket]: [...cleared[bracket], name] };
-    });
+    const updatedBrackets: SkilledBrackets = {
+      beginner:     skilledBrackets.beginner.filter(n => n !== name),
+      intermediate: skilledBrackets.intermediate.filter(n => n !== name),
+      advanced:     skilledBrackets.advanced.filter(n => n !== name),
+    };
+    updatedBrackets[bracket] = [...updatedBrackets[bracket], name];
+    setSkilledBrackets(updatedBrackets);
     if (skilledState) {
-      setSkilledState(prev => {
-        if (!prev) return prev;
-        const next = retagPlayerInQueue(name, bracket as SkillLevel, prev);
-        setQueue(next.waitingQueue);
-        queueRef.current = next.waitingQueue;
-        if (session.sessionId) session.syncField({ queue: next.waitingQueue });
-        return next;
-      });
+      if (activeHistory.length === 0) {
+        reseedSkilledBeforeFirstMatch(players, updatedBrackets);
+      } else {
+        setSkilledState(prev => {
+          if (!prev) return prev;
+          const next = retagPlayerInQueue(name, bracket as SkillLevel, prev);
+          setQueue(next.waitingQueue);
+          queueRef.current = next.waitingQueue;
+          if (session.sessionId) session.syncField({ queue: next.waitingQueue });
+          return next;
+        });
+      }
     }
   };
 
   // Remove skill tag only — player stays in session and queue (defaults to intermediate)
   const handleUnassignFromBracket = (bracket: SkillBracket, name: string) => {
-    setSkilledBrackets(prev => ({ ...prev, [bracket]: prev[bracket].filter(n => n !== name) }));
+    const updatedBrackets: SkilledBrackets = {
+      ...skilledBrackets,
+      [bracket]: skilledBrackets[bracket].filter(n => n !== name),
+    };
+    setSkilledBrackets(updatedBrackets);
     if (skilledState) {
-      setSkilledState(prev => {
-        if (!prev) return prev;
-        const next = retagPlayerInQueue(name, 'intermediate', prev);
-        setQueue(next.waitingQueue);
-        queueRef.current = next.waitingQueue;
-        if (session.sessionId) session.syncField({ queue: next.waitingQueue });
-        return next;
-      });
-    }
-  };
-
-  // Set skill for a player before or during session
-  const handleSetPlayerSkill = (name: string, skill: SkillBracket | undefined) => {
-    if (!skill) {
-      setSkilledBrackets(prev => ({
-        beginner:     prev.beginner.filter(n => n !== name),
-        intermediate: prev.intermediate.filter(n => n !== name),
-        advanced:     prev.advanced.filter(n => n !== name),
-      }));
-      if (skilledState) {
+      if (activeHistory.length === 0) {
+        reseedSkilledBeforeFirstMatch(players, updatedBrackets);
+      } else {
         setSkilledState(prev => {
           if (!prev) return prev;
           const next = retagPlayerInQueue(name, 'intermediate', prev);
@@ -2305,6 +2418,32 @@ function QueueSystemContent() {
           if (session.sessionId) session.syncField({ queue: next.waitingQueue });
           return next;
         });
+      }
+    }
+  };
+
+  // Set skill for a player before or during session
+  const handleSetPlayerSkill = (name: string, skill: SkillBracket | undefined) => {
+    if (!skill) {
+      const updatedBrackets: SkilledBrackets = {
+        beginner:     skilledBrackets.beginner.filter(n => n !== name),
+        intermediate: skilledBrackets.intermediate.filter(n => n !== name),
+        advanced:     skilledBrackets.advanced.filter(n => n !== name),
+      };
+      setSkilledBrackets(updatedBrackets);
+      if (skilledState) {
+        if (activeHistory.length === 0) {
+          reseedSkilledBeforeFirstMatch(players, updatedBrackets);
+        } else {
+          setSkilledState(prev => {
+            if (!prev) return prev;
+            const next = retagPlayerInQueue(name, 'intermediate', prev);
+            setQueue(next.waitingQueue);
+            queueRef.current = next.waitingQueue;
+            if (session.sessionId) session.syncField({ queue: next.waitingQueue });
+            return next;
+          });
+        }
       }
       return;
     }
@@ -2326,42 +2465,44 @@ function QueueSystemContent() {
     if (!names.length) return;
     const genuinelyNew = names.filter(n => n.trim() && !players.includes(n));
     let np = players;
-    let nq = queue;
+    const nq = genuinelyNew.length > 0 ? [...queue, ...genuinelyNew] : queue;
     if (genuinelyNew.length > 0) {
       np = [...players, ...genuinelyNew];
-      nq = [...queue, ...genuinelyNew];
-      setPlayers(np); setQueue(nq);
-      if (session.sessionId) session.syncField({ players: np, queue: nq });
+      setPlayers(np);
     }
-    setSkilledBrackets(prev => {
-      const cleared = {
-        beginner:     prev.beginner.filter(n => !names.includes(n)),
-        intermediate: prev.intermediate.filter(n => !names.includes(n)),
-        advanced:     prev.advanced.filter(n => !names.includes(n)),
-      };
-      const existing = cleared[bracket];
-      return { ...cleared, [bracket]: [...existing, ...names.filter(n => !existing.includes(n))] };
-    });
+    const updatedBrackets: SkilledBrackets = {
+      beginner:     skilledBrackets.beginner.filter(n => !names.includes(n)),
+      intermediate: skilledBrackets.intermediate.filter(n => !names.includes(n)),
+      advanced:     skilledBrackets.advanced.filter(n => !names.includes(n)),
+    };
+    const existing = updatedBrackets[bracket];
+    updatedBrackets[bracket] = [...existing, ...names.filter(n => !existing.includes(n))];
+    setSkilledBrackets(updatedBrackets);
+
     if (skilledState) {
-      setSkilledState(prev => {
-        if (!prev) return prev;
-        const updatedBrackets = {
-          beginner:     skilledBrackets.beginner.filter(n => !names.includes(n)),
-          intermediate: skilledBrackets.intermediate.filter(n => !names.includes(n)),
-          advanced:     skilledBrackets.advanced.filter(n => !names.includes(n)),
-        };
-        const existing = updatedBrackets[bracket];
-        updatedBrackets[bracket] = [...existing, ...names.filter(n => !existing.includes(n))];
-        let s = prev;
-        for (const name of names) {
-          s = addPlayerToSkilledStateEngine(name, s, updatedBrackets);
-          s = retagPlayerInQueue(name, bracket as SkillLevel, s);
-        }
-        setQueue(s.waitingQueue);
-        queueRef.current = s.waitingQueue;
-        if (session.sessionId) session.syncField({ players: np, queue: s.waitingQueue });
-        return s;
-      });
+      if (activeHistory.length === 0) {
+        reseedSkilledBeforeFirstMatch(np, updatedBrackets);
+        return;
+      }
+      const activeCount = np.filter(p => !activeSittingOut.includes(p)).length;
+      let s = skilledState;
+      for (const name of names) {
+        s = addPlayerToSkilledStateEngine(name, s, updatedBrackets);
+        s = retagPlayerInQueue(name, bracket as SkillLevel, s);
+      }
+      const finalized = finalizeSkilledState(s, activeCount, activeHistory);
+      setSkilledState(finalized.state);
+      setQueue(finalized.queue);
+      queueRef.current = finalized.queue;
+      setLocalCourtSlots(finalized.courtSlots);
+      courtSlotsRef.current = finalized.courtSlots;
+      if (session.sessionId) {
+        session.syncField({ players: np, queue: finalized.queue, courtSlots: finalized.courtSlots });
+      }
+    } else if (genuinelyNew.length > 0) {
+      setQueue(nq);
+      queueRef.current = nq;
+      if (session.sessionId) session.syncField({ players: np, queue: nq });
     }
   };
 
@@ -2726,7 +2867,7 @@ function QueueSystemContent() {
   // ── RENDER C — Default / Play-all / Skilled ──────────────
   const isSkilled = activeQueueMode === 'skilled';
 
-  const useMobileFirst = V1_RELEASE.mobileFirstShell && !isSkilled;
+  const useMobileFirst = V1_RELEASE.mobileFirstShell;
   const isMultiCourt = courtSlots.length > 0;
   const isSingles = (gameMode ?? 'doubles') === 'singles';
   const singleCourtModel = toSingleCourtViewModel({
@@ -2831,6 +2972,10 @@ function QueueSystemContent() {
   };
 
   const handleMultiCourtWin = async (courtId: string, side: 'A' | 'B', scoreStr?: string): Promise<boolean> => {
+    if (isSkilled) {
+      handleSkilledResult(courtId, side, scoreStr);
+      return true;
+    }
     if ((gameMode ?? 'doubles') === 'singles') {
       const slot = courtSlots.find(c => c.id === courtId);
       if (slot && slot.onCourt.length >= 2) {
@@ -2846,6 +2991,20 @@ function QueueSystemContent() {
     if (activeSittingOut.includes(name)) {
       const nextSittingOut = activeSittingOut.filter(p => p !== name);
       setLocalSittingOut(nextSittingOut);
+      if (activeQueueMode === 'skilled' && skilledState) {
+        const activeCount = players.filter(p => !nextSittingOut.includes(p)).length;
+        const s = addPlayerToSkilledStateEngine(name, { ...skilledState, sitOut: nextSittingOut }, skilledBrackets);
+        const finalized = finalizeSkilledState(s, activeCount, activeHistory);
+        setSkilledState(finalized.state);
+        setQueue(finalized.queue);
+        queueRef.current = finalized.queue;
+        setLocalCourtSlots(finalized.courtSlots);
+        courtSlotsRef.current = finalized.courtSlots;
+        if (session.sessionId) {
+          session.syncField({ sittingOut: nextSittingOut, queue: finalized.queue, courtSlots: finalized.courtSlots });
+        }
+        return;
+      }
       if (session.sessionId) session.syncField({ sittingOut: nextSittingOut });
       return;
     }
@@ -2855,6 +3014,32 @@ function QueueSystemContent() {
         { gameMode: gameMode ?? 'doubles', players, queue, courtSlots, sittingOut: activeSittingOut },
         qIdx,
       );
+      if (activeQueueMode === 'skilled' && skilledState) {
+        setLocalSittingOut(res.sittingOut);
+        const sq = {
+          beginner:     skilledState.skillQueue.beginner.filter(p => p !== name),
+          intermediate: skilledState.skillQueue.intermediate.filter(p => p !== name),
+          advanced:     skilledState.skillQueue.advanced.filter(p => p !== name),
+        };
+        const updated: SkilledState = {
+          ...skilledState,
+          skillQueue: sq,
+          waitingQueue: [...sq.beginner, ...sq.intermediate, ...sq.advanced],
+          restPool: skilledState.restPool.filter(e => e.name !== name),
+          sitOut: res.sittingOut,
+        };
+        const activeCount = players.filter(p => !res.sittingOut.includes(p)).length;
+        const finalized = finalizeSkilledState(updated, activeCount, activeHistory);
+        setSkilledState(finalized.state);
+        setQueue(finalized.queue);
+        queueRef.current = finalized.queue;
+        setLocalCourtSlots(finalized.courtSlots);
+        courtSlotsRef.current = finalized.courtSlots;
+        if (session.sessionId) {
+          session.syncField({ sittingOut: res.sittingOut, queue: finalized.queue, courtSlots: finalized.courtSlots });
+        }
+        return;
+      }
       setQueue(res.queue);
       queueRef.current = res.queue;
       if (session.sessionId) session.syncField({ queue: res.queue });
@@ -2877,6 +3062,8 @@ function QueueSystemContent() {
           onAddPlayerLive={handleAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}
           onToggleScorePrompt={() => setScorePromptEnabled(p => !p)}
+          queueMode={isSkilled ? 'skilled' : 'default'}
+          onQueueModeChange={gameMode === 'doubles' && canControl ? (m) => handleModeChange(m) : undefined}
           gearMenuProps={gearMenuProps}
           onBackHome={handleBackHome}
           activeTab={activeTab === 'analytics' ? 'analytics' : 'queue'}
@@ -2952,6 +3139,7 @@ function QueueSystemContent() {
           {activeTab === 'analytics' ? (
             <AnalyticsDashboard
               stats={statsList}
+              skilledBrackets={isSkilled ? skilledBrackets : undefined}
               history={activeHistory}
               careerStats={careerStats}
               roomCode={session.sessionId}
@@ -3025,7 +3213,72 @@ function QueueSystemContent() {
           )}
 
           {/* History is now in the dedicated Stats -> History tab */}
-          <SmartSuggestions suggestions={!isSkilled ? suggestions : []} />
+          {activeTab !== 'analytics' && isSkilled && canControl ? (
+            <section
+              style={{
+                marginTop: '14px',
+                borderRadius: 'var(--r-md, 12px)',
+                border: '1px solid var(--border, #2d3348)',
+                background: 'var(--card-alt, rgba(24, 27, 44, 0.92))',
+                overflow: 'hidden',
+              }}
+            >
+              <button
+                type="button"
+                data-testid="skill-dropdown-toggle"
+                aria-expanded={showSkillBrackets}
+                onClick={() => setShowSkillBrackets(s => !s)}
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  border: 'none',
+                  background: 'transparent',
+                  color: 'var(--txt-1, #f0f4ff)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '10px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 700, letterSpacing: '0.02em' }}>Skill</span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 7px', borderRadius: '99px', background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>
+                    B {skilledBrackets.beginner.length}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 7px', borderRadius: '99px', background: 'rgba(245,158,11,0.12)', color: '#f59e0b' }}>
+                    I {skilledBrackets.intermediate.length}
+                  </span>
+                  <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 7px', borderRadius: '99px', background: 'rgba(239,68,68,0.12)', color: '#ef4444' }}>
+                    A {skilledBrackets.advanced.length}
+                  </span>
+                  {untaggedInSkilled.size > 0 && (
+                    <span style={{ fontSize: '0.72rem', fontWeight: 700, padding: '2px 7px', borderRadius: '99px', background: 'rgba(148,163,184,0.14)', color: 'var(--txt-2, #94a3b8)' }}>
+                      {untaggedInSkilled.size} unassigned
+                    </span>
+                  )}
+                </span>
+                {showSkillBrackets ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+              </button>
+              {showSkillBrackets && (
+                <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border, #2d3348)' }}>
+                  <SkilledView
+                    compact
+                    brackets={skilledBrackets}
+                    players={players}
+                    roster={roster.map(e => e.name)}
+                    isHost={canControl}
+                    onAssign={handleAssignToBracket}
+                    onUnassign={handleUnassignFromBracket}
+                    onAddNew={handleAddNewToSkilled}
+                  />
+                </div>
+              )}
+            </section>
+          ) : (
+            <SmartSuggestions suggestions={!isSkilled ? suggestions : []} />
+          )}
         </AppShell>
       ) : (
         <>
@@ -3135,14 +3388,12 @@ function QueueSystemContent() {
                       }}
                     />
                   )}
-                  {!isSkilled && (
-                    <SitOutPanel
-                      players={players}
-                      sittingOut={activeSittingOut}
-                      onToggle={handleToggleSitOut}
-                      onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
-                    />
-                  )}
+                  <SitOutPanel
+                    players={players}
+                    sittingOut={activeSittingOut}
+                    onToggle={handleToggleSitOut}
+                    onSelectPlayer={p => setSelectedPlayerAction({ player: p, zone: 'break' })}
+                  />
                   {!isSkilled && gameMode === 'doubles' && courtSlots.length > 0 && (
                     <PartnerPanel
                       players={players}

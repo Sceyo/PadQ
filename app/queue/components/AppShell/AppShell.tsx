@@ -41,6 +41,8 @@ interface Props {
   onCheckInLateArrival?: (name: string) => boolean | Promise<boolean>;
   onCheckInAllLateArrivals?: () => boolean | number | void | Promise<boolean | number | void>;
   onDismissLateArrival?: (name: string) => void;
+  queueMode?: 'default' | 'skilled';
+  onQueueModeChange?: (mode: 'default' | 'skilled') => void;
 }
 
 export function AppShell({
@@ -68,6 +70,8 @@ export function AppShell({
   onCheckInLateArrival,
   onCheckInAllLateArrivals,
   onDismissLateArrival,
+  queueMode,
+  onQueueModeChange,
 }: Props) {
   const [isHostToolsOpen, setIsHostToolsOpen] = useState(false);
 
@@ -210,6 +214,8 @@ export function AppShell({
           onAddPlayer={onAddPlayerLive}
           scorePromptEnabled={scorePromptEnabled}
           onToggleScorePrompt={onToggleScorePrompt}
+          queueMode={queueMode}
+          onQueueModeChange={onQueueModeChange}
           lateArrivals={lateArrivals}
           onCheckInLateArrival={onCheckInLateArrival}
           onCheckInAllLateArrivals={onCheckInAllLateArrivals}

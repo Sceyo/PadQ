@@ -18,6 +18,7 @@ interface SkilledViewProps {
   onAssign:   (bracket: SkillBracket, name: string) => void;
   onUnassign: (bracket: SkillBracket, name: string) => void;
   onAddNew:   (bracket: SkillBracket, names: string[]) => void;
+  compact?:   boolean;
 }
 
 const BRACKET_ORDER: SkillBracket[] = ['beginner', 'intermediate', 'advanced'];
@@ -28,8 +29,8 @@ const BRACKET_META: Record<SkillBracket, { label: string; short: string; accent:
   advanced:     { label: 'Advanced',     short: 'A', accent: '#ef4444', dimBg: 'rgba(239,68,68,.08)' },
 };
 
-export function SkilledView({ brackets, players, isHost, onAssign, onUnassign, onAddNew }: SkilledViewProps) {
-  const [open,       setOpen]       = useState<Record<SkillBracket, boolean>>({ beginner: false, intermediate: false, advanced: false });
+export function SkilledView({ brackets, players, isHost, onAssign, onUnassign, onAddNew, compact = false }: SkilledViewProps) {
+  const [open,       setOpen]       = useState<Record<SkillBracket, boolean>>({ beginner: true, intermediate: true, advanced: true });
   const [addingTo,   setAddingTo]   = useState<SkillBracket | null>(null);
   const [rosterPick, setRosterPick] = useState<Set<string>>(new Set());
 
@@ -77,11 +78,13 @@ export function SkilledView({ brackets, players, isHost, onAssign, onUnassign, o
   };
 
   return (
-    <div className="skilled-view">
-      <p className="skilled-desc">
-        Assign session players to skill brackets. The engine pairs similar-skill players
-        and fills gaps with the nearest bracket when one is short.
-      </p>
+    <div className="skilled-view" style={compact ? { padding: '6px 0 8px' } : undefined}>
+      {!compact && (
+        <p className="skilled-desc">
+          Assign session players to skill brackets. The engine pairs similar-skill players
+          and fills gaps with the nearest bracket when one is short.
+        </p>
+      )}
 
       {/* ── Unassigned Players Card ── */}
       {unassignedPlayers.length > 0 && (

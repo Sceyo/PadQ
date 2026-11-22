@@ -146,6 +146,71 @@ describe('skilledMatchmakingEngine — assignCourts (multi-court)', () => {
     const allAssigned = filled.flatMap(c => c.players);
     expect(new Set(allAssigned).size).toBe(allAssigned.length);
   });
+
+  it('spreads 3 courts across Beginner, Intermediate, and Advanced when all 3 brackets have >= 4 players', () => {
+    const b = ['B1', 'B2', 'B3', 'B4', 'B5'];
+    const i = ['I1', 'I2', 'I3', 'I4', 'I5'];
+    const a = ['A1', 'A2', 'A3', 'A4', 'A5'];
+    const sq = buildSkillQueue([...b, ...i, ...a], brackets(b, i, a));
+    const { courts: filled } = assignCourts(sq, courts(3));
+    expect(filled.map(c => c.matchLevel)).toEqual(['beginner', 'intermediate', 'advanced']);
+    expect(filled.every(c => c.skillMatch === 'pure')).toBe(true);
+  });
+});
+
+describe('skilledMatchmakingEngine — P0 starvation override & adjacent fill', () => {
+  it('when a starved bracket has >= 4 waiting players, schedules a pure 4-player match from that bracket', () => {
+    const b = Array.from({ length: 8 }, (_, idx) => `B${idx + 1}`);
+    const i = ['I1', 'I2', 'I3', 'I4'];
+    const a = ['A1', 'A2', 'A3', 'A4', 'A5'];
+    const state: SkilledState = {
+      skillQueue: { beginner: b, intermediate: i, advanced: a },
+      courts: [
+        { id: 'c1', name: 'Court 1', players: [], skillMatch: 'pure', matchLevel: 'beginner', idleCycles: 0, earlyReturns: [] },
+        { id: 'c2', name: 'Court 2', players: ['B9', 'B10', 'B11', 'B12'], skillMatch: 'pure', matchLevel: 'beginner', idleCycles: 0, earlyReturns: [] },
+      ],
+      waitingQueue: [...b, ...i, ...a],
+      sitOut: [],
+      restPool: [],
+      restEnabled: true,
+      restCycleLength: 1,
+      totalPlayers: 21,
+      gamesCycleCount: 3,
+      bracketWaitCycles: { beginner: 0, intermediate: 1, advanced: 3 },
+      starvationThreshold: 3,
+    };
+
+    const next = reassignCourt('c1', state, brackets([...b, 'B9', 'B10', 'B11', 'B12'], i, a));
+    expect(next.courts[0].skillMatch).toBe('pure');
+    expect(next.courts[0].matchLevel).toBe('advanced');
+    expect(new Set(next.courts[0].players)).toEqual(new Set(['A1', 'A2', 'A3', 'A4']));
+  });
+
+  it('when advanced is starved with 2 players (A1, A2) and both I and B have players, takes all A and fills from adjacent I first', () => {
+    const b = ['B1', 'B2', 'B3', 'B4'];
+    const i = ['I1', 'I2', 'I3'];
+    const a = ['A1', 'A2'];
+    const state: SkilledState = {
+      skillQueue: { beginner: b, intermediate: i, advanced: a },
+      courts: [
+        { id: 'c1', name: 'Court 1', players: [], skillMatch: 'pure', matchLevel: 'mixed', idleCycles: 0, earlyReturns: [] },
+      ],
+      waitingQueue: [...b, ...i, ...a],
+      sitOut: [],
+      restPool: [],
+      restEnabled: false,
+      restCycleLength: 1,
+      totalPlayers: 9,
+      gamesCycleCount: 3,
+      bracketWaitCycles: { beginner: 0, intermediate: 0, advanced: 3 },
+      starvationThreshold: 3,
+    };
+
+    const next = reassignCourt('c1', state, brackets(b, i, a));
+    expect(next.courts[0].skillMatch).toBe('mixed');
+    expect(new Set(next.courts[0].players)).toEqual(new Set(['A1', 'A2', 'I1', 'I2']));
+    expect(next.courts[0].players.some(p => p.startsWith('B'))).toBe(false);
+  });
 });
 
 describe('skilledMatchmakingEngine — initSkilledState', () => {
@@ -235,6 +300,23 @@ describe('skilledMatchmakingEngine — rotatePlayers (rest pool routing)', () =>
     const uniqueNames = new Set(names);
     expect(uniqueNames.size).toBe(names.length);
   });
+
+  it('never graduates or routes players marked in sitOut back into restPool or skillQueue', () => {
+    const base = buildRestEnabledState();
+    const sitting = base.courts[0].players[0];
+    const rested = base.waitingQueue[0];
+    const withSitOut: SkilledState = {
+      ...base,
+      skillQueue: { beginner: [], intermediate: [], advanced: [] },
+      waitingQueue: [],
+      sitOut: [sitting, rested],
+      restPool: [{ name: rested, skillLevel: 'beginner', cyclesRemaining: 1 }],
+    };
+    const next = rotatePlayers(base.courts[0].players, withSitOut, brackets([], [], []));
+    expect(next.restPool.map(e => e.name)).not.toContain(sitting);
+    expect(next.waitingQueue).not.toContain(sitting);
+    expect(next.waitingQueue).not.toContain(rested);
+  });
 });
 
 describe('skilledMatchmakingEngine — reassignCourt', () => {
@@ -306,6 +388,36 @@ describe('skilledMatchmakingEngine — retagPlayerInQueue', () => {
     };
     const next = retagPlayerInQueue('OnCourt', 'advanced', state);
     expect(next).toEqual(state); // unchanged
+  });
+
+  it('updates skillLevel in restPool without duplicating the player into skillQueue when retagging a resting player', () => {
+    const state: SkilledState = {
+      skillQueue: { beginner: [], intermediate: [], advanced: [] },
+      courts: [{ id: 'c1', name: 'Court 1', players: ['C1', 'C2', 'C3', 'C4'], skillMatch: 'pure', matchLevel: 'intermediate', idleCycles: 0, earlyReturns: [] }],
+      waitingQueue: [],
+      sitOut: [],
+      restPool: [{ name: 'RestingP', skillLevel: 'beginner', cyclesRemaining: 1 }],
+      restEnabled: true, restCycleLength: 1, totalPlayers: 5, gamesCycleCount: 1,
+      bracketWaitCycles: { beginner: 0, intermediate: 0, advanced: 0 }, starvationThreshold: 3,
+    };
+    const next = retagPlayerInQueue('RestingP', 'advanced', state);
+    expect(next.restPool).toEqual([{ name: 'RestingP', skillLevel: 'advanced', cyclesRemaining: 1 }]);
+    expect(next.waitingQueue).not.toContain('RestingP');
+    expect(next.skillQueue.advanced).not.toContain('RestingP');
+  });
+
+  it('does not inject a sitting-out or unknown player into skillQueue', () => {
+    const state: SkilledState = {
+      skillQueue: { beginner: ['B1'], intermediate: [], advanced: [] },
+      courts: [],
+      waitingQueue: ['B1'],
+      sitOut: ['PausedP'],
+      restPool: [],
+      restEnabled: false, restCycleLength: 1, totalPlayers: 1, gamesCycleCount: 0,
+      bracketWaitCycles: { beginner: 0, intermediate: 0, advanced: 0 }, starvationThreshold: 3,
+    };
+    expect(retagPlayerInQueue('PausedP', 'advanced', state)).toEqual(state);
+    expect(retagPlayerInQueue('GhostP', 'beginner', state)).toEqual(state);
   });
 });
 
@@ -444,6 +556,27 @@ describe('skilledMatchmakingEngine — fillIdleCourts', () => {
     // Only 1 waiting + restEnabled=false means totalAvailable=1 < 4 -> stays idle.
     expect(next.courts[0].players).toEqual([]);
   });
+
+  it('uses pickBestGroup priority (selects P1 pure match and tags skillMatch/matchLevel) when waiting >= 4', () => {
+    const state: SkilledState = {
+      skillQueue: {
+        beginner: ['B1', 'B2'],
+        intermediate: ['I1', 'I2', 'I3', 'I4'],
+        advanced: [],
+      },
+      courts: [{ id: 'c1', name: 'Court 1', players: [], skillMatch: 'pure', matchLevel: 'mixed', idleCycles: 0, earlyReturns: [] }],
+      waitingQueue: ['B1', 'B2', 'I1', 'I2', 'I3', 'I4'],
+      sitOut: [],
+      restPool: [],
+      restEnabled: false, restCycleLength: 1, totalPlayers: 6, gamesCycleCount: 0,
+      bracketWaitCycles: { beginner: 0, intermediate: 0, advanced: 0 }, starvationThreshold: 3,
+    };
+    const next = fillIdleCourts(state);
+    expect(next.courts[0].skillMatch).toBe('pure');
+    expect(next.courts[0].matchLevel).toBe('intermediate');
+    expect(new Set(next.courts[0].players)).toEqual(new Set(['I1', 'I2', 'I3', 'I4']));
+    expect(next.waitingQueue).toEqual(['B1', 'B2']);
+  });
 });
 
 describe('skilledMatchmakingEngine — multi-court non-overlap invariant (integration-style nitpick)', () => {
@@ -511,6 +644,24 @@ describe('skilledMatchmakingEngine — Option B Unified Dual-Projection & Hydrat
     expect(hydrated.skillQueue.intermediate).toContain('Untagged1');
     expect(hydrated.skillQueue.intermediate).toContain('Untagged2');
     expect(hydrated.waitingQueue).toEqual(['Untagged1', 'Untagged2']);
+  });
+
+  it('hydrateSkilledStateFromCourtSlots preserves pure matchLevel tags when all 4 players share a bracket, and marks mixed when mixed', () => {
+    const allPlayers = ['B1', 'B2', 'B3', 'B4', 'A1', 'A2', 'A3', 'A4', 'I1', 'I2', 'B5', 'A5'];
+    const activeSlots = [
+      { id: 'court-0', name: 'Court 1', onCourt: ['B1', 'B2', 'B3', 'B4'] },
+      { id: 'court-1', name: 'Court 2', onCourt: ['A1', 'A2', 'A3', 'A4'] },
+      { id: 'court-2', name: 'Court 3', onCourt: ['I1', 'I2', 'B5', 'A5'] },
+    ];
+    const b = brackets(['B1', 'B2', 'B3', 'B4', 'B5'], ['I1', 'I2'], ['A1', 'A2', 'A3', 'A4', 'A5']);
+    const hydrated = hydrateSkilledStateFromCourtSlots(allPlayers, b, activeSlots, []);
+
+    expect(hydrated.courts[0].skillMatch).toBe('pure');
+    expect(hydrated.courts[0].matchLevel).toBe('beginner');
+    expect(hydrated.courts[1].skillMatch).toBe('pure');
+    expect(hydrated.courts[1].matchLevel).toBe('advanced');
+    expect(hydrated.courts[2].skillMatch).toBe('mixed');
+    expect(hydrated.courts[2].matchLevel).toBe('mixed');
   });
 
   it('end-to-end Option B dual-projection lifecycle maintains non-overlapping players across court rotation', () => {

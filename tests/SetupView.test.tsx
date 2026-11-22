@@ -107,4 +107,122 @@ describe('SetupView — Check-in & Expected Arrivals', () => {
     const startBtn = getByRole('button', { name: /Start Queue/i });
     expect((startBtn as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('does not render inline skill badges or pickers on checked-in players or roster items', () => {
+    const { queryByText, getByText, container } = render(
+      <SetupView
+        {...defaultProps}
+        showSkillTagging={true}
+        showRoster={true}
+        roster={[
+          { name: 'Ben Johns', skill: 'advanced' },
+          { name: 'Anna Leigh Waters', skill: 'intermediate' },
+        ]}
+        tempPlayers={['Federico Staksrud', 'Catherine Parenteau']}
+      />
+    );
+
+    expect(getByText('Federico Staksrud')).toBeTruthy();
+    expect(getByText('Ben Johns')).toBeTruthy();
+    expect(queryByText('?')).toBeNull();
+    expect(queryByText('Beginner')).toBeNull();
+    expect(container.querySelector('.skill-badge')).toBeNull();
+    expect(container.querySelector('.skill-picker')).toBeNull();
+  });
+
+  it('uses Expected Arrivals actions for paste and consolidated roster import', () => {
+    const onAddFromPaste = vi.fn();
+    const onAddFromRoster = vi.fn();
+    const onAddExpectedFromRoster = vi.fn();
+
+    const { getByTitle, getByRole, queryByTitle } = render(
+      <SetupView
+        {...defaultProps}
+        showRoster={true}
+        roster={[{ name: 'Riley Newman' }]}
+        rosterSelected={new Set(['Riley Newman'])}
+        pasteInput="Ben Johns, Anna Leigh Waters"
+        onAddFromPaste={onAddFromPaste}
+        onAddFromRoster={onAddFromRoster}
+        onAddExpectedFromRoster={onAddExpectedFromRoster}
+      />
+    );
+
+    expect(queryByTitle('Add as Expected')).toBeNull();
+    fireEvent.click(getByTitle('Add all to Expected Arrivals'));
+    expect(onAddFromPaste).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(getByRole('button', { name: /Add Selected \(1\)/i }));
+    expect(onAddExpectedFromRoster).toHaveBeenCalledTimes(1);
+    expect(onAddFromRoster).not.toHaveBeenCalled();
+  });
+
+  it('opens MODE modal on Start Queue in doubles mode and starts selected mode', () => {
+    const onStartQueue = vi.fn();
+
+    const { getByRole, queryByRole } = render(
+      <SetupView
+        {...defaultProps}
+        gameMode="doubles"
+        tempPlayers={['P1', 'P2', 'P3', 'P4', 'P5']}
+        onStartQueue={onStartQueue}
+      />
+    );
+
+    expect(queryByRole('dialog')).toBeNull();
+    fireEvent.click(getByRole('button', { name: /Start Queue/i }));
+    expect(onStartQueue).not.toHaveBeenCalled();
+    expect(getByRole('dialog', { name: /MODE/i })).toBeTruthy();
+
+    fireEvent.click(getByRole('button', { name: /Default/i }));
+    expect(onStartQueue).toHaveBeenNthCalledWith(1, 'default');
+    expect(queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(getByRole('button', { name: /Start Queue/i }));
+    fireEvent.click(getByRole('button', { name: /Matchmaking/i }));
+    expect(onStartQueue).toHaveBeenNthCalledWith(2, 'skilled');
+    expect(queryByRole('dialog')).toBeNull();
+
+    fireEvent.click(getByRole('button', { name: /Start Queue/i }));
+    fireEvent.click(getByRole('button', { name: /Close mode selector/i }));
+    expect(queryByRole('dialog')).toBeNull();
+    expect(onStartQueue).toHaveBeenCalledTimes(2);
+  });
+
+  it('calls onStartQueue directly in singles mode without opening MODE modal', () => {
+    const onStartQueue = vi.fn();
+
+    const { getByRole, queryByRole } = render(
+      <SetupView
+        {...defaultProps}
+        gameMode="singles"
+        tempPlayers={['P1', 'P2', 'P3', 'P4', 'P5']}
+        onStartQueue={onStartQueue}
+      />
+    );
+
+    fireEvent.click(getByRole('button', { name: /Start Queue/i }));
+    expect(queryByRole('dialog')).toBeNull();
+    expect(onStartQueue).toHaveBeenCalledWith('default');
+  });
+
+  it('portals MODE modal to document.body outside .setup-page so it stays viewport-centered', () => {
+    const { container, getByRole } = render(
+      <SetupView
+        {...defaultProps}
+        gameMode="doubles"
+        tempPlayers={['P1', 'P2', 'P3', 'P4', 'P5']}
+      />
+    );
+
+    fireEvent.click(getByRole('button', { name: /Start Queue/i }));
+    const dialog = getByRole('dialog', { name: /MODE/i });
+    const setupPage = container.querySelector('.setup-page');
+
+    expect(setupPage).toBeTruthy();
+    expect(setupPage!.contains(dialog)).toBe(false);
+    expect(container.contains(dialog)).toBe(false);
+    expect(dialog.parentElement?.parentElement).toBe(document.body);
+    expect(dialog.parentElement?.style.position).toBe('fixed');
+  });
 });
